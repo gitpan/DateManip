@@ -711,6 +711,9 @@ Version 5.42  2003-07-02
    Number changed to distinguish between the development release (5.41)
       and official release since.
 
+Version 5.42a 2003-07-03
+   A quick fix to replace a faulty test.
+
 #########################################################################
 # Backwards incompatibilities
 #########################################################################

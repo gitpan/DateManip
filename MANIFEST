@@ -8,7 +8,6 @@ Manip.pod
 README
 TODO
 t/Manip.cnf
-t/conv_tz_illegal.t
 t/date.t
 t/date_date_0.t
 t/date_date_1.t
