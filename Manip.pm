@@ -5,6 +5,26 @@ package Date::Manip;
 # under the same terms as Perl itself.
 
 ###########################################################################
+###########################################################################
+
+# Determine the type of OS...
+$Date::Manip::OS="Unix";
+$Date::Manip::OS="Windows"  if ((defined $^O and
+                                 $^O =~ /MSWin32/i ||
+                                 $^O =~ /Windows_95/i ||
+                                 $^O =~ /Windows_NT/i) ||
+                                (defined $ENV{OS} and
+                                 $ENV{OS} =~ /MSWin32/i ||
+                                 $ENV{OS} =~ /Windows_95/i ||
+                                 $ENV{OS} =~ /Windows_NT/i));
+$Date::Manip::OS="Mac"      if ((defined $^O and
+                                 $^O =~ /MacOS/i) ||
+                                (defined $ENV{OS} and
+                                 $ENV{OS} =~ /MacOS/i));
+$Date::Manip::OS="VMS"      if (defined $^O and
+                                $^O =~ /VMS/i);
+
+###########################################################################
 # CUSTOMIZATION
 ###########################################################################
 #
@@ -12,15 +32,28 @@ package Date::Manip;
 # below for a complete description of each of these variables.
 
 # Location of a the global config file.  Tilde (~) expansions are allowed.
+# This should be set in Date_Init arguments.
 $Date::Manip::GlobalCnf="";
 $Date::Manip::IgnoreGlobalCnf="";
 
-### Date::Manip variables set in the global config file
-
 # Name of a personal config file and the path to search for it.  Tilde (~)
-# expansions are allowed.
-$Date::Manip::PersonalCnf=".DateManip.cnf";
-$Date::Manip::PersonalCnfPath=".:~";
+# expansions are allowed.  This should be set in Date_Init arguments or in
+# the global config file.
+if ($Date::Manip::OS eq "Windows") {
+  # Windows don't know "~" and don't like files starting with "."
+  $Date::Manip::PersonalCnf="Manip.cnf";
+  $Date::Manip::PersonalCnfPath=".";
+} elsif ($Date::Manip::OS eq "VMS") {
+  # VMS doesn't like files starting with "."
+  $Date::Manip::PersonalCnf="Manip.cnf";
+  $Date::Manip::PersonalCnfPath=".:~";
+} elsif ($Date::Manip::OS eq "Mac") {
+  $Date::Manip::PersonalCnf="Manip.cnf";
+  $Date::Manip::PersonalCnfPath=".";
+} else {
+  $Date::Manip::PersonalCnf=".DateManip.cnf";
+  $Date::Manip::PersonalCnfPath=".:~";
+}
 
 ### Date::Manip variables set in the global or personal config file
 
@@ -68,11 +101,12 @@ $Date::Manip::DeltaSigns=0;
 # make week 1 contain Jan 1.
 $Date::Manip::Jan1Week1=0;
 
-# 2 digit years fall into the 100 year period given by [ CURR-N, CURR+(99-N) ]
-# where N is 0-99.  Default behavior is 89, but other useful numbers might
-# be 0 (forced to be this year or later) and 99 (forced to be this year or
-# earlier).  It can also be set to "c" (current century) or "cNN" (i.e.
-# c18 forces the year to bet 1800-1899).
+# 2 digit years fall into the 100 year period given by [ CURR-N,
+# CURR+(99-N) ] where N is 0-99.  Default behavior is 89, but other useful
+# numbers might be 0 (forced to be this year or later) and 99 (forced to be
+# this year or earlier).  It can also be set to "c" (current century) or
+# "cNN" (i.e.  c18 forces the year to bet 1800-1899).  Also accepts the
+# form cNNNN to give the 100 year period NNNN to NNNN+99.
 $Date::Manip::YYtoYYYY=89;
 
 # Set this to 1 if you want a long-running script to always update the
@@ -128,10 +162,9 @@ use integer;
 use Carp;
 use Cwd;
 use IO::File;
+require VMS::Filespec  if ($Date::Manip::OS eq "VMS");
 
-#use POSIX qw(tzname);
-
-$Date::Manip::VERSION="5.31";
+$Date::Manip::VERSION="5.32";
 
 ########################################################################
 ########################################################################
@@ -142,7 +175,7 @@ $Date::Manip::VERSION="5.31";
 # I may need others in the future.  To avoid the "Identifier XXX used only
 # once: possibly typo" warnings, all are declared here.
 #
-# Pacakge Variables
+# Package Variables
 #
 
 $Date::Manip::Am = undef;
@@ -171,6 +204,7 @@ $Date::Manip::Init = 0;
 $Date::Manip::InitDone = 0;
 $Date::Manip::InitFilesRead = 0;
 $Date::Manip::LastExp = undef;
+$Date::Manip::Later = undef;
 $Date::Manip::MExp = undef;
 $Date::Manip::MnExp = undef;
 $Date::Manip::Mode = undef;
@@ -209,7 +243,6 @@ $Date::Manip::ZoneExp = undef;
 @Date::Manip::Week = ();
 @Date::Manip::Wk = ();
 
-%Date::Manip::AmPm = ();
 %Date::Manip::CurrHolidays = ();
 %Date::Manip::CurrZone = ();
 %Date::Manip::Day = ();
@@ -241,42 +274,15 @@ sub Date_Init {
   print "DEBUG: Date_Init\n"  if ($Date::Manip::Debug =~ /trace/);
   $Date::Manip::Debug="";
 
-  my($language,$format,$tz,$convtz,@args)=@_;
+  my(@args)=@_;
   $Date::Manip::InitDone=1;
   local($_)=();
   my($internal,$firstday)=();
-  my($var,$val,$file)=();
+  my($var,$val,$file,@tmp)=();
 
-  #### Backwards compatibility junk
-  if (defined $language  and  $language) {
-    if ($language=~ /=/) {
-      push(@args,$language);
-    } else {
-      push(@args,"Language=$language");
-    }
-  }
-  if (defined $format  and  $format) {
-    if ($format=~ /=/) {
-      push(@args,$format);
-    } else {
-      push(@args,"DateFormat=$format");
-    }
-  }
-  if (defined $tz  and  $tz) {
-    if ($tz=~ /=/) {
-      push(@args,$tz);
-    } else {
-      push(@args,"TZ=$tz");
-    }
-  }
-  if (defined $convtz  and  $convtz) {
-    if ($convtz=~ /=/) {
-      push(@args,$convtz);
-    } else {
-      push(@args,"ConvTZ=$convtz");
-    }
-  }
-  #### End backwards compatibility junk
+  # InitFilesRead = 0    : no conf files read yet
+  #                 1    : global read, no personal read
+  #                 2    : personal read
 
   $Date::Manip::EraseHolidays=0;
   foreach (@args) {
@@ -284,24 +290,37 @@ sub Date_Init {
     s/^\s*//;
     /^(\S+) \s* = \s* (.+)$/x;
     ($var,$val)=($1,$2);
-    $Date::Manip::InitFilesRead--,
-    $Date::Manip::PersonalCnf=$val,      next  if ($var eq "PersonalCnf");
-    $Date::Manip::PersonalCnfPath=$val,  next  if ($var eq "PersonalCnfPath");
+    if ($var =~ /^PersonalCnf$/i) {
+      $Date::Manip::PersonalCnf=$val;
+      $Date::Manip::InitFilesRead=1  if ($Date::Manip::InitFilesRead==2);
+    } elsif ($var =~ /^PersonalCnfPath$/i) {
+      $Date::Manip::PersonalCnfPath=$val;
+    } elsif ($var =~ /^IgnoreGlobalCnf$/i) {
+      $Date::Manip::InitFilesRead=1  if ($Date::Manip::InitFilesRead==0);
+      $Date::Manip::IgnoreGlobalCnf=1;
+    } elsif ($var =~ /^EraseHolidays$/i) {
+      &EraseHolidays();
+    } else {
+      push(@tmp,$_);
+    }
   }
+  @args=@tmp;
 
-  $Date::Manip::InitFilesRead=1  if ($Date::Manip::IgnoreGlobalCnf);
-  if ($Date::Manip::InitFilesRead<1) {
+  # Read global config file
+  if ($Date::Manip::InitFilesRead<1  &&  ! $Date::Manip::IgnoreGlobalCnf) {
     $Date::Manip::InitFilesRead=1;
-    # Read Global Init file
+
     if ($Date::Manip::GlobalCnf) {
       $file=&ExpandTilde($Date::Manip::GlobalCnf);
     }
     &Date_InitFile($file)  if (defined $file  and  $file  and  -r $file  and
                                -s $file  and  -f $file);
   }
+
+  # Read personal config file
   if ($Date::Manip::InitFilesRead<2) {
     $Date::Manip::InitFilesRead=2;
-    # Read Personal Init file
+
     if ($Date::Manip::PersonalCnf  and  $Date::Manip::PersonalCnfPath) {
       $file=&SearchPath($Date::Manip::PersonalCnf,
                         $Date::Manip::PersonalCnfPath,"r");
@@ -329,9 +348,8 @@ sub Date_Init {
     if ($Date::Manip::WorkWeekEnd <= $Date::Manip::WorkWeekBeg);
 
   my(%lang,
-     $tmp,@tmp,%tmp,@tmp2,
+     $tmp,%tmp,@tmp2,
      $i,$j,@tmp3,
-     $am,$pm,
      $zonesrfc,@zones)=();
 
   if (! $Date::Manip::Init) {
@@ -351,26 +369,21 @@ sub Date_Init {
     if ($Date::Manip::Language eq "English") {
       &Date_Init_English(\%lang);
 
-      $am="AM";
-      $pm="PM";
-
     } elsif ($Date::Manip::Language eq "French") {
       &Date_Init_French(\%lang);
-
-      $am="du_matin";  # le matin
-      $pm="du_soir";   # le soir
 
     } elsif ($Date::Manip::Language eq "Swedish") {
       &Date_Init_Swedish(\%lang);
 
-      $am="FM";
-      $pm="EM";
-
     } elsif ($Date::Manip::Language eq "German") {
       &Date_Init_German(\%lang);
 
-      $am="FM";
-      $pm="EM";
+    } elsif ($Date::Manip::Language eq "Polish") {
+      &Date_Init_Polish(\%lang);
+
+    } elsif ($Date::Manip::Language eq "Dutch"  ||
+             $Date::Manip::Language eq "Nederlands") {
+      &Date_Init_Dutch(\%lang);
 
     # } elsif ($Date::Manip::Language eq "Danish") {
     # } elsif ($Date::Manip::Language eq "Spanish") {
@@ -442,19 +455,14 @@ sub Date_Init {
     #   $AmExp   : "(am)"
     #   $PmExp   : "(pm)"
     #   $AmPmExp : "(am|pm)"
-    #   %AmPm    : (am,1,pm,2)
     #   $Am      : "AM"
     #   $Pm      : "PM"
-    $Date::Manip::AmPmExp=&Date_Regexp("$am $pm","lc,back,under");
-    ($Date::Manip::AmExp,@tmp2)=&Date_Regexp("$am","lc,back,under",1);
-    ($Date::Manip::PmExp,@tmp3)=&Date_Regexp("$pm","lc,back,under",1);
-    @tmp=map { $_,1 } @tmp2;
-    push(@tmp,map { $_,2 } @tmp3);
-    %Date::Manip::AmPm=@tmp;
-    ($tmp,@tmp2)=&Date_Regexp("$am","under",1);
-    ($tmp,@tmp3)=&Date_Regexp("$pm","under",1);
-    $Date::Manip::Am=shift(@tmp2);
-    $Date::Manip::Pm=shift(@tmp3);
+    &Date_InitStrings($lang{"am"},\$Date::Manip::AmExp,"lc,sort,escape");
+    &Date_InitStrings($lang{"pm"},\$Date::Manip::PmExp,"lc,sort,escape");
+    &Date_InitStrings([ @{$lang{"am"}},@{$lang{"pm"}} ],\$Date::Manip::AmPmExp,
+                      "lc,back,sort,escape");
+    $Date::Manip::Am=$lang{"am"}[0];
+    $Date::Manip::Pm=$lang{"pm"}[0];
 
     # Date::Manip:: variables for expressions used in parsing deltas
     #    $YExp   : "(?:y|yr|year|years)"
@@ -516,13 +524,13 @@ sub Date_Init {
       #"nst   -0330 ".  # Newfoundland Standard      nst=North Sumatra    +0630
       "nft    -0330 ".  # Newfoundland
       #"gst   -0300 ".  # Greenland Standard         gst=Guam Standard    +1000
-      "bst    -0300 ".  # Brazil Standard            bst=British Summer   +0100
+      #"bst   -0300 ".  # Brazil Standard            bst=British Summer   +0100
       "adt    -0300 ".  # Atlantic Daylight
       "ndt    -0230 ".  # Newfoundland Daylight
       "at     -0200 ".  # Azores
       "wat    -0100 ".  # West Africa
       "gmt    +0000 ".  # Greenwich Mean
-      "ut     +0000 ".  # Universal (Coordinated)
+      "ut     +0000 ".  # Universal
       "utc    +0000 ".  # Universal (Coordinated)
       "wet    +0000 ".  # Western European
       "cet    +0100 ".  # Central European
@@ -530,7 +538,8 @@ sub Date_Init {
       "met    +0100 ".  # Middle European
       "mewt   +0100 ".  # Middle European Winter
       "swt    +0100 ".  # Swedish Winter
-      #"bst   +0100 ".  # British Summer             bst=Brazil standard  -0300
+      "bst    +0100 ".  # British Summer             bst=Brazil standard  -0300
+      "gb     +0100 ".  # GMT with daylight savings
       "eet    +0200 ".  # Eastern Europe, USSR Zone 1
       "cest   +0200 ".  # Central European Summer
       "fst    +0200 ".  # French Summer
@@ -538,6 +547,8 @@ sub Date_Init {
       "metdst +0200 ".  # An alias for mest used by HP-UX
       "sst    +0200 ".  # Swedish Summer             sst=South Sumatra    +0700
       "bt     +0300 ".  # Baghdad, USSR Zone 2
+      "eest   +0300 ".  # Eastern Europe Summer
+      "eetedt +0300 ".  # Eastern Europe, USSR Zone 1
       "it     +0330 ".  # Iran
       "zp4    +0400 ".  # USSR Zone 3
       "zp5    +0500 ".  # USSR Zone 4
@@ -545,10 +556,12 @@ sub Date_Init {
       "zp6    +0600 ".  # USSR Zone 5
       "nst    +0630 ".  # North Sumatra              nst=Newfoundland Std -0330
       #"sst   +0700 ".  # South Sumatra, USSR Zone 6 sst=Swedish Summer   +0200
-      "jt     +0730 ".  # Java (3pm in Cronusland!)
+      "hkt    +0800 ".  # Hong Kong
+      "sgt    +0800 ".  # Singapore
       "cct    +0800 ".  # China Coast, USSR Zone 7
       "awst   +0800 ".  # West Australian Standard
       "wst    +0800 ".  # West Australian Standard
+      "kst    +0900 ".  # Republic of Korea
       "jst    +0900 ".  # Japan Standard, USSR Zone 8
       "rok    +0900 ".  # Republic of Korea
       "cast   +0930 ".  # Central Australian Standard
@@ -582,12 +595,14 @@ sub Date_Init {
     #    $Of     : "(?:in|of)"
     #    $On     : "(?:on)"
     #    $Future : "(?:in)"
+    #    $Later  : "(?:later)"
     #    $Past   : "(?:ago)"
     #    $Next   : "(?:next)"
     #    $Prev   : "(?:last|previous)"
     &Date_InitStrings($lang{"at"},\$Date::Manip::At,"lc,sort");
     &Date_InitStrings($lang{"on"},\$Date::Manip::On,"lc,sort");
     &Date_InitStrings($lang{"future"},\$Date::Manip::Future,"lc,sort");
+    &Date_InitStrings($lang{"later"},\$Date::Manip::Later,"lc,sort");
     &Date_InitStrings($lang{"past"},\$Date::Manip::Past,"lc,sort");
     &Date_InitStrings($lang{"next"},\$Date::Manip::Next,"lc,sort");
     &Date_InitStrings($lang{"prev"},\$Date::Manip::Prev,"lc,sort");
@@ -661,7 +676,7 @@ sub ParseDateString {
   print "DEBUG: ParseDateString\n"  if ($Date::Manip::Debug =~ /trace/);
   local($_)=@_;
   my($y,$m,$d,$h,$mn,$s,$i,$which,$dofw,$wk,$tmp,$z,$num,$err,$iso,$ampm)=();
-  my($date)=();
+  my($date,$z2,$delta)=();
 
   # We only need to reinitialize if we have to determine what NOW is.
   &Date_Init()  if (! $Date::Manip::InitDone  or  $Date::Manip::UpdateCurrTZ);
@@ -679,6 +694,23 @@ sub ParseDateString {
   } elsif (! defined $Date::Manip::Mode) {
     $Date::Manip::Mode=0;
   }
+
+  # Unfortunately, some deltas can be parsed as dates.  An example is
+  #    1 second  ==  1 2nd  ==  1 2
+  # But, some dates can be parsed as deltas.  The most important being:
+  #    1998010101:00:00
+  # We'll check to see if a "date" can be parsed as a delta.  If so, we'll
+  # assume that it is a delta (since they are musch simpler, it is much
+  # less likely that we'll mistake a delta for a date than vice versa)
+  # unless it is an ISO-8601 date.
+  #
+  # This is important because we are using DateCalc to test whether a
+  # string is a date or a delta.  Dates are tested first, so we need to
+  # be able to pass a delta into this routine and have it correctly NOT
+  # interpreted as a date.
+
+  $delta=0;
+  $delta=1  if (&ParseDateDelta($_));
 
   # Put parse in a simple loop for an easy exit.
  PARSE: {
@@ -711,6 +743,7 @@ sub ParseDateString {
     my($prev)='\s*'.$Date::Manip::Prev;     # \s*(?:last|previous)
     my($past)='\s*'.$Date::Manip::Past;     # \s*(?:ago)
     my($future)='\s*'.$Date::Manip::Future; # \s*(?:in)
+    my($later)='\s*'.$Date::Manip::Later;   # \s*(?:later)
     my($at)=$Date::Manip::At;               # (?:at)
     my($of)='\s*'.$Date::Manip::Of;         # \s*(?:in|of)
     my($on)='(?:\s*'.$Date::Manip::On.'\s*|\s+)';
@@ -728,7 +761,12 @@ sub ParseDateString {
     my($D) ='(\d{1,2})';          # 1 or 2 digit  (mon/day/hr)
     my($FS)="(?:$ss\\d+)?";       # fractional secs
     my($sep)='[\/.-]';            # non-ISO8601 m/d/yy separators
-    my($zone2)='\s*([+-](?:\d{4}|\d{2}:\d{2}|\d{2}))';  # absolute time zone
+    # absolute time zone     +0700 (GMT)
+    my($hzone)='(?:[0-1][0-9]|2[0-3])';                    # 00 - 23
+    my($mzone)='(?:[0-5][0-9])';                           # 00 - 59
+    my($zone2)='(?:\s*([+-](?:'."$hzone$mzone|$hzone:$mzone|$hzone))".
+                                                           # +0700 +07:00 -07
+      '(?:\s*\(([a-zA-Z]+)\))?)';                          # (GMT)
 
     # A regular expression for the time EXCEPT for the hour part
 
@@ -760,17 +798,17 @@ sub ParseDateString {
       $tmp=0;
       $tmp=1  if (/$mnsec$zone2?\s*$/i);
       $tmp=0  if (/$ampmexp/i);
-      if (s/(^|[^a-z])$at\s*$D$mnsec$zone/$1 /i  ||
+      if (s/(^|[^a-z])$at\s*$D$mnsec$zone()/$1 /i  ||
           s/(^|[^a-z])$at\s*$D$mnsec$zone2?/$1 /i  ||
-          s/(^|[^0-9])(\d)$mnsec$zone/$1 /i ||
+          s/(^|[^0-9])(\d)$mnsec$zone()/$1 /i ||
           s/(^|[^0-9])(\d)$mnsec$zone2?/$1 /i ||
-          (s/()$DD$mnsec$zone/ /i and (($iso=$tmp) || 1)) ||
+          (s/()$DD$mnsec$zone()/ /i and (($iso=$tmp) || 1)) ||
           (s/()$DD$mnsec$zone2?/ /i and (($iso=$tmp) || 1))  ||
-          s/(^|$at\s*|\s+)$D()()\s*$ampmexp$zone/ /i  ||
+          s/(^|$at\s*|\s+)$D()()\s*$ampmexp$zone()/ /i  ||
           s/(^|$at\s*|\s+)$D()()\s*$ampmexp$zone2?/ /i  ||
           0
          ) {
-        ($h,$mn,$s,$ampm,$z)=($2,$3,$4,$5,$6);
+        ($h,$mn,$s,$ampm,$z,$z2)=($2,$3,$4,$5,$6,$7);
         if (defined ($z)) {
           if ($z =~ /^[+-]\d{2}:\d{2}$/) {
             $z=~ s/://;
@@ -802,9 +840,9 @@ sub ParseDateString {
       s/\s+$//;
 
       if (/^$D4\s*$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone2?$/  ||
-          /^$D4\s*$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone?$/i  ||
+          /^$D4\s*$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone?()$/i  ||
           /^$DD\s+$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone2?$/  ||
-          /^$DD\s+$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone?$/i  ||
+          /^$DD\s+$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone?()$/i  ||
           0
          ) {
         # ISO 8601 Dates with times
@@ -816,7 +854,7 @@ sub ParseDateString {
         #    YY MMDDHHMNSS
         #    YY MMDDHHMN
         #    YY MMDDHH
-        ($y,$m,$d,$h,$mn,$s,$tmp)=($1,$2,$3,$4,$5,$6,$7);
+        ($y,$m,$d,$h,$mn,$s,$tmp,$z2)=($1,$2,$3,$4,$5,$6,$7,$8);
         $z=""    if (! defined $h  ||  ! $h);
         return ""  if (defined $tmp  and  $tmp  and  $z);
         $z=$tmp  if (defined $tmp  and  $tmp);
@@ -858,9 +896,12 @@ sub ParseDateString {
       }
     }
 
+    # All deltas that are not ISO-8601 dates are NOT dates.
+    return ""  if ($delta);
+
     # Check for some special types of dates (next, prev)
-    if (/$whichexp/i  ||  /$future/i  ||  /$past/i  ||  /$next/i  ||
-        /$prev/i  ||  /^$wkexp$/i  ||  /$week/i) {
+    if (/$whichexp/i  ||  /$future/i  ||  /$later/i  ||  /$past/i  ||
+        /$next/i  ||  /$prev/i  ||  /^$wkexp$/i  ||  /$week/i) {
       $tmp=0;
 
       if (/^$whichexp\s*$wkexp$of\s*$mmm\s*$YY?$/i) {
@@ -890,7 +931,7 @@ sub ParseDateString {
         # last day in month
         ($m,$y)=($1,$2);
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $y=&Date_FixYear($y)  if (length($y)<4);
+        $y=&Date_FixYear($y)  if (! defined $y  or  length($y)<4);
         $m=$mmm{lc($m)};
         $d=&Date_DaysInMonth($m,$y);
         last PARSE;
@@ -936,8 +977,29 @@ sub ParseDateString {
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
 
-      } elsif (/^$future\s*(\d+)$week$/i) {
+      } elsif (/^$future\s*(\d+)$day$/i  ||
+               /^(\d+)$day$later$/i) {
+        # in 2 days
+        # 2 days later
+        ($num)=($1);
+        &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:0:0:$num:0:0:0",
+                                  \$err,0);
+        $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
+        last PARSE;
+      } elsif (/^(\d+)$day$past$/i) {
+        # 2 days ago
+        ($num)=($1);
+        &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:0:0:$num:0:0:0",
+                                 \$err,0);
+        $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
+        last PARSE;
+
+      } elsif (/^$future\s*(\d+)$week$/i  ||
+               /^(\d+)$week$later$/i) {
         # in 2 weeks
+        # 2 weeks later
         ($num)=($1);
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
         $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:0:$num:0:0:0:0",
@@ -953,8 +1015,10 @@ sub ParseDateString {
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
 
-      } elsif (/^$future\s*(\d+)$month$/i) {
+      } elsif (/^$future\s*(\d+)$month$/i  ||
+               /^(\d+)$month$later$/i) {
         # in 2 months
+        # 2 months later
         ($num)=($1);
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
         $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:$num:0:0:0:0:0",
@@ -970,16 +1034,20 @@ sub ParseDateString {
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
 
-      } elsif (/^$wkexp$future\s*(\d+)$week$/i) {
+      } elsif (/^$wkexp$future\s*(\d+)$week$/i  ||
+               /^$wkexp\s*(\d+)$week$later$/i) {
         # friday in 2 weeks
+        # friday 2 weeks later
         ($dofw,$num)=($1,$2);
         $tmp="+";
       } elsif (/^$wkexp\s*(\d+)$week$past$/i) {
         # friday 2 weeks ago
         ($dofw,$num)=($1,$2);
         $tmp="-";
-      } elsif (/^$future\s*(\d+)$week$on$wkexp$/i) {
+      } elsif (/^$future\s*(\d+)$week$on$wkexp$/i  ||
+               /^(\d+)$week$later$on$wkexp$/i) {
         # in 2 weeks on friday
+        # 2 weeks later on friday
         ($num,$dofw)=($1,$2);
         $tmp="+"
       } elsif (/^(\d+)$week$past$on$wkexp$/i) {
@@ -1298,20 +1366,21 @@ sub ParseDateDelta {
   $mnexp="(?: $exp1 $Date::Manip::MnExp)?";
   $sexp ="(?: $exp1 $Date::Manip::SExp?)?";
   my($future)=$Date::Manip::Future;
+  my($later)=$Date::Manip::Later;
   my($past)=$Date::Manip::Past;
 
   $delta="";
-  PARSE: while (@a) {
-    $_ = join(" ",@a);
-    s/\s*$//;
+ PARSE: while (@a) {
+    $_ = join(" ", grep {defined;} @a);
+    s/\s+$//;
 
     # Mode is set in DateCalc.  ParseDateDelta only overrides it if the
     # string contains a mode.
-    if      (s/$Date::Manip::Exact//) {
+    if      ($Date::Manip::Exact     &&  s/$Date::Manip::Exact//) {
       $Date::Manip::Mode=0;
-    } elsif (s/$Date::Manip::Approx//) {
+    } elsif ($Date::Manip::Approx    &&  s/$Date::Manip::Approx//) {
       $Date::Manip::Mode=1;
-    } elsif (s/$Date::Manip::Business//) {
+    } elsif ($Date::Manip::Business  &&  s/$Date::Manip::Business//) {
       $Date::Manip::Mode=2;
     } elsif (! defined $Date::Manip::Mode) {
       $Date::Manip::Mode=0;
@@ -1325,6 +1394,7 @@ sub ParseDateDelta {
 
     # in or ago
     s/(^|[^a-z])$future($|[^a-z])/$1 $2/i;
+    s/(^|[^a-z])$later($|[^a-z])/$1 $2/i;
     $dir=1;
     $dir=-1  if (s/(^|[^a-z])$past($|[^a-z])/$1 $2/i);
     s/\s*$//;
@@ -1333,7 +1403,7 @@ sub ParseDateDelta {
     $colon="";
     if (s/($signexp?$numexp?(:($signexp?$numexp)?){1,6})$//) {
       $colon=$1;
-      s/\s*$//;
+      s/\s+$//;
     }
     @colon=split(/:/,$colon);
 
@@ -1344,9 +1414,10 @@ sub ParseDateDelta {
     foreach $exp1 ($yexp,$mexp,$wexp,$dexp,$hexp,$mnexp,$sexp) {
       last  if ($#colon>=$i--);
       $val=0;
-      s/^$exp1//ix;
-      $val=$2  if (defined $2  &&  $2);
-      $sign=$1  if (defined $1  &&  $1);
+      if (s/^$exp1//ix) {
+        $val=$2   if (defined $2  &&  $2);
+        $sign=$1  if (defined $1  &&  $1);
+      }
       push(@delta,"$sign$val");
     }
     if (! /^\s*$/) {
@@ -1357,9 +1428,10 @@ sub ParseDateDelta {
     # make sure that the colon part has a sign
     for ($i=0; $i<=$#colon; $i++) {
       $val=0;
-      $colon[$i] =~ /^$signexp$numexp?/;
-      $val=$2  if (defined $2  &&  $2);
-      $sign=$1  if (defined  $1 &&  $1);
+      if ($colon[$i] =~ /^$signexp$numexp?/) {
+        $val=$2   if (defined $2  &&  $2);
+        $sign=$1  if (defined  $1 &&  $1);
+      }
       $colon[$i] = "$sign$val";
     }
 
@@ -1428,7 +1500,7 @@ sub UnixDate {
       }
       if (&Date_WeekOfYear($mm,$dd,$yy,7)==2) {
         $f{"L"}=$yy;
-        $f{"W"}=1;
+        $f{"U"}=1;
       }
     }
   }
@@ -1592,7 +1664,10 @@ sub Delta_Format {
   $wl = $dl*7;
 
   # The decimal amount of each unit contained in all smaller units
-  my($sd,$md,$hd,$dd,$wd)=();
+  my($yd,$Md,$sd,$md,$hd,$dd,$wd)=();
+  $yd = $M/12;
+  $Md = 0;
+
   $wd = ($d*$dl + $h*$hl + $m*$ml + $s*$sl)/$wl;
   $dd =          ($h*$hl + $m*$ml + $s*$sl)/$dl;
   $hd =                   ($m*$ml + $s*$sl)/$hl;
@@ -1600,7 +1675,10 @@ sub Delta_Format {
   $sd = 0;
 
   # The amount of each unit contained in higher units.
-  my($sh,$mh,$hh,$dh,$wh)=();
+  my($yh,$Mh,$sh,$mh,$hh,$dh,$wh)=();
+  $yh = 0;
+  $Mh = ($yh+$y)*12;
+
   $wh = 0;
   $dh = ($wh+$w)*7;
   $hh = ($dh+$d)*24;
@@ -1609,24 +1687,32 @@ sub Delta_Format {
 
   # Set up the formats
 
+  $f{"yv"} = $y;
+  $f{"Mv"} = $M;
   $f{"wv"} = $w;
   $f{"dv"} = $d;
   $f{"hv"} = $h;
   $f{"mv"} = $m;
   $f{"sv"} = $s;
 
+  $f{"yh"} = $y+$yh;
+  $f{"Mh"} = $M+$Mh;
   $f{"wh"} = $w+$wh;
   $f{"dh"} = $d+$dh;
   $f{"hh"} = $h+$hh;
   $f{"mh"} = $m+$mh;
   $f{"sh"} = $s+$sh;
 
+  $f{"yd"} = sprintf($dec,$y+$yd);
+  $f{"Md"} = sprintf($dec,$M+$Md);
   $f{"wd"} = sprintf($dec,$w+$wd);
   $f{"dd"} = sprintf($dec,$d+$dd);
   $f{"hd"} = sprintf($dec,$h+$hd);
   $f{"md"} = sprintf($dec,$m+$md);
   $f{"sd"} = sprintf($dec,$s+$sd);
 
+  $f{"yt"} = sprintf($dec,$yh+$y+$yd);
+  $f{"Mt"} = sprintf($dec,$Mh+$M+$Md);
   $f{"wt"} = sprintf($dec,$wh+$w+$wd);
   $f{"dt"} = sprintf($dec,$dh+$d+$dd);
   $f{"ht"} = sprintf($dec,$hh+$h+$hd);
@@ -1704,7 +1790,7 @@ sub ParseRecur {
   local($_)=$recur;
   my($date_b,$date_0,$date_1,$flag_t,$recur_0,$recur_1,@recur0,@recur1)=();
   my(@tmp,$tmp,$each,$mode,$num,$y,$m,$d,$w,$h,$mn,$s,$delta,$y0,$y1,$yb)=();
-  my($yy,$n,$dd,@d,@tmp2,$date,@date,@w,@tmp2,@tmp3,@m,@y)=();
+  my($yy,$n,$dd,@d,@tmp2,$date,@date,@w,@tmp2,@tmp3,@m,@y,$tmp2,$d2)=();
 
   $date0=""  if (! defined $date0);
   $date1=""  if (! defined $date1);
@@ -1899,6 +1985,7 @@ sub ParseRecur {
     # * Y-M-W-D-H-MN-S
     if ($y eq "0") {
       push(@recur0,0);
+      shift(@recur1);
 
     } else {
       @y=&ReturnList($y);
@@ -2049,6 +2136,7 @@ sub ParseRecur {
     if ($m eq "0") {
       # Y * 0-W-D-H-MN-S   (equiv to Y-0 * W-D-H-MN-S)
       push(@recur0,0);
+      shift(@recur1);
 
     } elsif ($w eq "0") {
       # Y * M-0-DOM-H-MN-S
@@ -2110,6 +2198,7 @@ sub ParseRecur {
     if ($w eq "0") {
       # Y-M * 0-D-H-MN-S   (equiv to Y-M-0 * D-H-MN-S)
       push(@recur0,0);
+      shift(@recur1);
 
     } elsif ($m==0) {
       # Y-0 * WOY-0-H-MN-S
@@ -2258,7 +2347,7 @@ sub ParseRecur {
       @d=&ReturnList($d);
       return ()  if (! @d);
       foreach $d (@d) {
-        return ()  if (! &IsInt($d,1,31));
+        return ()  if (! &IsInt($d,-31,31)  ||  $d==0);
       }
       @d=sort { $a<=>$b } (@d);
 
@@ -2266,11 +2355,14 @@ sub ParseRecur {
       @tmp=();
       foreach $date (@tmp2) {
         ($y,$m)=( &Date_Split($date) )[0..1];
+        $tmp2=&Date_DaysInMonth($m,$y);
         foreach $d (@d) {
-          $tmp=&Date_Join($y,$m,$d,0,0,0);
-          push(@tmp,$tmp)  if ($d<29  ||  &Date_Split($tmp));
+          $d2=$d;
+          $d2=$tmp2+1+$d  if ($d<0);
+          push(@tmp,&Date_Join($y,$m,$d2,0,0,0))  if ($d2<=$tmp2);
         }
       }
+      @tmp=sort (@tmp);
       @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
 
     } else {
@@ -2740,14 +2832,7 @@ sub Date_TimeZone {
   # Microsoft operating systems don't have a date command built in.  Try
   # to trap all the various ways of knowing we are on one of these systems:
   unless (($^X =~ /perl\.exe$/i) or
-          (defined $^O and
-           $^O =~ /MSWin32/i ||
-           $^O =~ /Windows_95/i ||
-           $^O =~ /Windows_NT/i) or
-          (defined $ENV{OS} and
-           $ENV{OS} =~ /MSWin32/i ||
-           $ENV{OS} =~ /Windows_95/i ||
-           $ENV{OS} =~ /Windows_NT/i)) {
+          $Date::Manip::OS eq "Windows") {
     $tz = `date`;
     chomp($tz);
     $tz=(split(/\s+/,$tz))[4];
@@ -2778,8 +2863,8 @@ sub Date_TimeZone {
       $tz=$Date::Manip::CurrZone{$tmp};
     }
 
-    # Handle STD#DST# format
-    if ($tz =~ /^([a-z]+)\d([a-z]+)\d?$/i) {
+    # Handle STD#DST# format (and STD-#DST-# formats)
+    if ($tz =~ /^([a-z]+)-?\d([a-z]+)-?\d?$/i) {
       ($std,$dst)=($1,$2);
       next  if (! defined $Date::Manip::Zone{lc($std)} or
                 ! defined $Date::Manip::Zone{lc($dst)});
@@ -2986,6 +3071,17 @@ sub Date_NthDayOfYear {
 # This is used in Date_Init to fill in a hash based on international
 # data.  It takes a list of keys and values and returns both a hash
 # with these values and a regular expression of keys.
+#
+# IN:
+#   $data   = [ key1 val1 key2 val2 ... ]
+#   $opts   = lc     : lowercase the keys in the regexp
+#             sort   : sort (by length) the keys in the regexp
+#             back   : create a regexp with a back reference
+#             escape : escape all strings in the regexp
+#
+# OUT:
+#   $regexp = '(?:key1|key2|...)'
+#   $hash   = { key1=>val1 key2=>val2 ... }
 
 sub Date_InitHash {
   print "DEBUG: Date_InitHash\n"  if ($Date::Manip::Debug =~ /trace/);
@@ -2994,10 +3090,11 @@ sub Date_InitHash {
   my($key,$val,@list)=();
 
   # Parse the options
-  my($lc,$sort,$back)=(0,0,0);
+  my($lc,$sort,$back,$escape)=(0,0,0,0);
   $lc=1     if ($opts =~ /lc/i);
   $sort=1   if ($opts =~ /sort/i);
   $back=1   if ($opts =~ /back/i);
+  $escape=1 if ($opts =~ /escape/i);
 
   # Create the hash
   while (@data) {
@@ -3010,6 +3107,11 @@ sub Date_InitHash {
   if ($regexp) {
     @list=keys(%$hash);
     @list=sort sortByLength(@list)  if ($sort);
+    if ($escape) {
+      foreach $val (@list) {
+        $val="\Q$val\E";
+      }
+    }
     if ($back) {
       $$regexp="(" . join("|",@list) . ")";
     } else {
@@ -3022,6 +3124,26 @@ sub Date_InitHash {
 # hashes based on international data.  It takes a list of lists which have
 # to be stored as regular expressions (to find any element in the list),
 # lists, and hashes (indicating the location in the lists).
+#
+# IN:
+#   $data   = [ [ [ valA1 valA2 ... ][ valA1' valA2' ... ] ... ]
+#               [ [ valB1 valB2 ... ][ valB1' valB2' ... ] ... ]
+#               ...
+#               [ [ valZ1 valZ2 ... ] [valZ1' valZ1' ... ] ... ] ]
+#   $lists  = [ \@listA \@listB ... \@listZ ]
+#   $opts   = lc     : lowercase the values in the regexp
+#             sort   : sort (by length) the values in the regexp
+#             back   : create a regexp with a back reference
+#             escape : escape all strings in the regexp
+#   $hash   = [ \%hash, TYPE ]
+#             TYPE 0 : $hash{ valBn=>n-1 }
+#             TYPE 1 : $hash{ valBn=>n }
+#
+# OUT:
+#   $regexp = '(?:valA1|valA2|...|valB1|...)'
+#   $lists  = [ [ valA1 valA2 ... ]         # only the 1st list (or
+#               [ valB1 valB2 ... ] ... ]   # 2nd for int. characters)
+#   $hash
 
 sub Date_InitLists {
   print "DEBUG: Date_InitLists\n"  if ($Date::Manip::Debug =~ /trace/);
@@ -3031,10 +3153,11 @@ sub Date_InitLists {
   my($i,@ele,$ele,@list,$j,$tmp)=();
 
   # Parse the options
-  my($lc,$sort,$back)=(0,0,0);
+  my($lc,$sort,$back,$escape)=(0,0,0,0);
   $lc=1     if ($opts =~ /lc/i);
   $sort=1   if ($opts =~ /sort/i);
   $back=1   if ($opts =~ /back/i);
+  $escape=1 if ($opts =~ /escape/i);
 
   # Set each of the lists
   if (@lists) {
@@ -3077,6 +3200,11 @@ sub Date_InitLists {
   if ($regexp) {
     @list=keys(%hash);
     @list=sort sortByLength(@list)  if ($sort);
+    if ($escape) {
+      foreach $ele (@list) {
+        $ele="\Q$ele\E";
+      }
+    }
     if ($back) {
       $$regexp="(" . join("|",@list) . ")";
     } else {
@@ -3088,6 +3216,16 @@ sub Date_InitLists {
 # This is used in Date_Init to fill in regular expressions and lists based
 # on international data.  This takes a list of strings and returns a regular
 # expression (to find any one of them).
+#
+# IN:
+#   $data   = [ string1 string2 ... ]
+#   $opts   = lc     : lowercase the values in the regexp
+#             sort   : sort (by length) the values in the regexp
+#             back   : create a regexp with a back reference
+#             escape : escape all strings in the regexp
+#
+# OUT:
+#   $regexp = '(string1|string2|...)'
 
 sub Date_InitStrings {
   print "DEBUG: Date_InitStrings\n"  if ($Date::Manip::Debug =~ /trace/);
@@ -3095,13 +3233,20 @@ sub Date_InitStrings {
   my(@list)=@{ $data };
 
   # Parse the options
-  my($lc,$sort,$back)=(0,0,0);
+  my($lc,$sort,$back,$escape)=(0,0,0,0);
   $lc=1     if ($opts =~ /lc/i);
   $sort=1   if ($opts =~ /sort/i);
   $back=1   if ($opts =~ /back/i);
+  $escape=1 if ($opts =~ /escape/i);
 
   # Create the regular expression
+  my($ele)=();
   @list=sort sortByLength(@list)  if ($sort);
+  if ($escape) {
+    foreach $ele (@list) {
+      $ele="\Q$ele\E";
+    }
+  }
   if ($back) {
     $$regexp="(" . join("|",@list) . ")";
   } else {
@@ -3758,7 +3903,7 @@ sub DateCalc_DateDate {
     $delta[2]=0;
     $delta[3]=$d;
 
-    for ($i=0; $i<6; $i++) {
+    for ($i=0; $i<7; $i++) {
       $delta[$i]="+".$delta[$i]  if ($delta[$i]>=0);
     }
 
@@ -4082,11 +4227,12 @@ sub Date_SetConfigVariable {
   print "DEBUG: Date_SetConfigVariable\n"  if ($Date::Manip::Debug =~ /trace/);
   my($var,$val)=@_;
 
-  return  if ($var =~ /^PersonalCnf$/i);
-  return  if ($var =~ /^PersonalCnfPath$/i);
+  # These are most appropriate for command line options instead of in files.
+  $Date::Manip::PersonalCnf=$val,    return  if ($var =~ /^PersonalCnf$/i);
+  $Date::Manip::PersonalCnfPath=$val,return  if ($var =~ /^PersonalCnfPath$/i);
+  &EraseHolidays(),                  return  if ($var =~ /^EraseHolidays$/i);
+  $Date::Manip::IgnoreGlobalCnf=1,   return  if ($var =~ /^IgnoreGlobalCnf$/i);
 
-  $Date::Manip::InitFilesRead=1,     return  if ($var =~ /^IgnoreGlobalCnf$/i);
-  %Date::Manip::Holidays=(),         return  if ($var =~ /^EraseHolidays$/i);
   $Date::Manip::Init=0,
   $Date::Manip::Language=$val,       return  if ($var =~ /^Language$/i);
   $Date::Manip::DateFormat=$val,     return  if ($var =~ /^DateFormat$/i);
@@ -4114,6 +4260,15 @@ sub Date_SetConfigVariable {
   confess "ERROR: Unknown configuration variable $var in Date::Manip.\n";
 }
 
+sub EraseHolidays {
+  print "DEBUG: EraseHolidays\n"  if ($Date::Manip::Debug =~ /trace/);
+
+  $Date::Manip::EraseHolidays=0;
+  $Date::Manip::CurrHolidayYear=0;
+  %Date::Manip::Holidays=();
+  %Date::Manip::CurrHolidays=();
+}
+
 # This reads an init file.
 sub Date_InitFile {
   print "DEBUG: Date_InitFile\n"  if ($Date::Manip::Debug =~ /trace/);
@@ -4130,6 +4285,8 @@ sub Date_InitFile {
     next  if (! $_  or  /^\#/);
     if (s/^\*\s*//) {
       $section=$_;
+      &EraseHolidays()
+        if ($section =~ /holiday/i  &&  $Date::Manip::EraseHolidays);
       next;
     }
 
@@ -4283,9 +4440,14 @@ sub Date_FixYear {
     $y1=substring($y,0,2);
     $y="$y1$y";
 
-  } elsif ($Date::Manip::YYtoYYYY =~ /^c(\d{2})$/) {
+  } elsif ($Date::Manip::YYtoYYYY =~ /^c(\d{2})$/i) {
     $y1=$1;
     $y="$y1$y";
+
+  } elsif ($Date::Manip::YYtoYYYY =~ /^c(\d{2})(\d{2})$/i) {
+    $y1="$1$2";
+    $y ="$1$y";
+    $y += 100  if ($y<$y1);
 
   } else {
     $y1=$curr_y-$Date::Manip::YYtoYYYY;
@@ -4605,6 +4767,7 @@ sub Char_8Bit {
 #   $ past            in the past               ago
 #   $ next            next item                 next
 #   $ prev            previous item             last previous
+#   $ later           2 hours later
 #
 #   % offset          a hash of special dates   { tomorrow->0:0:0:1:0:0:0 }
 #   % times           a hash of times           { noon->12:00:00 ... }
@@ -4662,7 +4825,6 @@ sub Char_8Bit {
 sub Date_Init_English {
   print "DEBUG: Date_Init_English\n"  if ($Date::Manip::Debug =~ /trace/);
   my($d)=@_;
-  
 
   $$d{"month_name"}=
     [["January","February","March","April","May","June",
@@ -4704,6 +4866,7 @@ sub Date_Init_English {
   $$d{"past"}    =["ago"];
   $$d{"next"}    =["next"];
   $$d{"prev"}    =["previous","last"];
+  $$d{"later"}   =["later"];
 
   $$d{"exact"}   =["exactly"];
   $$d{"approx"}  =["approximately"];
@@ -4724,6 +4887,9 @@ sub Date_Init_English {
   $$d{"sephm"}   =':';
   $$d{"sepms"}   =':';
   $$d{"sepss"}   ='[.:]';
+
+  $$d{"am"}      = ["AM","A.M."];
+  $$d{"pm"}      = ["PM","P.M."];
 }
 
 sub Date_Init_French {
@@ -4776,6 +4942,7 @@ sub Date_Init_French {
   $$d{"past"}    =["il y a"];
   $$d{"next"}    =["suivant"];
   $$d{"prev"}    =["precedent","pr$e"."c$e"."dent"];
+  $$d{"later"}   =["plus tard"];
 
   $$d{"exact"}   =["exactement"];
   $$d{"approx"}  =["approximativement"];
@@ -4796,6 +4963,9 @@ sub Date_Init_French {
   $$d{"sephm"}   ='[h:]';
   $$d{"sepms"}   =':';
   $$d{"sepss"}   ='[.:,]';
+
+  $$d{"am"}      = ["du matin"];
+  $$d{"pm"}      = ["du soir"];
 }
 
 sub Date_Init_Swedish {
@@ -4839,6 +5009,7 @@ sub Date_Init_Swedish {
   $$d{"past"}    =["ago"];
   $$d{"next"}    =["next"];
   $$d{"prev"}    =["previous","last"];
+  $$d{"later"}   =["later"];
 
   $$d{"exact"}   =["exactly"];
   $$d{"approx"}  =["approximately"];
@@ -4859,6 +5030,9 @@ sub Date_Init_Swedish {
   $$d{"sephm"}   ='[.:]';
   $$d{"sepms"}   =':';
   $$d{"sepss"}   ='[.:]';
+
+  $$d{"am"}      = ["FM"];
+  $$d{"pm"}      = ["EM"];
 }
 
 sub Date_Init_German {
@@ -4891,10 +5065,10 @@ sub Date_Init_German {
     [["M","Di","Mi","Do","F","Sa","So"]];
 
   $$d{"num_suff"}=
-    [["1","2","3","4","5","6","7","8","9","10",
-      "11","12","13","14","15","16","17","18","19","20",
-      "21","22","23","24","25","26","27","28","29","30",
-      "31"]];
+    [["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th",
+      "11th","12th","13th","14th","15th","16th","17th","18th","19th","20th",
+      "21st","22nd","23rd","24th","25th","26th","27th","28th","29th","30th",
+      "31st"]];
   $$d{"num_word"}=
     [
      ["erste","zweite","dritte","vierte","funfte","sechste","siebente",
@@ -4923,6 +5097,7 @@ sub Date_Init_German {
   $$d{"past"}    =["vor"];
   $$d{"next"}    =["nachste","n$a"."chste"];
   $$d{"prev"}    =["letzte"];
+  $$d{"later"}   =["later"];
 
   $$d{"exact"}   =["genau"];
   $$d{"approx"}  =["ungefahr","ungef$a"."hr"];
@@ -4943,6 +5118,195 @@ sub Date_Init_German {
   $$d{"sephm"}   =':';
   $$d{"sepms"}   ='[: ]';
   $$d{"sepss"}   ='[.:]';
+
+  $$d{"am"}      = ["FM"];
+  $$d{"pm"}      = ["EM"];
+}
+
+sub Date_Init_Dutch {
+  print "DEBUG: Date_Init_Dutch\n"  if ($Date::Manip::Debug =~ /trace/);
+  my($d)=@_;
+
+  $$d{"month_name"}=
+    [["januari","februari","maart","april","mei","juni","juli","augustus",
+      "september","october","november","december"],
+     ["","","","","","","","","","oktober"]];
+
+  $$d{"month_abb"}=
+    [["jan","feb","maa","apr","mei","jun","jul",
+      "aug","sep","oct","nov","dec"],
+     ["","","","","","","","","","okt"]];
+  $$d{"day_name"}=
+    [["maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag",
+      "zondag"]];
+  $$d{"day_abb"}=
+    [["ma","di","wo","do","vr","zat","zon"]];
+  $$d{"day_char"}=
+    [["M","D","W","D","V","Za","Zo"]];
+
+  $$d{"num_suff"}=
+    [["1ste","2de","3de","4de","5de","6de","7de","8ste","9de","10de",
+      "11de","12de","13de","14de","15de","16de","17de","18de","19de","20ste",
+      "21ste","22ste","23ste","24ste","25ste","26ste","27ste","28ste","29ste",
+      "30ste","31ste"]];
+  $$d{"num_word"}=
+    [["eerste","tweede","derde","vierde","vijfde","zesde","zevende","achtste",
+      "negende","tiende","elfde","twaalfde",
+      map {"${_}tiende";} qw (der veer vijf zes zeven acht negen),
+      "twintigste",
+      map {"${_}entwintigste";} qw (een twee drie vier vijf zes zeven acht
+                                    negen),
+      "dertigste","eenendertigste"],
+     ["","","","","","","","","","","","","","","","","","","","",
+      map {"${_}-en-twintigste";} qw (een twee drie vier vijf zes zeven acht
+                                      negen),
+      "dertigste","een-en-dertigste"],
+     ["een","twee","drie","vier","vijf","zes","zeven","acht","negen","tien",
+      "elf","twaalf",
+      map {"${_}tien"} qw (der veer vijf zes zeven acht negen),
+      "twintig",
+      map {"${_}entwintig"} qw (een twee drie vier vijf zes zeven acht negen),
+      "dertig","eenendertig"],
+     ["","","","","","","","","","","","","","","","","","","","",
+      map {"${_}-en-twintig"} qw (een twee drie vier vijf zes zeven acht
+                                  negen),
+      "dertig","een-en-dertig"]];
+
+  $$d{"now"}     =["nu","nou","vandaag"];
+  $$d{"last"}    =["laatste"];
+  $$d{"each"}    =["each"];
+  $$d{"of"}      =["in","van"];
+  $$d{"at"}      =["om"];
+  $$d{"on"}      =["op"];
+  $$d{"future"}  =["over"];
+  $$d{"past"}    =["geleden","vroeger","eerder"];
+  $$d{"next"}    =["volgende","volgend"];
+  $$d{"prev"}    =["voorgaande","voorgaand"];
+  $$d{"later"}   =["later"];
+
+  $$d{"exact"}   =["exact","precies","nauwkeurig"];
+  $$d{"approx"}  =["ongeveer","ong",'ong\.',"circa","ca",'ca\.'];
+  $$d{"business"}=["werk","zakelijke","zakelijk"];
+
+  $$d{"offset"}  =["morgen","+0:0:0:1:0:0:0","overmorgen","+0:0:0:2:0:0:0",
+                   "gisteren","-0:0:0:1:0:0:0","eergisteren","-0::00:2:0:0:0"];
+  $$d{"times"}   =["noen","12:00:00","middernacht","00:00:00"];
+
+  $$d{"years"}   =["jaar","jaren","ja","j"];
+  $$d{"months"}  =["maand","maanden","mnd"];
+  $$d{"weeks"}   =["week","weken","w"];
+  $$d{"days"}    =["dag","dagen","d"];
+  $$d{"hours"}   =["uur","uren","u","h"];
+  $$d{"minutes"} =["minuut","minuten","min"];
+  $$d{"seconds"} =["seconde","seconden","sec","s"];
+  $$d{"replace"} =["m","minuten"];
+
+  $$d{"sephm"}   ='[:.uh]';
+  $$d{"sepms"}   ='[:.m]';
+  $$d{"sepss"}   ='[.:]';
+
+  $$d{"am"}      = ["am","a.m.","vm","v.m.","voormiddag","'s_ochtends",
+                    "ochtend","'s_nachts","nacht"];
+  $$d{"pm"}      = ["pm","p.m.","nm","n.m.","namiddag","'s_middags","middag",
+                    "'s_avonds","avond"];
+}
+
+sub Date_Init_Polish {
+  print "DEBUG: Date_Init_Polish\n"  if ($Date::Manip::Debug =~ /trace/);
+  my($d)=@_;
+
+  $$d{"month_name"}=
+    [["stycznia","luty","marca","kwietnia","maja","czerwca",
+      "lipca","sierpnia","wrzesnia","pazdziernika","listopada","grudnia"],
+     ["stycznia","luty","marca","kwietnia","maja","czerwca","lipca",
+      "sierpnia","wrzeœnia","paŸdziernika","listopada","grudnia"]];
+  $$d{"month_abb"}=
+    [["sty.","lut.","mar.","kwi.","maj","cze.",
+      "lip.","sie.","wrz.","paz.","lis.","gru."],
+     ["sty.","lut.","mar.","kwi.","maj","cze.",
+      "lip.","sie.","wrz.","paŸ.","lis.","gru."]];
+
+  $$d{"day_name"}=
+    [["poniedzialek","wtorek","sroda","czwartek","piatek","sobota",
+      "niedziela"],
+     ["poniedzia³ek","wtorek","œroda","czwartek","pi¹tek",
+      "sobota","niedziela"]];
+  $$d{"day_abb"}=
+    [["po.","wt.","sr.","cz.","pi.","so.","ni."],
+     ["po.","wt.","œr.","cz.","pi.","so.","ni."]];
+  $$d{"day_char"}=
+    [["p","w","e","c","p","s","n"],
+     ["p","w","œ.","c","p","s","n"]];
+
+  $$d{"num_suff"}=
+    [["1","2","3","4","5","6","7","8","9","10",
+      "11","12","13","14","15","16","17","18","19","20",
+      "21","22","23","24","25","26","27","28","29","30",
+      "31"]];
+  $$d{"num_word"}=
+    [["pierwszego","drugiego","trzeczego","czwartego","piatego","szostego",
+      "siodmego","osmego","dziewiatego","dziesiatego",
+      "jedenastego","dwunastego","trzynastego","czternastego","pietnastego",
+      "szestnastego","siedemnastego","osiemnastego","dziewietnastego",
+      "dwudziestego",
+      "dwudziestego pierwszego","dwudziestego drugiego",
+      "dwudziestego trzeczego","dwudziestego czwartego",
+      "dwudziestego piatego","dwudziestego szostego",
+      "dwudziestego siodmego","dwudziestego osmego",
+      "dwudziestego dziewiatego","trzydziestego","trzydziestego pierwszego"],
+     ["pierwszego","drugiego","trzeczego","czwartego","pi¹tego",
+      "szóstego","siódmego","ósmego","dziewi¹tego",
+      "dziesi¹tego","jedenastego","dwunastego","trzynastego",
+      "czternastego","piêtnastego","szestnastego","siedemnastego",
+      "osiemnastego","dziewietnastego","dwudziestego",
+      "dwudziestego pierwszego","dwudziestego drugiego",
+      "dwudziestego trzeczego","dwudziestego czwartego",
+      "dwudziestego pi¹tego","dwudziestego szóstego",
+      "dwudziestego siódmego","dwudziestego ósmego",
+      "dwudziestego dziewi¹tego","trzydziestego",
+      "trzydziestego pierwszego"]];
+
+  $$d{"now"}     =["dzisaj","teraz"];
+  $$d{"last"}    =["ostatni","ostatna"];
+  $$d{"each"}    =["kazdy","ka¿dy", "kazdym","ka¿dym"];
+  $$d{"of"}      =["w","z"];
+  $$d{"at"}      =["o","u"];
+  $$d{"on"}      =["na"];
+  $$d{"future"}  =["za"];
+  $$d{"past"}    =["temu"];
+  $$d{"next"}    =["nastepny","nastêpny","nastepnym","nastêpnym",
+                   "przyszly","przysz³y","przyszlym",
+                   "przysz³ym"];
+  $$d{"prev"}    =["zeszly","zesz³y","zeszlym","zesz³ym"];
+  $$d{"later"}   =["later"];
+
+  $$d{"exact"}   =["doklandnie","dok³andnie"];
+  $$d{"approx"}  =["w przyblizeniu","w przybli¿eniu","mniej wiecej",
+                   "mniej wiêcej","okolo","oko³o"];
+  $$d{"business"}=["sluzbowy","s³u¿bowy","sluzbowym",
+                   "s³u¿bowym"];
+
+  $$d{"times"}   =["po³udnie","12:00:00",
+                   "pó³noc","00:00:00",
+                   "poludnie","12:00:00","polnoc","00:00:00"];
+  $$d{"offset"}  =["wczoraj","-0:0:1:0:0:0","jutro","+0:0:1:0:0:0"];
+
+  $$d{"years"}   =["rok","lat","lata","latach"];
+  $$d{"months"}  =["m.","miesiac","miesi¹c","miesiecy",
+                   "miesiêcy","miesiacu","miesi¹cu"];
+  $$d{"weeks"}   =["ty.","tydzien","tydzieñ","tygodniu"];
+  $$d{"days"}    =["d.","dzien","dzieñ","dni"];
+  $$d{"hours"}   =["g.","godzina","godziny","godzinie"];
+  $$d{"minutes"} =["mn.","min.","minut","minuty"];
+  $$d{"seconds"} =["s.","sekund","sekundy"];
+  $$d{"replace"} =["m.","miesiac"];
+
+  $$d{"sephm"}   =':';
+  $$d{"sepms"}   =':';
+  $$d{"sepss"}   ='[.:]';
+
+  $$d{"am"}      = ["AM","A.M."];
+  $$d{"pm"}      = ["PM","P.M."];
 }
 
 ########################################################################
@@ -4996,23 +5360,28 @@ sub ModuloAddition {
 #++ IsInt :: Num.pl
 #!! IsInt
 # $Flag=&IsInt($String [,$low, $high]);
-#    Returns 1 if $String is a valid integer, 0 otherwise.  If $low
-#    and $high are entered, the integer must be in that range.
+#    Returns 1 if $String is a valid integer, 0 otherwise.  If $low is
+#    entered, $String must be >= $low.  If $high is entered, $String must
+#    be <= $high.  It is valid to check only one of the bounds.
+#
+#    undef (rather than 0) is returned if there is an error in either $low
+#    or $high or if $N is completely missing.
 #!!
 #&& IsInt
 sub IsInt {
   my($N,$low,$high)=@_;
-  return 0 if ($N eq "");
-  my($sign)='^\s* [-+]? \s*';
-  my($int) ='\d+ \s* $ ';
-  if ($N =~ /$sign $int/x) {
-    if (defined $low  and  defined $high) {
-      return 1  if ($N>=$low  and  $N<=$high);
-      return 0;
-    }
-    return 1;
+  return undef    if (! defined $N);
+  return 0        if ($N !~ /^\s*([+-]?)\s*(\d+)\s*$/);
+  $N="$1$2";
+  if (defined $low  and  length($low)>0) {
+    return undef  if (! &IsInt($low));
+    return 0      if ($N<$low);
   }
-  return 0;
+  if (defined $high  and  length($high)>0) {
+    return undef  if (! &IsInt($high));
+    return 0  if ($N>$high);
+  }
+  return 1;
 }
 #&&
 
@@ -5079,68 +5448,65 @@ sub CleanFile {
 }
 #&&
 
-#++ ExpandTilde :: Path.pl
-#!! ExpandTilde
 # $File=&ExpandTilde($file);
 #   This checks to see if a "~" appears as the first character in a path.
 #   If it does, the "~" expansion is interpreted (if possible) and the full
 #   path is returned.  If a "~" expansion is used but cannot be
-#   interpreted, an empty string is returned.  CleanFile is called.
-#!!
-#&& ExpandTilde
+#   interpreted, an empty string is returned.
+#
+#   This is Windows/Mac friendly.
+#   This is efficient.
 sub ExpandTilde {
   my($file)=shift;
-  my($user)=();
-  my($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell)=();
+  my($user,$home)=();
   # ~aaa/bbb=      ~  aaa      /bbb
-  if ($file =~ m% ^~ ([^\/]*) (\/.*)? %x) {
-    ($user,$file)=($1,$2);
+  if ($file =~ s|^~([^/]*)||) {
+    $user=$1;
     # Single user operating systems (Mac, MSWindows) don't have the getpwnam
     # and getpwuid routines defined.  Try to catch various different ways
     # of knowing we are on one of these systems:
-    return ""  if (defined $^O and
-                   $^O =~ /MacOS/i ||
-                   $^O =~ /MSWin32/i ||
-                   $^O =~ /Windows_95/i ||
-                   $^O =~ /Windows_NT/i);
-    return ""  if (defined $ENV{OS} and
-                   $ENV{OS} =~ /MacOS/i ||
-                   $ENV{OS} =~ /MSWin32/i ||
-                   $ENV{OS} =~ /Windows_95/i ||
-                   $ENV{OS} =~ /Windows_NT/i);
+    return ""  if ($Date::Manip::OS eq "Windows"  or
+                   $Date::Manip::OS eq "Mac");
+    #     return ""  if (defined $^O and
+    #                    $^O =~ /MacOS/i ||
+    #                    $^O =~ /MSWin32/i ||
+    #                    $^O =~ /Windows_95/i ||
+    #                    $^O =~ /Windows_NT/i);
+    #     return ""  if (defined $ENV{OS} and
+    #                    $ENV{OS} =~ /MacOS/i ||
+    #                    $ENV{OS} =~ /MSWin32/i ||
+    #                    $ENV{OS} =~ /Windows_95/i ||
+    #                    $ENV{OS} =~ /Windows_NT/i);
     $user=""  if (! defined $user);
-    $file=""  if (! defined $file);
+
     if ($user) {
-      ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell)=
-        getpwnam($user);
+      $home= (getpwnam($user))[7];
     } else {
-      ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell)=
-        getpwuid($<);
+      $home= (getpwuid($<))[7];
     }
-    return ""  if (! $dir);
-
-    $file="$dir/$file";
+    return ""  if (! $home);
+    $file="$home/$file";
   }
-  return &CleanFile($file);
+  $file;
 }
-#&&
 
-#++ FullFilePath :: Path.pl
-#!! FullFilePath
 # $File=&FullFilePath($file);
-#   Returns the full path to $file.  Returns an empty string if a "~"
+#   Returns the full path to $file (expanding "~" if necessary and turning
+#   relative paths into full paths).  Returns an empty string if a "~"
 #   expansion cannot be interpreted.  The path does not need to exist.
 #   CleanFile is called.
-#!!
-#&& FullFilePath
+#
+#   I'd like to get rid of the call to cwd (which does `pwd`).
 sub FullFilePath {
   my($file)=shift;
   $file=&ExpandTilde($file);
   return ""  if (! $file);
-  $file=cwd . "/$file"  if ($file !~ m|^/|);   # $file = "a/b/c"
+  my($cwd) = cwd;
+  # $cwd = VMS::Filespec::unixpath($cwd) if (defined $^O and $^O eq 'VMS');
+  $cwd = VMS::Filespec::unixpath($cwd) if ($Date::Manip::OS eq "VMS");
+  $file="$cwd/$file"  if ($file !~ m|^/|);   # $file = "a/b/c"
   return &CleanFile($file);
 }
-#&&
 
 #++ CheckFilePath :: Path.pl
 #!! CheckFilePath

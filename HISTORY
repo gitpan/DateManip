@@ -401,6 +401,7 @@ Version 5.31  1998-04-08
       <h8825393@idefix.wu-wien.ac.at>
    Removed the only occurence of $& (which may speed some things up).  Fix
       by Ken Williams <ken@forum.swarthmore.edu>
+      Oops.  First suggested by Abigal <abigail@fnx.com>
    Fixed a bug in converting timezones with a minutes field (+1030).  Found
       by <paulo@mail.ddnet.es>
    Fixed an overflow bug in doing date calculations with 2 dates more than
@@ -414,6 +415,55 @@ Version 5.31  1998-04-08
       <raminv@hotmail.com>
    Fixed a documentation problem with Date_GetPrev.  It was still 0-6
       instead of 1-7.  Thanks to Robert Klep <robert@ilse.nl>
+
+Version 5.32  1998-08-17
+   Added "in N days" and "N days ago" formats.  Tony Bowden <tony@tmtm.com>
+   Added cYYYY format to YYtoYYYY variable.  Mark Rejhon <marky@ottawa.com>
+   Allowed timezones of the format STD-#DST-#.  Peter Gordon
+      <peter@vhp9.valor.com>
+   Documentation fix.  Peter Gordon <peter@vhp9.valor.com>
+   Added Hong Kong, Singapore, and Korean timezones.  W. Phillip Moore
+      <wpm@ms.com>
+   Fixed a bug where the deltas could be off by up to a couple minutes in
+      some rare cases.  Herman Horsten <herman@Belgium.EU.net>
+   Minor documentation changes.  Yamamoto Hiroshi <hiroshi@246.ne.jp>
+   Fixed an "uninitialized symbol" warning.  Mark D. Anderson
+      <mda@discerning.com>
+   Added timezone support for "+0500 (EST)".  Tom Christiansen
+      <tchrist@jhereg.perl.com>
+   Removed support for oldstyle Date_Init arguments.
+   Fixed a bug where holidays were't erased.  Jonathan Wright
+      <JONATHAN_WRIGHT@Non-HP-Australia-om4.om.hp.com>
+   Added GB timezone.  Michael Smith <mjs@iii.co.uk>
+   Added Polish support.  Ian Wojtowicz <i@woj.com>
+   Applied a bug fix from Joe Chapman <joe@world.std.com> where the %W/%U
+      UnixDate formats were frequently wrong.
+   Added Dutch support.  Abigal <abigail@fnx.com>
+   Added 2 days/weeks/months later in both ParseDate and ParseDelta (for
+      Dutch support).  Abigal <abigail@fnx.com>
+   Several minor fixes and improvements.  Abigal <abigail@fnx.com>
+   Added some VMS support.  Charles Lane <lane@duphy4.drexel.edu>
+   Fixed a bug which caused a test to fail on some systems.  Charles Lane
+      <lane@duphy4.drexel.edu>
+   *** Changed DateManip.cnf to Manip.cnf (to get rid of problems with
+      certain OS's that can't handle filenames that aren't 8.3 characters)
+      for ALL non-Unix platforms (Wintel, VMS, Mac).  For all Unix platforms,
+      it's still .DateManip.cnf .  Also, it will only look in a users home
+      directory on VMS and Unix.
+   Added info about the RCS problem.  Supplied by Kipp E. Howard
+      <kipp.e.howard@boeing.com>
+   Added "Y:M:0*-DOM:0:0:0" to ParseRecur.  Jeff Yoak <jeff@yoak.com>
+   Added A.M. and P.M. parsing (not just AM and PM).  William W. Arnold
+      <warnold@vipnet.org>
+   Added timezone.  Samuli Karkkainen <skarkkai@woods.iki.fi>
+   Fixed a bug where "-1second" was treated as a date rather than a delta
+      in DateCalc.  Kenneth Ingham <ingham@i-pi.com>
+   Restricted timzeones parsing to 0000-2359 instead of 0000-9999.
+      Frank Cusack <fcusack@iconnet.net>.
+   Added a bit to the Makefile.PL (as it was distributed in the Win32
+      Perl Resource Kit).  Murray Nesbitt <murray@ActiveState.com>
+   Fixed a German initialization problem.  Christian Reithmaier
+      <reithmaier@04.blf01.telekom400.dbp.de>
 
 #########################################################################
 # Backwards incompatibilities
@@ -441,3 +491,7 @@ In 5.21
 
 In 5.30
   Delta now contains a week field.
+
+In 5.32
+  Old style Date_Init arguments no longer supported.
+  The DateManip.cnf file's name has changed for ALL non-Unix platforms.

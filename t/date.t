@@ -2,6 +2,7 @@
 
 require 5.001;
 use Date::Manip;
+@Date::Manip::TestArgs=();
 $runtests=shift(@ARGV);
 if ( -f "t/test.pl" ) {
   require "t/test.pl";
@@ -10,11 +11,10 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
-$ntest=219;
+$ntest=220;
 
 print "1..$ntest\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST",
-           "ForceDate=1997-03-08-12:30:00");
+&Date_Init(@Date::Manip::TestArgs,"ForceDate=1997-03-08-12:30:00");
 
 ($currS,$currMN,$currH,$currD,$currM,$currY)=("00","30","12","08","03","1997");
 
@@ -717,6 +717,8 @@ epoch 400000
 Mon, 19 Jan 1998 08:11:34 +1030
     1998011816:41:34
 
+Tue, 26 May 1998 13:23:15 -0500 (EST)
+    1998052613:23:15
 ";
 
 print "Date...\n";

@@ -33,72 +33,29 @@ the timezone ( YYYYMMDDHH:MN:SS+HHMN ).  Using UnixDate to extract information
 from a date is recommended.
 
 
-Notes for version 5.31:
+Notes for version 5.32:
   Mainly a bug fix release.
-  Aplit Manip.pm so it's not all in one file.
-  Allowed non-ISO-8601 timezones with ISO-8601 dates.
-  Added "epoch 52352352352" to ParseDate to parse seconds since the epoch.
-  Added German date support.
-  Date_NthDayOfYear enhanced.
-
-Notes for version 5.30:
-  *** Deltas now have a week field: Y:M:W:D:H:Mn:S
-  *** Added ParseRecur.
-  Added the Delta_Format function.
-  Added Date_SetDateField function.
-  All routines now handle 2 or 4 digit years.
-
-Notes for version 5.21:
-  Now passes taint checks (for 5.004_03 ... I haven't checked 5.004_04
-    which apparently does better taint checking).
-  Several speedups (significantly faster now).
-  Added some config variables:
-    YYtoYYYY, UpdateCurrTZ, TomorrowFirst
-  Added the Date_NearestWorkDay function
-  Some minor bugfixes.
-  Fixed handling of ISO 8601 weeks 01, 52, and 53 (and added %G and %L formats
-    to UnixDate to acommadate this).
-  Better handling of foreign languages (now handles accents reasonably well).
-  Several minor additions to parsing formats:
-    British date formats
-    Added Sept as a valid abbreviation
-    Time can be written as 5pm
-  Added ForceDate variable.
-  Tests now work for all years.
-
-Notes for version 5.20:
-  *** Added ISO 8601 date formats.
-  Added ParseDateString for speed.
-  Changed week handling to meet ISO 8601 standards.
-  Added %J and %K UnixDate formats.
-  Added some speedups (more to come).
-  Added more Parse formats:
-     last day in mmm in YY             "last day of October"
-     dofw                              "Friday" (Friday of current week)
-     Nth                               "12th", "1st" (day of current month)
+  Added Polish and Dutch support.
+  *** Changed .DateManip.cnf to Manip.cnf (to get rid of problems on OS's
+     that insist on 8.3 filenames) for all non-Unix platforms (Wintel, VMS,
+     Mac).  For all Unix platforms, it's still .DateManip.cnf .  It will only
+     look in the user's home directory on VMS and Unix.
+  Added "in N days" and "N days ago" parse formats.
+  Added "N days/weeks/months later" parse formats (both dates and deltas).
+  Allow timezones in the formats "STD-#DST-#" and "+HHMM (NAME)".
+  Added several timezones.
+  Added "A.M." parsing (not just "AM").
 
 Backwards incompatibilities:
+
+  Version 5.32
+    Old style Date_Init arguments no longer supported.
+    *** .DateManip.cnf changed to Manip.cnf on all non-Unix platforms.
 
   Version 5.30
     The internal format of a delta has changed.  This will cause some people
        problems.  Use the routine Delta_Format to extract information from
        a delta.
-
-  Version 5.21
-    When running processes (running over time zone changes).  See UpdateCurrTZ
-       documentation.
-    The UnixDate formats %W and %U no longer return week 00.
-
-  Version 5.20
-    Some old formats were removed since they conflicted with ISO 8601
-       formats.  MM-DD-YY (conflicts with YY-MM-DD), YYMMDD (conflicts
-       with YYYYMM).
-    Weekdays are now numbered 1-7 (mon-sun) instead of 0-6 (sun-sat)
-    By default the week now starts with Monday instead of Sunday to meet
-       ISO 8601.  The FirstDay variable can be set to 7 to set Sunday as
-       the first day.
-    By default, the 1st week of the year contains Jan 4 (ISO 8601).  See
-       the Jan1Week1 variable for overriding this.
 
   ############################################################################
   If you would like to stay informed about future versions of this module,
@@ -183,7 +140,7 @@ an hour of each other, etc.
 
 NOTE:  Support for this will be added soon.
 
-mong other things, Date::Manip allow you to:
+Among other things, Date::Manip allow you to:
 
 1.  Enter a date and be able to choose any format conveniant
 

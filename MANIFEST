@@ -7,8 +7,7 @@ Manip.pm
 Manip.pod
 README
 TODO
-t/.DateManip.cnf
-t/DateManip.cnf
+t/Manip.cnf
 t/date.t
 t/date_date_0.t
 t/date_date_1.t

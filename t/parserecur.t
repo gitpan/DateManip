@@ -2,6 +2,7 @@
 
 require 5.001;
 use Date::Manip;
+@Date::Manip::TestArgs=();
 $runtests=shift(@ARGV);
 if ( -f "t/test.pl" ) {
   require "t/test.pl";
@@ -10,10 +11,10 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
-$ntest=25;
+$ntest=26;
 
 print "1..$ntest\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
+&Date_Init(@Date::Manip::TestArgs);
 
 $tests ="
 
@@ -155,6 +156,24 @@ Jul 1 1998
    1998050200:00:00
    1998053100:00:00
    1998060200:00:00
+
+0:1:0*-2:0:0:0
+Jan 1 1998
+Jan 1 1998
+Dec 31 1998
+   ~
+   1998013000:00:00
+   1998022700:00:00
+   1998033000:00:00
+   1998042900:00:00
+   1998053000:00:00
+   1998062900:00:00
+   1998073000:00:00
+   1998083000:00:00
+   1998092900:00:00
+   1998103000:00:00
+   1998112900:00:00
+   1998123000:00:00
 
 0:1*2,-1:0:0:0:0
 Jan 1 1998

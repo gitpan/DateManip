@@ -4,7 +4,7 @@
 # See Date::Manip man page for a description of all config variables.
 
 EraseHolidays		=
-PersonalCnf		= .DateManip.cnf
+PersonalCnf		= Manip.cnf
 PersonalCnfPath		= t:.
 Language		= English
 DateFormat		= US

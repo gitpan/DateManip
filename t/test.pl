@@ -1,4 +1,9 @@
-#!/usr/local/bin/perl
+#!/usr/local/bin/perl -w
+
+# Sets a couple standard arguments:
+@Date::Manip::TestArgs=();
+@Date::Manip::TestArgs=("PersonalCnf=Manip.cnf","PersonalCnfPath=./t:.",
+                        "IgnoreGlobalCnf=1","TZ=EST");
 
 # This takes a list of strings of the form:
 #   ARG1

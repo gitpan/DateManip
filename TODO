@@ -2,6 +2,27 @@
 # MISC
 ########################################################################
 
+If it can't determine the local timezone, set TZ to IGNORED ???
+
+Add another INIT variable to NOT initialize any language variable unless
+needed.
+
+Add another internal format "xYYYYxMMxDDxHHxMNxSS" just to make sure
+that NOTHING in Date::Manip is parsing the date itself.  Add a DateCalc
+test using it (with the parsed dates including "next week Sunday" types
+strings to test most routines).
+
+Use of holidays and other named days in ParseDate ("Christmas 1995")
+Abigal <abigail@fnx.com>
+
+A business week in a delta should be treated as an exact week (i.e. from
+Monday to Monday regardless of the number of work days)
+Abigal <abigail@fnx.com>
+
+Change the Jan1Week1 variable to accept the values "m1-m7" (1st week contains
+Jan X) or "d1-d7" (1st week contains the 1st dX day of week ... so d1
+means that the 1st week of the year contains the 1st Monday).
+
 Make work weeks able to start and stop on arbitrary days (even across
 weekends).
 
@@ -45,6 +66,10 @@ Change EXPORT to EXPORT_OK (message 9 by Peter Bray)
 Add ParseDateTemplate where a template containing any of the formats
 from UnixDate may be used in a string (which may contain perl REs)
 to parse a very strange date.
+
+Mark Dedlow <dedlow@voro.lbl.gov>
+  nth DAY of month
+  nth WEEKDAY of month
 
 ########################################################################
 # TESTS
@@ -110,8 +135,7 @@ $flag=&Date_GranularityTest($date,$base,$granularity [,$flags] [$width])
 # DAYLIGHT SAVINGS TIME
 ########################################################################
 
-Use POSIX tzset/tzname (and perhaps GNU date) to handle timezone and
-daylight savings time correctly.  See messages by Marvin Soloman.
+Use zdump command to get timezone info.
 
 If ignoring TIMEZONE info, treat all dates as in current timezone with
 no d.s.t. effects (i.e. Jun 1 12:00 EDT == Jun 1 12:00 EST).
@@ -125,22 +149,20 @@ paired up.  Places with only a single timezone should work as well.
 
 Make a 2nd hash where EST -> EST#EDT for all timezones.
 
-When doing date calculations, if neither date has a time (or if both are
-at the exact same time and are in the same timezone or in timezones
-related through daylight savings time such as EST and EDT), ignore the
-time gain/loss from savings time transitions IFF the variable IgnoreDST
-is on (it is by default).  Otherwise, do the calculation exactly.
-
 Add an option to all date calculations to ignore daylight savings time
-transitions.
+transitions.  Both normal/savings timezones are treated as identical to
+the CURRENT timezone.  IgnoreSavingsTime=true
 
 ########################################################################
 # TIMEZONES
 ########################################################################
 
-It is just too confusing knowing what timezone you are working it.  I
-give up.  Change the internal format to YYYYMMDDHH:MN:SS+HHMN or
-YYYYMMDDHH:MN::SS-HHMN
+Make date format:
+  YYYYMMDDHH:MN:SS+HHMN*EST:EDT
+where EST and EDT are the timezone abbreviations to use (this is set
+when the date is parsed).  If these are not set, they default to the
+timezones to use with +HHMN.
+
 By default, convert all dates to current timezone however unless a
 NOCONV option is set.
 

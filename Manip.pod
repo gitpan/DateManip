@@ -77,7 +77,9 @@ manipulation easy to do.  Operations such as comparing two times,
 calculating a time a given amount of time from another, or parsing
 international times are all easily done.  From the very beginning, the main
 focus of Date::Manip has been to be able to do ANY desired date/time
-operation easily, not necessarily quickly.  There are other modules that
+operation easily, not necessarily quickly.  Also, it is definitely oriented
+towards the type of operationw we (as people) tend to think of rather than
+those operations used routinely by computers.  There are other modules that
 can do a small subset of the operations available in Date::Manip much
 quicker than those presented here, so if speed is a primary issue, you
 should look elsewhere.  Check out the CPAN listing of Time and Date
@@ -110,8 +112,8 @@ types of data.
 
 Although the word date is used extensively here, it is actually somewhat
 misleading.  Date::Manip works with the full date AND time (year, month,
-day, hour, minute, second).  It doesn't work with fractional seconds.
-Timezones are also supported.
+day, hour, minute, second and weeks when appropriate).  It doesn't work
+with fractional seconds.  Timezones are also supported to some extent.
 
 NOTE:  Much better support for timezones (including Daylight Savings Time)
 is planned for the future.
@@ -138,7 +140,7 @@ they are identical at a granularity of days, then they only have to occur
 on the same day.  At a granularity of an hour, they have to occur within
 an hour of each other, etc.
 
-NOTE:  Support for this will be added soon.
+NOTE:  Support for this will be added in the future.
 
 =back
 
@@ -200,9 +202,10 @@ cases, a non-English equivalent will work equally well.
   $date1=&ParseDate($string1);
   $date2=&ParseDate($string2);
   $delta=&DateCalc($date1,$date2,\$err);
-  => 0:0:DD:HH:MM:SS   the days, hours, minutes, and seconds between the two
+  => 0:0:WK:DD:HH:MM:SS   the weeks, days, hours, minutes, and seconds
+                          between the two
   $delta=&DateCalc($date1,$date2,\$err,1);
-  => YY:MM:DD:HH:MM:SS  the years, months, etc. between the two
+  => YY:MM:WK:DD:HH:MM:SS  the years, months, etc. between the two
 
   Read the documentation below for an explanation of the difference.
 
@@ -231,6 +234,53 @@ in this module is language dependent).  It is simply that I do not have the
 correct translation available for some words.  If there is a date form that
 works in English but does not work in a language you need, let me know and
 if you can provide me the translation, I will fix DateManip.
+
+=head1 SHOULD I USE DATE::MANIP
+
+If you look in CPAN, you'll find that there are a number of Date and Time
+packages.  Is Date::Manip the one you should be using?
+
+Date::Manip has several strengths.  These include flexibility, a wide
+variety of functions, and it is written entirely in perl.
+
+It also has several weaknesses.  The main one is that it is written
+entirely in perl.
+
+The fact that it is written in perl is both an advantage and a disadvantage.
+It means that you are not required to have a C compiler around in order to
+install Date::Manip (in fact, Date::Manip has no dependancies on anything
+not included in a standard perl distribution since perl 5.002 or so).  On
+Unix platforms, this is not terribly important since they pretty much all have
+a C compiler, but on non-Unix platforms, this can simplify insallation.
+
+The downside is that Date::Manip is slow, especially when compared to
+several of the other Date/Time modules which are written in C.  Although I
+am working on making Date::Manip faster, it will never be as fast as these
+modules.  And before anyone asks, Date::Manip will never be translated to C
+(at least by me).  I write C because I have to.  I write perl because I
+like to.  Date::Manip is something I do because it interests me, not
+something I'm paid for.
+
+If you are going to be using the module in cases where performance is an
+important factor (parsing 10,000 dates from a database or started up in a
+CGI program being run by your web server 5,000 times a second), you might
+check out one of the other Date or Time modules in CPAN.  Date::DateCalc,
+Date::TimeDate, or Time::Time-modules might meet your needs.  In general,
+you do not need the flexibility offered by Date::Manip in these cases.  For
+example, if you are reading a database, all of the dates are written in
+exactly the same format.  It should be trivial to write a routine specific
+to this format.
+
+The biggest strength of Date::Manip is it's flexibility.  None of the other
+modules can do everything that Date::Manip can do.  I'm trying to build a
+library which can do _EVERY_ conceivable date/time manipulation that you'll
+run into in everyday life.  It is definitely intended to use in the terms
+of how you (not the computer) think of dates and times.
+
+If you are doing operations based more on how people think of dates and
+times, Date::Manip is almost certainly for you.  This includes parsing
+dates (including foreign language dates), calendar type operations,
+business dates and holidays, etc.
 
 =head1 ROUTINES
 
@@ -307,7 +357,8 @@ only be used when no ambiguity is introduced (i.e. when it is not
 immediately preceded by a digit).
 
 A time is usually entered in 24 hour mode, but 12 hour mode can be used
-as well if AM/PM are entered.
+as well if AM/PM are entered (AM can be entered as AM or A.M. or other
+variations depending on the language).
 
 Fractional seconds are also supported in parsing but the fractional part is
 discarded.
@@ -396,22 +447,23 @@ obtained by setting the config variable DateFormat to something other than
 "US" (see CUSTOMIZING DATE::MANIP below).
 
 Miscellaneous other allowed formats are:
-  which dofw in mmm in YY           "first sunday in june 1996 at 14:00"
-  dofw week num YY                  "sunday week 22 1995"
-  which dofw YY                     "22nd sunday at noon"
-  dofw which week YY                "sunday 22nd week in 1996"
-  next/last dofw                    "next friday at noon"
-  next/last week/month              "next month"
-  in num weeks/months               "in 3 weeks at 12:00"
-  num weeks/months ago              "3 weeks ago"
-  dofw in num week                  "Friday in 2 weeks"
-  in num weeks dofw                 "in 2 weeks on friday"
-  dofw num week ago                 "Friday 2 weeks ago"
-  num week ago dofw                 "2 weeks ago friday"
-  last day in mmm in YY             "last day of October"
-  dofw                              "Friday" (Friday of current week)
-  Nth                               "12th", "1st" (day of current month)
-  ecpoch SECS                       seconds since the epoch
+  which dofw in mmm in YY      "first sunday in june 1996 at 14:00"
+  dofw week num YY             "sunday week 22 1995"
+  which dofw YY                "22nd sunday at noon"
+  dofw which week YY           "sunday 22nd week in 1996"
+  next/last dofw               "next friday at noon"
+  next/last week/month         "next month"
+  in num days/weeks/months     "in 3 weeks at 12:00"
+  num days/weeks/months later  "3 weeks later"
+  num days/weeks/months ago    "3 weeks ago"
+  dofw in num week             "Friday in 2 weeks"
+  in num weeks dofw            "in 2 weeks on friday"
+  dofw num week ago            "Friday 2 weeks ago"
+  num week ago dofw            "2 weeks ago friday"
+  last day in mmm in YY        "last day of October"
+  dofw                         "Friday" (Friday of current week)
+  Nth                          "12th", "1st" (day of current month)
+  ecpoch SECS                  seconds since the epoch
 
 Note that certain words such as "in", "at", "of", etc. which commonly appear
 in a date or time are ignored.  Also, the year is alway optional.
@@ -423,6 +475,7 @@ In addition, the following strings are recognized:
   tomorrow  (exactly 24 hours from now)
   noon      (12:00:00)
   midnight  (00:00:00)
+Other languages have similar (and in some cases additional) strings.
 
 Some things to note:
 
@@ -655,9 +708,9 @@ This is similar to the UnixDate routine except that it extracts information
 from a delta.  Unlike the UnixDate routine, most of the formats are 2
 characters instead of 1.
 
-NOTE:  For the time being, Delta_Format only understands the "exact" parts of
-a delta (W/D/H/MN/S).  Additional formats to handle the remainder will be
-added shortly.
+NOTE: For the time being, Delta_Format only understands the "exact" parts
+of a delta (Y/M) and (W/D/H/MN/S).  There is currently no "mixing" between
+the two parts.
 
 Formats currently understood are:
 
@@ -668,12 +721,13 @@ Formats currently understood are:
              of X
    %Xt     : the value of all fields expressed in units of X
 
-   X is one of w,d,h,m,s (case sensitive).
+   X is one of y,M,w,d,h,m,s (case sensitive).
 
    %%      : returns a "%"
 
 So, the format "%hd" means the values of H, MN, and S expressed in hours.
-So for the delta "0:0:0:0:2:30:0", this format returns 2.5.
+So for the delta "0:0:0:0:2:30:0", this format returns 2.5.  Similarily, the
+format "%yd" means the value (in years) of both the Y and M fields.
 
 The format "%hh" returns the value of W, D, and H expressed in hours.
 
@@ -737,6 +791,7 @@ This is best illustrated by example.
   1:0:0*45:0:0:0       45th day of every year
   0:1*4:2:0:0:0        4th tuesday (day 2) of every month
   0:1*-1:2:0:0:0       last tuesday of every month
+  0:1:0*-2:0:0:0       2nd to last day of every month
   0:0:3*2:0:0:0        every 3rd tuesday (every 3 weeks on 2nd day of week)
   1:0*12:2:0:0:0       tuesday of the 12th week of each year
   *1990-1995:12:0:1:0:0:0
@@ -1234,7 +1289,7 @@ and Paul Foley (with some additions by myself).
      #NST     -0330    Newfoundland Standard       nst=North Sumatra    +0630
       NFT     -0330    Newfoundland
      #GST     -0300    Greenland Standard          gst=Guam Standard    +1000
-      BST     -0300    Brazil Standard             bst=British Summer   +0100
+     #BST     -0300    Brazil Standard             bst=British Summer   +0100
       ADT     -0300    Atlantic Daylight
       NDT     -0230    Newfoundland Daylight
       AT      -0200    Azores
@@ -1248,13 +1303,15 @@ and Paul Foley (with some additions by myself).
       MET     +0100    Middle European
       MEWT    +0100    Middle European Winter
       SWT     +0100    Swedish Winter
-     #BST     +0100    British Summer              bst=Brazil standard  -0300
+      BST     +0100    British Summer              bst=Brazil standard  -0300
+      GB      +0100    GMT with daylight savings
       CEST    +0200    Central European Summer
       EET     +0200    Eastern Europe, USSR Zone 1
       FST     +0200    French Summer
       MEST    +0200    Middle European Summer
       METDST  +0200    An alias for MEST used by HP-UX
       SST     +0200    Swedish Summer              sst=South Sumatra    +0700
+      EEST    +0300    Eastern Europe Summer
       BT      +0300    Baghdad, USSR Zone 2
       IT      +0330    Iran
       ZP4     +0400    USSR Zone 3
@@ -1263,7 +1320,6 @@ and Paul Foley (with some additions by myself).
       ZP6     +0600    USSR Zone 5
       NST     +0630    North Sumatra               nst=Newfoundland Std -0330
      #SST     +0700    South Sumatra, USSR Zone 6  sst=Swedish Summer   +0200
-      JT      +0730    Java (3pm in Cronusland!)
       CCT     +0800    China Coast, USSR Zone 7
       AWST    +0800    West Australian Standard
       WST     +0800    West Australian Standard
@@ -1439,7 +1495,10 @@ global config file will be read.
 
 If this variable is used (any value is ignored), the current list of
 defined holidays is erased.  A new set will be set the next time a
-config file is read in.
+config file is read in.  This can be set in either the global config file
+or as a Date_Init argument (in which case holidays can be read in from
+both the global and personal config files) or in the personal config file
+(in which case, only holidays in the personal config file are counted).
 
 =item PersonalCnf
 
@@ -1447,10 +1506,14 @@ This variable can be passed into Date_Init to read a different personal
 configuration file.  It can also be included in the global config file
 to define where personal config files live.
 
+The default name for the config file is .DateManip.cnf on all Unix
+platforms and Manip.cnf on all non-Unix platforms (because some of them
+insist on 8.3 character filenames :-).
+
 =item PersonalCnfPath
 
 Used in the same way as the PersonalCnf option.  You can use tilde (~)
-expansions when defining the path.
+expansions when defining the path for Unix and VMS platforms.
 
 =item Language
 
@@ -1597,6 +1660,9 @@ YYtoYYYY can also be set to "C" to force it into the current century, or
 to "C##" to force it into a specific century.  So, no (1998), "C" forces
 2 digit years to be 1900-1999 and "C18" would force it to be 1800-1899.
 
+It can also be set to the form "C####" to force it into a specific 100
+year period.  C1950 refers to 1950-2049.
+
 =item UpdateCurrTZ
 
 If a script is running over a long period of time, the timezone may change
@@ -1633,6 +1699,17 @@ release.  There have been a few minor incompatibilities introduced at
 various stages.  Major differences are marked with bullets.
 
 =over 4
+
+=item VERSION 5.32
+
+=over 4
+
+=item Date_Init arguments
+
+The old style Date_Init arguments that were deprecated in version 5.07
+have been removed.
+
+=back
 
 =item VERSION 5.30
 
@@ -1715,16 +1792,20 @@ old method
 
   &Date_Init($language,$format,$tz,$convtz);
 
-is still supported, but this support will likely disappear in the future.
+is still supported , but this support will likely disappear in the future.
 Use the new calling format instead:
 
   &Date_Init("var=val","var=val",...);
 
-=back
+NOTE:  The old format is no longer supported as of version 5.32 .
 
 =back
 
-=head1 COMMON PROBLEMS
+=back
+
+=head1 KNOWN PROBLEMS
+
+The following are not bugs, but they may give some people problems.
 
 =over 4
 
@@ -1735,11 +1816,26 @@ Perhaps the most common problem occurs when you get the error:
    Error: Date::Manip unable to determine TimeZone.
 
 Date::Manip tries hard to determine the local timezone, but on some
-machines, it cannot do this (especially those without a unix date
-command... i.e. Microsoft Windows systems).  To fix this, just set the TZ
-variable, either at the top of the Manip.pm file, or in the DateManip.cnf
-file.  I suggest using the form "EST5EDT" so you don't have to change it
-every 6 months when going to or from daylight savings time.
+machines, it cannot do this (especially non-unix systems).  To fix this,
+just set the TZ variable, either at the top of the Manip.pm file, or in the
+DateManip.cnf file.  I suggest using the form "EST5EDT" so you don't have
+to change it every 6 months when going to or from daylight savings time.
+
+A minor (false) assumption that some users might make is that since
+Date::Manip passed all of it's tests at install time, this should not occur
+and are surprised when it does.
+
+Some of the tests are timezone dependent.  Since the tests all include
+input and expected output, I needed to know in advance what timezone they
+would be run in.  So, the tests all explicitely set the timezone using the
+TZ configuration variable passed into Date_Init.  Since this overrides any
+other method of determining the timezone, Date::Manip uses this and doesn't
+have to look elsewhere for the timezone.
+
+When running outside the tests, Date::Manip has to rely on it's other
+methods for determining the timezone.
+
+=item Complaining about getpwnam/getpwuid
 
 Another problem is when running on Micro$oft OS'es.  I have added many
 tests to catch them, but they still slip through occasionally.  If any ever
@@ -1754,28 +1850,14 @@ to your script before
 
 =item Date::Manip is slow
 
-From the very beginning, I have designed Date::Manip to be capable of doing
-virtually every common operation that you could ever want to do with a
-date and to do it easily.  To get this amount of flexibility, there is
-a price to be paid, and in this case it is in performance.  Date::Manip is
-NOT an extremely fast module and it likely never will be.
-
-If you are going to be using the module in cases where performance is an
-important factor (parsing 10,000 dates from a database or started up in a
-CGI program being run by your web server 5,000 times a second), you might
-check out one of the other Date or Time modules in CPAN.  Date::DateCalc,
-Date::TimeDate, or Time::Time-modules might meet your needs.
-
-Although I am working on making Date::Manip faster, it will never be as
-fast as these other modules.  Some of them are written in C for one thing.
-And before anyone asks, Date::Manip will never be translated to C (at least
-by me).  I write C because I have to.  I write perl because I like to.
-Date::Manip is something I do because it interests me, not something I'm
-paid for.  Version 5.21 does run noticably faster than earlier versions due
-to rethinking some of the initialization, so at the very least, make sure
-you are running this version or later.
+The reasons for this are covered in the SHOULD I USE DATE::MANIP section
+above.
 
 Some things that will definitely help:
+
+Version 5.21 does run noticably faster than earlier versions due to
+rethinking some of the initialization, so at the very least, make sure you
+are running this version or later.
 
 ISO-8601 dates are parsed first and fastest.  Use them whenever possible.
 
@@ -1787,12 +1869,12 @@ days, today at noon, etc.).  These take a lot longer to parse.
    5.21 took 29.1 seconds (these were run on a slow, overloaded computer with
    little memory... but the ratios should be reliable on a faster computer).
 
-Business date calculations are extremely.  You should consider alternatives
-if possible (i.e. doing the calculation in exact mode and then multiplying
-by 5/7).  There will be an approximate business mode in one of the next
-versions which will be much faster (though less accurate) which will do
-something like this.  Whenever possible, use this mode.  And who needs a
-business date more accurate than "6 to 8 weeks" anyway huh :-)
+Business date calculations are extremely slow.  You should consider
+alternatives if possible (i.e. doing the calculation in exact mode and then
+multiplying by 5/7).  There will be an approximate business mode in one of
+the next versions which will be much faster (though less accurate) which
+will do something like this.  Whenever possible, use this mode.  And who
+needs a business date more accurate than "6 to 8 weeks" anyway huh :-)
 
 Never call Date_Init more than once.  Unless you're doing something very
 strange, there should never be a reason to anyway.
@@ -1818,24 +1900,25 @@ is used in the sort.  For example, the following code fails:
 
 but if you uncomment the Date_Init line, it works.  The reason for this is
 that the first time you call Date_Init, it initializes a number of items
-used by Date::Manip.  Some of these are sorted.  It turns out that perl
-(5.003 and earlier) has a bug in it which does not allow a sort within a
-sort.  The next version (5.004) may fix this.  For now, the best thing to
-do is to call Date_Init explicitely.  NOTE: This is an EXTREMELY
-inefficient way to sort data.  Instead, you should translate the dates to
-the Date::Manip internal format, sort them using a normal string
+used by Date::Manip.  Some of these have to be sorted (regular expressions
+sorted by length to ensure the longest match).  It turns out that perl
+(5.004 and earlier) has a bug in it which does not allow a sort within a
+sort.  At some point, this should be fixed, but for now, the best thing to
+do is to call Date_Init explicitely.
+
+NOTE: This is an EXTREMELY inefficient way to sort data.  Instead, you
+should parse the dates with ParseDate, sort them using a normal string
 comparison, and then convert them back to the format desired using
 UnixDate.
-
-NOTE:  5.004 has not fixed this to date.
 
 =item RCS Control
 
 If you try to put Date::Manip under RCS control, you are going to have
-problems.  Apparently, RCS replaces strings of the form "$Date...$" with
-the current date.  This form occurs all over in Date::Manip.  Since very
-few people will ever have a desire to do this (and I don't use RCS), I have
-not worried about it.
+problems.  Apparently, RCS replaces strings of the form "$Date...$" with 
+the current date.  This form occurs all over in Date::Manip.  To prevent the
+RCS keyword expansion, checkout files using "co -ko".  Since very few people
+will ever have a desire to do this (and I don't use RCS), I have not worried
+about it.
 
 =back
 
@@ -1902,27 +1985,34 @@ this buzzword starts flying around more and more frantically, other's might
 follow suit, so this section answers the question.
 
 Is Date::Manip year 2000 compliant?  Yes, but the question is largely
-unimportant!  Date::Manip is basically a parser.  It'll parse dates in any
+unmeaningful.  Date::Manip is basically a parser.  It'll parse dates in any
 of thousands of different formats (including the 2 digit years that are
-going to cause the computer equivalent of doomsday Dec 31, 1999).  But,
+going to cause the computer equivalent of doomsday on Dec 31, 1999).  But,
 internally, Date::Manip stores years as 4 digits, and all of it's functions
 work with the 4 digit representation, so there is no problem with dates
 after 2000.
 
-A better question is is Date::Manip 10,000 compliant.  No.  If you were to
-take the current version forward 8000 years, it would cause any number of
-problems.  Actually, Date::Manip should break down somewhere around the
-year 3000 since at that point the current method of determining leap years
-will break down (we'll be off by a day every 3200 years or so).
+The better question is "Is Perl year 2000 compliant"?  This is such a good
+question, that it's in the perl FAQ.  Go read "Does Perl have a year 2000
+problem" in section 4.
 
-The best question is for what dates are Date::Manip useful.  It definitely
-can't deal with BC dates.  I haven't tested Date::Manip for years between
-0001 AD and 0999 AD, but I think it should handle them.  This is completely
-untested however!  More important is the fact that Date::Manip is based on
-the Gregorian calendar which wasn't adopted until relatively recently.
+The best question is "For what dates is Date::Manip useful?"  It definitely
+can't handle BC dates, or dates past Dec 31, 9999.  Also, one of the basic
+routines I wrote counts the days since Dec 31, 0999.  I realize now that I
+should have had it calculate days since Dec 31, 0001 BC, but I didn't.  One
+day I may go back and change this, but until I do, dates in the first
+millenium (0001 to 0999) probably won't work.  So, I guarantee that
+Date::Manip works during the years 1000 to 9999.
 
-So, Date::Manip will return accurate results provided you stay within
-the years after the Gregorian calendar was adopted and before 3000 AD.
+In practical terms however, Date::Manip deals with the Gregorian calendar,
+and is therefore useful in the period that that calendar has been, or will
+be, in effect.  The Gregorian calendar was first adopted by the Catholic
+church in 1582, but some countries were still using the Julian calendar as
+late as the early part of this century.  Also, at some point around the
+year 3000, the calendar system is going to have to be modified slightly
+since the current system of leap years will be off by one day every 3200
+years or so.  So...  in practical terms, Date::Manip is _probably_ useful
+from 1900 to 3000.  Approximately.
 
 One other note is that Date::Manip will NOT handle 3 digit years.  So, if
 you store the year as an offset from 1900 (which is 2 digits now, but will
@@ -1930,6 +2020,25 @@ become 3 digits in 2000), these will NOT be parsable by Date::Manip.
 
 Finally, Date::Manip is flexible.  It will allow you to write Year 2000
 NON-compliant code if you really want to.
+
+=head1 ACKNOWLEDGEMENTS
+
+There are many people who have contributed to Date::Manip over the years
+that I'd like to thank.  The most important contributions have come in the
+form of suggestions and bug reports by users.  I have tried to include the
+name of every person who first suggested each improvement or first reported
+each bug.  These are included in the HISTORY file in the Date::Manip
+distribution.  The list is simply too long to appear here, but I appreciate
+their help.
+
+I'd also like a couple of authors.  Date::Manip has recently been getting
+some really good press in a couple of books.  Since no one's paying me to
+write Date::Manip, seeing my module praised in a book written by someone
+else is really great.  My thanks to Nate Patwardhan and Clay Irving
+(Programming with Perl Modules -- part of the O'Reilly Perl Resource Kit);
+and Tom Christiansen and Nathan Torkington (for the forthcoming book The
+Perl Cookbook).  Also, thanks to any other authors who've written about
+Date::Manip who's books I haven't seen.
 
 =head1 AUTHOR
 

@@ -2,6 +2,7 @@
 
 require 5.001;
 use Date::Manip;
+@Date::Manip::TestArgs=();
 $runtests=shift(@ARGV);
 if ( -f "t/test.pl" ) {
   require "t/test.pl";
@@ -13,8 +14,7 @@ if ( -f "t/test.pl" ) {
 $ntest=89;
 
 print "1..$ntest\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST",
-           "ForceDate=1997-03-08-12:30:00");
+&Date_Init(@Date::Manip::TestArgs,"ForceDate=1997-03-08-12:30:00");
 
 ($currS,$currMN,$currH,$currD,$currM,$currY)=("00","30","12","08","03","1997");
 

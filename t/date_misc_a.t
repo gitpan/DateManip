@@ -2,6 +2,7 @@
 
 require 5.001;
 use Date::Manip;
+@Date::Manip::TestArgs=();
 $runtests=shift(@ARGV);
 if ( -f "t/test.pl" ) {
   require "t/test.pl";
@@ -13,7 +14,7 @@ if ( -f "t/test.pl" ) {
 $ntest=2;
 
 print "1..$ntest\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
+&Date_Init(@Date::Manip::TestArgs);
 
 $dates="
 # Tests YYMMDD time
