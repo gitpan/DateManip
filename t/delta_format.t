@@ -15,24 +15,27 @@ $ntest=3;
 print "1..$ntest\n"  if (! $runtests);
 &Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
-$calcs="
+$tests="
 
-Wed Nov 20 1996 noon
-+0:5:0:0
-  1996112108:30:00
+0:0:1:2:3:4:5
+4
+%wv %dv %hv %mv %sv : %wh %dh %hh %mh %sh
+  1_2_3_4_5_:_1_9_219_13144_788645
 
-Wed Nov 20 1996 noon
-+3:7:0:0
-  1996112610:30:00
+0:0:1:2:3:4:5
+4
+%wd %dd %hd %md %sd
+  1.3040_2.1278_3.0681_4.0833_5.0000
 
-Mar 31 1997 16:59:59
-+ 1 sec
-  1997040108:30:00
+0:0:1:2:3:4:5
+4
+%wt %dt %ht %mt %st
+  1.3040_9.1278_219.0681_13144.0833_788645.0000
 
 ";
 
-&Date_Init("WorkDayBeg=08:30","WorkDayEnd=17:00");
-print "DateCalc (date,delta,business 8:30-5:00)...\n";
-&test_Func($ntest,\&DateCalc,$calcs,$runtests,2);
+print "FormatDelta...\n";
+&test_Func($ntest,\&Delta_Format,$tests,$runtests);
 
 1;
+

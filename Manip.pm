@@ -71,11 +71,12 @@ $Date::Manip::Jan1Week1=0;
 # 2 digit years fall into the 100 year period given by [ CURR-N, CURR+(99-N) ]
 # where N is 0-99.  Default behavior is 89, but other useful numbers might
 # be 0 (forced to be this year or later) and 99 (forced to be this year or
-# earlier).
+# earlier).  It can also be set to "c" (current century) or "cNN" (i.e.
+# c18 forces the year to bet 1800-1899).
 $Date::Manip::YYtoYYYY=89;
 
 # Set this to 1 if you want a long-running script to always update the
-# timezone.  This is slow.  Read the POD documentation.
+# timezone.  This will slow Date::Manip down.  Read the POD documentation.
 $Date::Manip::UpdateCurrTZ=0;
 
 # Use an international character set.
@@ -94,13 +95,15 @@ require Exporter;
    Date_Init
    ParseDateString
    ParseDate
-   ParseOccurence
+   ParseRecur
    DateCalc
    ParseDateDelta
    UnixDate
+   Delta_Format
    Date_GetPrev
    Date_GetNext
    Date_SetTime
+   Date_SetDateField
 
    Date_DaysInMonth
    Date_DayOfWeek
@@ -130,6 +133,7 @@ use IO::File;
 ########################################################################
 # HISTORY
 ########################################################################
+# Important changes marked with *** (as of 5.20)
 
 # Written by:
 #    Sullivan Beck (sbeck@cise.ufl.edu)
@@ -443,7 +447,7 @@ use IO::File;
 #    Fixed some incorrect uses of $in instead of $future in ParseDate.
 #       Thanks to Erik Corry <erik@arbat.com>
 #    Added formats:
-#       All ISO 8601 formats
+#       *** All ISO 8601 formats
 #       "Friday"    suggested by Rob Perelman <robp@electriciti.com>
 #       "12th"      suggested by Rob Perelman <robp@electriciti.com>
 #       12th (12th day of current month)
@@ -497,6 +501,18 @@ use IO::File;
 #       <skarkkai@kelloseppakoulu.fi>
 #    Added ForceDate variable.
 #    Fixed the tests to not fail in 1998.
+#
+# Version 5.30  01/20/98
+#    *** Added a week field to deltas.
+#    All routines can now take either a 2- or 4-digit year.
+#    Added Delta_Format.  First suggested by Alan Burlison
+#       <aburlison@cix.compulink.co.uk>
+#    Added Date_SetDateField.  Martin Thurn <mthurn@copper.irnet.rest.tasc.com>
+#    Made the $err argument to DateCalc optional.
+#    Changed the name of several of the library routines (not the callable
+#       ones) to standardize naming.
+#    *** Added ParseRecur.  First suggested by Chris Jackson
+#       <chrisj@biddeford.com>
 
 
 # Backwards incompatibilities
@@ -520,43 +536,61 @@ use IO::File;
 # In 5.21
 #   Long running process timezone may slip.  See UpdateCurrTZ variable.
 #   UnixDate formats %W,%U no longer return week 00.  %J is now correct.
+#
+# In 5.30
+#   Delta now contains a week field.
 
-$Date::Manip::Version="5.21";
+$Date::Manip::VERSION="5.30";
 
 ########################################################################
 # TODO
 ########################################################################
 
-################ NEXT VERSION
+### MISC
 
-### TIMEZONES
+# Make work weeks able to start and stop on arbitrary days (even across
+# weekends).
 
-# It is just too confusing knowing what timezone you are working it.  I
-# give up.  Change the internal format to YYYYMMDDHH:MN:SS+HHMN or
-# YYYYMMDDHH:MN::SS-HHMN
-# By default, convert all dates to current timezone however unless a
-# NOCONV option is set.
+# Add the other ISO8601 stuff.
 
-# Add a Date_Compare to compare two dates (with timezone).
+# The only change needed to get it to work under 5.001 is to change the line:
+#    $file=cwd . "/$file"  if ($file !~ m|^/|);   # $file = "a/b/c"
+# to:
+#    $file=&getcwd . "/$file"  if ($file !~ m|^/|);   # $file = "a/b/c"
+# Since this also may eliminate a shell command (`pwd`), add a flag to
+# switch between the two.  Piran Montford <piran@cogapp.com>
 
-# Modify all routines accordingly.
+# Add 15/Oct/1997:07:56:43 (netscape log) suggested by:
+#  bugaj@dnrc.bell-labs.com  Stephan Vladimir Bugaj
 
-### SPEEDUPS
+# Try to get rid of `date` in Date_TimeZone
+# Also, Cwd::cwd calls `pwd` (Bowen Dwelle) , but this may be inevitable.
+# If not, add a variable which will allow you to skip the sections where
+#    backticks are used since they are a performance sink.  Suggested by
+#    Bowen Dwelle.
 
-# UpdateHolidays, don't use ParseDate to parse dates of form DD/MM or MM/DD.
+# Combine GetNext and GetPrev (?)
 
-# In business mode date-date calculations, add a "quick" mode in which the
-# number of business days is estimated by:
-#     $date1 = &ParseDate("...");
-#     $date2 = &ParseDate("...");         # a 2nd date a long time after date1
-#     $delta = &DateCalc($date1,$date2);  # get an exact delta
-#     $days  = ( split(/:/,$delta) )[2];  # the number of days between the two
-#     $yrs   = $days/365.24;              # the number of years between the two
-#     $days  = $days*(5/7) - $yrs*9;
-# where 9 is the number of holidays in the year.  Add a variable to turn this
-# behavior off and another to tell what threshold to apply this to (by default
-# apply it to anything 2 months apart or more).  In this mode, only days are
-# returned, hours, minutes, seconds are ignored.
+# Add a "SPECIAL HOLIDAY" section to fully specify holidays so weird ones
+# can be defined for each year.  Add Easter calculations here as well:
+#   Easter = easter
+# means that Easter is calculated using the method easter.
+
+# Add
+#   Spanish
+#   German
+#   Italian
+#   Japanese (Kevin Baker will help)
+
+# Fill in some of the language variables ($past, $future, $zones).
+
+# Check Swedish/French special characters.
+
+# Change EXPORT to EXPORT_OK (message 9 by Peter Bray)
+
+# Add ParseDateTemplate where a template containing any of the formats
+# from UnixDate may be used in a string (which may contain perl REs)
+# to parse a very strange date.
 
 ### TESTS
 
@@ -640,84 +674,34 @@ $Date::Manip::Version="5.21";
 # Add an option to all date calculations to ignore daylight savings time
 # transitions.
 
-### MISC
+### TIMEZONES
 
-# Add the other ISO8601 stuff.
+# It is just too confusing knowing what timezone you are working it.  I
+# give up.  Change the internal format to YYYYMMDDHH:MN:SS+HHMN or
+# YYYYMMDDHH:MN::SS-HHMN
+# By default, convert all dates to current timezone however unless a
+# NOCONV option is set.
 
-# Fix a variable to allow a 2digit year to be forced into the current century.
-#   VAR = "c"
-# or an arbitrary century
-#   VAR = "cXX"
+# Add a Date_Compare to compare two dates (with timezone).
 
-# Add a week field into the delta
+# Modify all routines accordingly.
 
-# The only change needed to get it to work under 5.001 is to change the line:
-#    $file=cwd . "/$file"  if ($file !~ m|^/|);   # $file = "a/b/c"
-# to:
-#    $file=&getcwd . "/$file"  if ($file !~ m|^/|);   # $file = "a/b/c"
-# Since this also may eliminate a shell command (`pwd`), add a flag to
-# switch between the two.  Piran Montford <piran@cogapp.com>
+### SPEEDUPS
 
-# Add a way to set sub-values of a date:
-#   &Date_SetValue($date,(y|m|d|h|mn|s|z),val)
-# ex. &Date_SetValue($date,'y',1995);
-# Martin Thurn <mthurn@copper.irnet.rest.tasc.com>
+# UpdateHolidays, don't use ParseDate to parse dates of form DD/MM or MM/DD.
 
-# Add 15/Oct/1997:07:56:43 (netscape log) suggested by:
-#  bugaj@dnrc.bell-labs.com  Stephan Vladimir Bugaj
-
-# Try to get rid of `date` in Date_TimeZone
-# Also, Cwd::cwd calls `pwd` (Bowen Dwelle) , but this may be inevitable.
-# If not, add a variable which will allow you to skip the sections where
-#    backticks are used since they are a performance sink.  Suggested by
-#    Bowen Dwelle.
-
-# Document how you need to use the stock .DateManip.cnf file when running
-# the tests.  Make sure that TZ=EST is set in the sample one.
-
-# Clean up ParseDateDelta
-
-# Combine GetNext and GetPrev (?)
-
-# Make err an optional argument to DateCalc (by checking to see if the
-# 3rd argument exists).  If it does and is a reference, it is err, otherwise,
-# it is mode.
-
-# Add a "SPECIAL HOLIDAY" section to fully specify holidays so weird ones
-# can be defined for each year.  Add Easter calculations here as well:
-#   Easter = easter
-# means that Easter is calculated using the method easter.
-
-# Add
-#   Spanish
-#   German
-#   Italian
-#   Japanese (Kevin Baker will help)
-
-# Fill in some of the language variables ($past, $future, $zones).
-
-# Check Swedish/French special characters.
-
-# Change EXPORT to EXPORT_OK (message 9 by Peter Bray)
-
-# Add equivalent of UnixDate to print out Deltas in various formats
-# (mess 37 by Alan Burlison).  Nothing fancy.
-#
-# It prints out exact deltas as:
-#    plus/minus d:h:mn:s
-#    plus/minus s         (converted to s)
-#    plus/minus d         (converted to d, returned as a floating point)
-#    plus/minus h         (similar)
-#    plus/minus mn        (similar)
-# Approximate deltas as:
-#    plus/minus y:m  plus/minus d:h:m:s
-#    or, you can give a date as an argument which says take the approx.
-#    delta from that date and turn the result into an exact delta which
-#    can be printed in any of the exact formats.
-
-# Add ParseDateTemplate where a template containing any of the formats
-# from UnixDate may be used in a string (which may contain perl REs)
-# to parse a very strange date.
+# In business mode date-date calculations, add a "quick" mode in which the
+# number of business days is estimated by:
+#     $date1 = &ParseDate("...");
+#     $date2 = &ParseDate("...");         # a 2nd date a long time after date1
+#     $delta = &DateCalc($date1,$date2);  # get an exact delta
+#     $days  = ( split(/:/,$delta) )[2];  # the number of days between the two
+#     $yrs   = $days/365.24;              # the number of years between the two
+#     $days  = $days*(5/7) - $yrs*9;
+# where 9 is the number of holidays in the year.  Add a variable to turn this
+# behavior off and another to tell what threshold to apply this to (by default
+# apply it to anything 2 months apart or more).  In this mode, only days are
+# returned, hours, minutes, seconds are ignored.
 
 ########################################################################
 ########################################################################
@@ -818,189 +802,9 @@ $Date::Manip::DebugVal="";
 ########################################################################
 ########################################################################
 
-# This parses an occurence.
-sub ParseOccurence {
-  my($string)=@_;
-  my($y,$m,$w,$d,$h,$mn,$s,$flag,$date,@occ)=();
-
-  my($S)='[:*]';
-  my($D)='([-+,0-9]*)';
-  my($F)='([^*]*)';
-  if ($string =~ /^($D$S$D$S$D$S$D$S$D$S$D$S$D)(?:\*$F)?(?:\*(.*))?$/) {
-    (@occ)=($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
-    $date=pop(@occ);
-    $flag=pop(@occ);
-    
-
-  } else {
-    return "";
-  }
-  
-  return $string;
-}
-
-# Sets or returns the DayBase of an occurence
-sub Date_OccurenceDayBase {
-  print "DEBUG: Date_SetOccurence\n"  if ($Date::Manip::Debug =~ /trace/);
-}
-
-sub ParseDates {
-  print "DEBUG: ParseDates\n"  if ($Date::Manip::Debug =~ /trace/);
-  &Date_Init()  if (! $Date::Manip::InitDone);
-  my($string,$start,$stop,$time0)=@_;
-  my(@date,$tmp,$num,$m,$d,$y,$delta,$mode,$err)=();
-  local($_)=$string;
-
-  my($mmm)='\s*'.$Date::Manip::MonExp;    # \s*(jan|january|...)
-  my(%mmm)=%Date::Manip::Month;           # { jan=>1, ... }
-  my($wkexp)='\s*'.$Date::Manip::WkExp;   # \s*(mon|monday|...)
-  my($day)='\s*'.$Date::Manip::DExp;      # \s*(?:d|day|days)
-  my($month)='\s*'.$Date::Manip::MExp;    # \s*(?:mon|month|months)
-  my($week)='\s*'.$Date::Manip::WExp;     # \s*(?:w|wk|week|weeks)
-  my($daysexp)=$Date::Manip::DayExp;      # (1st|first|...31st)
-  my(%dayshash)=%Date::Manip::Day;        # { 1st=>1, first=>1, ... }
-  my($of)='\s*'.$Date::Manip::Of;         # \s*(?:in|of)
-  my($each)=$Date::Manip::EachExp;        # (?:each|every)
-
-  my($D)='\s*(\d+)';
-  my($Y)='\s*(\d{4}|\d{2})';
-
-  # Check arguements...
-  if (defined $time0  and  $time0) {
-    $tmp=$time0;
-    $time0=&ParseDateString($time0);
-    if (! $time0) {
-      print "ERROR: ParseDates: invalid time0: $tmp\n";
-      return ();
-    }
-  } else {
-    $time0="";
-  }
-  if (defined $start  and  $start) {
-    $tmp=$start;
-    $start=&ParseDateString($start);
-    if (! $start) {
-      print "ERROR: ParseDates: invalid start: $tmp\n";
-      return ();
-    }
-  } else {
-    $start="";
-  }
-  if (defined $stop  and  $stop) {
-    $tmp=$stop;
-    $stop=&ParseDateString($stop);
-    if (! $stop) {
-      print "ERROR: ParseDates: invalid stop: $tmp\n";
-      return ();
-    }
-  } else {
-    $stop="";
-  }
-
-  # Change 1st to 1
-  if ($daysexp ne "()"  and  /(^|[^a-z])$daysexp($|[^a-z])/i) {
-    $tmp=lc($2);
-    $tmp=$dayshash{"$tmp"};
-    s/(^|[^a-z])$daysexp($|[^a-z])/$1 $tmp $3/i;
-  }
-  s/\s*$//;
-
-  # Get rid of "each"
-  if ($each ne "(?:)"  and  /(^|[^a-z])$each($|[^a-z])/i) {
-    s/(^|[^a-z])$each($|[^a-z])/ /i;
-    $each=1;
-  } else {
-    $each=0;
-  }
-
-  # Find out if it's business mode.
-  $mode=0;
-  $mode=2  if (s/$Date::Manip::Business//);
-
-  if ($each) {
-
-    if (/^$D?$day(?:$of$mmm?$Y)?$/i ||
-        /^$D?$day(?:$of$mmm())?$/i) {
-      # every 2nd day in june 1997
-      ($num,$m,$y)=($1,$2,$3);
-      $num=1 if (! defined $num);
-      $m=""  if (! defined $m);
-      $y=""  if (! defined $y);
-      if ($m  ||  $y) {
-        $y=$Date::Manip::CurrY  if (! $y);
-        if ($m) {
-          $m=$mmm{lc($m)};
-          $start=&FormDate($y,$m,1,0,0,0);
-          $stop=&DateCalc_DateDelta($start,"+0:1:0:0:0:0",\$err,$mode);
-        } else {
-          $start=&FormDate($y,1,1,0,0,0);
-          $stop=&FormDate($y+1,1,1,0,0,0);
-        }
-      } else {
-        if (! $start  or  ! $stop) {
-          print "ERROR: ParseDates: stop and start required\n";
-          return ();
-        }
-      }
-      $delta="0:0:$num:0:0:0";
-      if (! $time0  and  $num != 1) {
-        print "WARNING: ParseDates: time0 required\n";
-        return ();
-      } elsif (! $time0) {
-        $time0=$start;
-      }
-
-      while ($time0 lt $start) {
-        $time0=&DateCalc($time0,$delta,\$err,$mode);
-      }
-      while ($time0 ge $stop) {
-        $time0=&DateCalc($time0,"-$delta",\$err,$mode);
-      }
-      return ()  if ($time0 lt $start);
-      $tmp=$time0;
-      while ($time0 ge $start) {
-        push(@date,$time0);
-        $time0=&DateCalc($time0,"-$delta",\$err,$mode);
-      }
-      @date=reverse @date;
-      $time0=$tmp;
-      while ($time0 lt $stop) {
-        $time0=&DateCalc($time0,$delta,\$err,$mode);
-        push(@date,$time0)  if ($time0 lt $stop);
-      }
-      return @date;
-
-    } elsif (/^$D$day?$of$month(?:$of?$Y)?$/) {
-      # 2nd [day] of every month [in] 1997
-      ($num,$y)=($1,$2);
-
-    } elsif (/^$D$wkexp$of$month(?:$of?$Y)?$/) {
-      # 2nd tuesday of every month [in] 1997
-      ($num,$d,$y)=($1,$2);
-
-    } elsif (/^$D$wkexp(?:$of$mmm?$Y)?$/i ||
-             /^$D$wkexp(?:$of$mmm())?$/i) {
-      # every 2nd tuesday in june 1997
-      ($num,$d,$m,$y)=($1,$2,$3,$4);
-
-    }
-
-  # else
-
-  # endif
-  }
-}
-
-
-
-
-
-
-
-
 sub DateManipVersion {
   print "DEBUG: DateManipVersion\n"  if ($Date::Manip::Debug =~ /trace/);
-  return $Date::Manip::Version;
+  return $Date::Manip::VERSION;
 }
 
 sub Date_Init {
@@ -1062,8 +866,8 @@ sub Date_Init {
     if ($Date::Manip::GlobalCnf) {
       $file=&ExpandTilde($Date::Manip::GlobalCnf);
     }
-    &ReadInitFile($file)  if (defined $file  and  $file  and  -r $file  and
-                              -s $file  and  -f $file);
+    &Date_InitFile($file)  if (defined $file  and  $file  and  -r $file  and
+                               -s $file  and  -f $file);
   }
   if ($Date::Manip::InitFilesRead<2) {
     $Date::Manip::InitFilesRead=2;
@@ -1072,8 +876,8 @@ sub Date_Init {
       $file=&SearchPath($Date::Manip::PersonalCnf,
                         $Date::Manip::PersonalCnfPath,"r");
     }
-    &ReadInitFile($file)  if (defined $file  and  $file  and  -r $file  and
-                              -s $file  and  -f $file);
+    &Date_InitFile($file)  if (defined $file  and  $file  and  -r $file  and
+                               -s $file  and  -f $file);
   }
 
   foreach (@args) {
@@ -1097,11 +901,9 @@ sub Date_Init {
   my($lang,$tmp,@tmp,%tmp,@tmp2,
      $i,$j,$a,$b,$now,$offset,$in,$at,$on,@tmp3,
      @mon,@month,
-     @w,@wk,@week,$weeks,
+     @w,@wk,@week,
      $days,$am,$pm,
-     $zones,$zonesrfc,@zones,$times,$future,$past,$sephm,$sepms,$sepss,
-     $years,$months,$days,$hours,$minutes,$seconds,$replace,$next,$prev,
-     $approx,$exact,$business)=();
+     $zones,$zonesrfc,@zones,$sephm,$sepms,$sepss)=();
 
   if (! $Date::Manip::Init) {
     $Date::Manip::Init=1;
@@ -1114,22 +916,7 @@ sub Date_Init {
     #  $am,$pm  : different ways of expressing AM (PM), the first one in each
     #             list is the one that will be used when printing out an AM
     #             or PM string
-    #  $years   : string containing abbreviations for the word year
-    #  $months  : string containing abbreviations for the word month
-    #  $weeks   : string containing abbreviations for the work week
-    #  $days    : string containing abbreviations for the word day
-    #  $hours   : string containing abbreviations for the word hour
-    #  $minutes : string containing abbreviations for the word minute
-    #  $seconds : string containing abbreviations for the word second
     #  $now     : string containing words referring to now
-    #  $at      : strings fitting "at 12:00"
-    #  $on      : strings fitting "on June 1st"
-    #  $future  : strings to indicate the future
-    #  $past    : strings to indicate the past
-    #  $next    : strings to indicate the "next" of something
-    #  $prev    : strings to indicate the "previous" of something
-    #  $times   : different strings which stand for specific times and
-    #             the time they translate to (ex. "noon 12:00:00")
     #  $zones   : a space separated string containing additional timezone
     #             strings (beyond the RFC 822 zones) along with their
     #             translatrion.  So, the string "EST -0500 EDT -0400"
@@ -1145,22 +932,6 @@ sub Date_Init {
     #             defined as (?::|h) or [:h] but NOT as (:|h) since the latter
     #             produces a back-reference.  Also, the dot "." should be
     #             defined as '\.' since it is in a regular expression.
-    #  $approx  : strings which force approximate mode in DateCalc.
-    #  $exact   : exact mode
-    #  $business: business mode
-    #
-    # One important variable is $replace.  In English (and probably
-    # other languages), one of the abbreviations for the word month that
-    # would be nice is "m".  The problem is that "m" matches the "m" in
-    # "minute" which causes the string to be improperly matched in some
-    # cases.  Hence, the list of abbreviations for month is given as:
-    #   "mon month months"
-    # In order to allow you to enter "m", replacements can be done.
-    # $replace is a list of pairs of words which are matched and replaced
-    # AS ENTIRE WORDS.  Having $replace equal to "m month" means that
-    # the entire word "m" will be replaced with "month".  This allows the
-    # desired abbreviation to be used.  Make sure that $replace contains
-    # an even number of words (i.e. all must be pairs).
     #
     # One other variable to set is $offset.  This contains a space separated
     # set of dates which are defined as offsets from the current time.
@@ -1170,106 +941,43 @@ sub Date_Init {
     if ($Date::Manip::Language eq "English") {
       $lang=&Date_Init_English();
 
-      $at="at";
-      $on="on";
-      $future="in";
-      $past="ago";
-      $next="next";
-      $prev="previous last";
-
       $am="AM";
       $pm="PM";
 
-      $years  ="y yr year yrs years";
-      $months ="mon month months";
-      $weeks  ="w wk wks week weeks";
-      $days   ="d day days";
-      $hours  ="h hr hrs hour hours";
-      $minutes="mn min minute minutes";
-      $seconds="s sec second seconds";
-      $replace="m month";
-
       $now="today now";
-      $offset="yesterday -0:0:1:0:0:0 tomorrow +0:0:1:0:0:0";
-      $times="noon 12:00:00 midnight 00:00:00";
+      $offset="yesterday -0:0:0:1:0:0:0 tomorrow +0:0:0:1:0:0:0";
 
       $sephm=':';
       $sepms=':';
       $sepss='[.:]';
       $zones="";
 
-      $exact="exactly";
-      $approx="approximately";
-      $business="business";
-
     } elsif ($Date::Manip::Language eq "Swedish") {
       $lang=&Date_Init_Swedish();
-
-      $on="";
-      $at="kl kl. klockan";
-      $future="";
-      $past="";
-      $next="";
-      $prev="";
 
       $am="FM";
       $pm="EM";
 
-      $years  ="o or";
-      $months ="mon monad monader";
-      $weeks  ="";
-      $days   ="d dag dagar";
-      $hours  ="t tim timme timmar";
-      $minutes="mn min minut minuter";
-      $seconds="s sek sekund sekunder";
-      $replace="m monad";
-
       $now="idag nu";
-      $offset="igor -0:0:1:0:0:0 imorgon +0:0:1:0:0:0";
-      $times="";
+      $offset="igor -0:0:0:1:0:0:0 imorgon +0:0:0:1:0:0:0";
       $sephm='[:.]';
       $sepms=':';
       $sepss='[.:]';
       $zones="";
 
-      $exact="";
-      $approx="";
-      $business="";
-
     } elsif ($Date::Manip::Language eq "French") {
       $lang=&Date_Init_French();
-
-      $on="";
-      $at="a";         # a`
-      $future="en";
-      $past="il_y_a";
-      $next="suivant";
-      $prev="precedent";  # pre'ce'dent
 
       $am="du_matin";  # le matin
       $pm="du_soir";   # le soir
 
-      $years  ="an annee ans annees";  # anne'e
-      $months ="mois";
-      $weeks  ="sem semaine";
-      $days   ="j jour jours";
-      $hours  ="h heure heures";
-      $minutes="mn min minute minutes";
-      $seconds="s sec seconde secondes";
-      $replace="m mois";
-
       $now="aujourd'hui maintenant";
-      $offset="hier -0:0:1:0:0:0 demain +0:0:1:0:0:0";
-      $times="";
+      $offset="hier -0:0:0:1:0:0:0 demain +0:0:0:1:0:0:0";
       $sephm='(?::|h)';
       $sepms=':';
       $sepss='(?:\.|:|,)';
 
       $zones="";
-
-      $exact="exactement";
-      $approx="approximativement";
-      $business="professionel";
 
       # } elsif ($Date::Manip::Language eq "Danish") {
       # } elsif ($Date::Manip::Language eq "Spanish") {
@@ -1338,9 +1046,6 @@ sub Date_Init {
     $Date::Manip::WhichExp="(" . join("|", sort sortByLength(@tmp2)) . ")";
     &Date_InitStrings($$lang{"each"},\$Date::Manip::EachExp,"lc,sort");
 
-
-
-
     # Date::Manip:: variables for AM or PM
     #   $AmExp   : "(am)"
     #   $PmExp   : "(pm)"
@@ -1368,14 +1073,14 @@ sub Date_Init {
     #    $MnExp  : similar for minutes
     #    $SExp   : similar for seconds
     #    %Replace: a list of replacements
-    $Date::Manip::YExp   =&Date_Regexp($years,"lc,sort,under");
-    $Date::Manip::MExp   =&Date_Regexp($months,"lc,sort,under");
-    $Date::Manip::WExp   =&Date_Regexp($weeks,"lc,sort,under");
-    $Date::Manip::DExp   =&Date_Regexp($days,"lc,sort,under");
-    $Date::Manip::HExp   =&Date_Regexp($hours,"lc,sort,under");
-    $Date::Manip::MnExp  =&Date_Regexp($minutes,"lc,sort,under");
-    $Date::Manip::SExp   =&Date_Regexp($seconds,"lc,sort,under,opt");
-    %Date::Manip::Replace=split(/\s+/,lc($replace));
+    &Date_InitStrings($$lang{"years"}  ,\$Date::Manip::YExp,"lc,sort");
+    &Date_InitStrings($$lang{"months"} ,\$Date::Manip::MExp,"lc,sort");
+    &Date_InitStrings($$lang{"weeks"}  ,\$Date::Manip::WExp,"lc,sort");
+    &Date_InitStrings($$lang{"days"}   ,\$Date::Manip::DExp,"lc,sort");
+    &Date_InitStrings($$lang{"hours"}  ,\$Date::Manip::HExp,"lc,sort");
+    &Date_InitStrings($$lang{"minutes"},\$Date::Manip::MnExp,"lc,sort");
+    &Date_InitStrings($$lang{"seconds"},\$Date::Manip::SExp,"lc,sort");
+    &Date_InitHash($$lang{"replace"},undef,"lc",\%Date::Manip::Replace);
 
     # Date::Manip:: variables for special dates that are offsets from now
     #    $Now      : "(now|today)"
@@ -1383,11 +1088,11 @@ sub Date_Init {
     #    %Offset   : ("yesterday","-1:0:0:0",...)
     #    $TimesExp : "(noon|midnight)"
     #    %Times    : ("noon","12:00:00","midnight","00:00:00")
+    &Date_InitHash($$lang{"times"},\$Date::Manip::TimesExp,"lc,sort,back",
+                   \%Date::Manip::Times);
     $Date::Manip::Now=   &Date_Regexp($now,"lc,back,under");
     ($Date::Manip::Offset,%Date::Manip::Offset)=
       &Date_Regexp($offset,"lc,under,back","keys");
-    ($Date::Manip::TimesExp,%Date::Manip::Times)=
-      &Date_Regexp($times,"lc,under,back","keys");
     $Date::Manip::SepHM=$sephm;
     $Date::Manip::SepMS=$sepms;
     $Date::Manip::SepSS=$sepss;
@@ -1488,22 +1193,21 @@ sub Date_Init {
     #    $Past   : "(?:ago)"
     #    $Next   : "(?:next)"
     #    $Prev   : "(?:last|previous)"
-    $Date::Manip::At    =&Date_Regexp($at,"lc,under");
-    $Date::Manip::On    =&Date_Regexp($on,"lc,under,pre,post,optws");
-    $Date::Manip::Future=&Date_Regexp($future,"lc,under");
-    $Date::Manip::Past  =&Date_Regexp($past,"lc,under");
-    $Date::Manip::Next  =&Date_Regexp($next,"lc,under");
-    $Date::Manip::Prev  =&Date_Regexp($prev,"lc,under");
-
+    &Date_InitStrings($$lang{"at"},\$Date::Manip::At,"lc,sort");
+    &Date_InitStrings($$lang{"on"},\$Date::Manip::On,"lc,sort");
+    &Date_InitStrings($$lang{"future"},\$Date::Manip::Future,"lc,sort");
+    &Date_InitStrings($$lang{"past"},\$Date::Manip::Past,"lc,sort");
+    &Date_InitStrings($$lang{"next"},\$Date::Manip::Next,"lc,sort");
+    &Date_InitStrings($$lang{"prev"},\$Date::Manip::Prev,"lc,sort");
     &Date_InitStrings($$lang{"of"},\$Date::Manip::Of,"lc,sort");
 
     # Date::Manip:: calc mode variables
     #    $Approx  : "(?:approximately)"
     #    $Exact   : "(?:exactly)"
     #    $Business: "(?:business)"
-    $Date::Manip::Exact   =&Date_Regexp($exact,"lc,under");
-    $Date::Manip::Approx  =&Date_Regexp($approx,"lc,under");
-    $Date::Manip::Business=&Date_Regexp($business,"lc,under");
+    &Date_InitStrings($$lang{"exact"},\$Date::Manip::Exact,"lc,sort");
+    &Date_InitStrings($$lang{"approx"},\$Date::Manip::Approx,"lc,sort");
+    &Date_InitStrings($$lang{"business"},\$Date::Manip::Business,"lc,sort");
 
     ############### END OF LANGUAGE INITIALIZATION
   }
@@ -1556,7 +1260,7 @@ sub Date_Init {
   $Date::Manip::CurrMn=$mn;
   $Date::Manip::CurrS=$s;
   $Date::Manip::CurrAmPm=$ampm;
-  $Date::Manip::Curr=&FormDate($y,$m,$d,$h,$mn,$s);
+  $Date::Manip::Curr=&Date_Join($y,$m,$d,$h,$mn,$s);
 
   $Date::Manip::Debug=$Date::Manip::DebugVal;
 }
@@ -1586,7 +1290,7 @@ sub ParseDateString {
 
   # Put parse in a simple loop for an easy exit.
  PARSE: {
-    my(@tmp)=&CheckDate($_);
+    my(@tmp)=&Date_Split($_);
     if (@tmp) {
       ($y,$m,$d,$h,$mn,$s)=@tmp;
       last PARSE;
@@ -1595,7 +1299,7 @@ sub ParseDateString {
     # Fundamental regular expressions
 
     my($mmm)=$Date::Manip::MonExp;          # (jan|january|...)
-    my($wkexp)='\s*'.$Date::Manip::WkExp;   # \s*(mon|monday|...)
+    my($wkexp)=$Date::Manip::WkExp;         # (mon|monday|...)
     my(%mmm)=%Date::Manip::Month;           # { jan=>1, ... }
     my(%dofw)=%Date::Manip::Week;           # { mon=>1, monday=>1, ... }
     my($whichexp)=$Date::Manip::WhichExp;   # (1st|...|fifth|last)
@@ -1617,7 +1321,8 @@ sub ParseDateString {
     my($future)='\s*'.$Date::Manip::Future; # \s*(?:in)
     my($at)=$Date::Manip::At;               # (?:at)
     my($of)='\s*'.$Date::Manip::Of;         # \s*(?:in|of)
-    my($on)=$Date::Manip::On;               # \s*(?:on)\s*    or  \s+
+    my($on)='(?:\s*'.$Date::Manip::On.'\s*|\s+)';
+                                            # \s*(?:on)\s*    or  \s+
     my($last)='\s*'.$Date::Manip::LastExp;  # \s*(?:last)
     my($hm)=$Date::Manip::SepHM;            # :
     my($ms)=$Date::Manip::SepMS;            # :
@@ -1641,7 +1346,7 @@ sub ParseDateString {
     $date="";
 
     # Substitute all special time expressions.
-    if ($timeexp ne "()"  and  /(^|[^a-z])$timeexp($|[^a-z])/i) {
+    if (/(^|[^a-z])$timeexp($|[^a-z])/i) {
       $tmp=$2;
       $tmp=$Date::Manip::Times{$tmp};
       s/(^|[^a-z])$timeexp($|[^a-z])/$1 $tmp $3/i;
@@ -1747,7 +1452,7 @@ sub ParseDateString {
         /$prev/i  ||  /^$wkexp$/i  ||  /$week/i) {
       $tmp=0;
 
-      if (/^$whichexp$wkexp$of\s*$mmm\s*$YY?$/i) {
+      if (/^$whichexp\s*$wkexp$of\s*$mmm\s*$YY?$/i) {
         # last friday in October 95
         ($which,$dofw,$m,$y)=($1,$2,$3,$4);
         # fix $m, $y
@@ -1755,9 +1460,9 @@ sub ParseDateString {
         $dofw=$dofw{lc($dofw)};
         $which=$which{lc($which)};
         # Get the first day of the month
-        $date=&FormDate($y,$m,1,$h,$mn,$s);
+        $date=&Date_Join($y,$m,1,$h,$mn,$s);
         if ($which==-1) {
-          $date=&DateCalc_DateDelta($date,"+0:1:0:0:0:0",\$err,0);
+          $date=&DateCalc_DateDelta($date,"+0:1:0:0:0:0:0",\$err,0);
           $date=&Date_GetPrev($date,$dofw,0);
         } else {
           for ($i=0; $i<$which; $i++) {
@@ -1779,7 +1484,7 @@ sub ParseDateString {
         $d=&Date_DaysInMonth($m,$y);
         last PARSE;
 
-      } elsif (/^$next?$wkexp$/i) {
+      } elsif (/^$next?\s*$wkexp$/i) {
         # next friday
         # friday
         ($dofw)=($1);
@@ -1787,7 +1492,7 @@ sub ParseDateString {
         $date=&Date_GetNext($Date::Manip::Curr,$dofw,0,$h,$mn,$s);
         last PARSE;
 
-      } elsif (/^$prev$wkexp$/i) {
+      } elsif (/^$prev\s*$wkexp$/i) {
         # last friday
         ($dofw)=($1);
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
@@ -1797,26 +1502,26 @@ sub ParseDateString {
       } elsif (/^$next$week$/i) {
         # next week
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:0:7:0:0:0",\$err,0);
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:0:1:0:0:0:0",\$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
       } elsif (/^$prev$week$/i) {
         # last week
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:0:7:0:0:0",\$err,0);
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:0:1:0:0:0:0",\$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
 
       } elsif (/^$next$month$/i) {
         # next month
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:1:0:0:0:0",\$err,0);
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:1:0:0:0:0:0",\$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
       } elsif (/^$prev$month$/i) {
         # last month
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:1:0:0:0:0",\$err,0);
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:1:0:0:0:0:0",\$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
 
@@ -1824,7 +1529,7 @@ sub ParseDateString {
         # in 2 weeks
         ($num)=($1);
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:0:" .7*$num. ":0:0:0",
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:0:$num:0:0:0:0",
                                   \$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
@@ -1832,7 +1537,7 @@ sub ParseDateString {
         # 2 weeks ago
         ($num)=($1);
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:0:" .7*$num. ":0:0:0",
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:0:$num:0:0:0:0",
                                  \$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
@@ -1841,7 +1546,7 @@ sub ParseDateString {
         # in 2 months
         ($num)=($1);
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:$num:0:0:0:0",
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:$num:0:0:0:0:0",
                                   \$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
@@ -1849,7 +1554,7 @@ sub ParseDateString {
         # 2 months ago
         ($num)=($1);
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:$num:0:0:0:0",
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"-0:$num:0:0:0:0:0",
                                   \$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
@@ -1878,7 +1583,7 @@ sub ParseDateString {
       } elsif (/^$now\s*$week$/i) {
         # today week     (British date: 1 week from today)
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
-        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:0:7:0:0:0",\$err,0);
+        $date=&DateCalc_DateDelta($Date::Manip::Curr,"+0:0:1:0:0:0:0",\$err,0);
         $date=&Date_SetTime($date,$h,$mn,$s)  if (defined $h);
         last PARSE;
       } elsif (/^$offset\s*$week$/i) {
@@ -1887,7 +1592,7 @@ sub ParseDateString {
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
         $offset=$Date::Manip::Offset{lc($offset)};
         $date=&DateCalc_DateDelta($Date::Manip::Curr,$offset,\$err,0);
-        $date=&DateCalc_DateDelta($date,"+0:0:7:0:0:0",\$err,0);
+        $date=&DateCalc_DateDelta($date,"+0:0:1:0:0:0:0",\$err,0);
         if ($time) {
           return ""
             if (&Date_ErrorCheck(\$y,\$m,\$d,\$h,\$mn,\$s,\$ampm,\$wk));
@@ -1899,7 +1604,7 @@ sub ParseDateString {
       if ($tmp) {
         &Date_Init()  if (! $Date::Manip::UpdateCurrTZ);
         $date=&DateCalc_DateDelta($Date::Manip::Curr,
-                                  $tmp . "0:0:" .7*$num. ":0:0:0",\$err,0);
+                                  $tmp . "0:0:$num:0:0:0:0",\$err,0);
         $date=&Date_GetPrev($date,$Date::Manip::FirstDay,1);
         $date=&Date_GetNext($date,$dofw,1,$h,$mn,$s);
         last PARSE;
@@ -1908,7 +1613,7 @@ sub ParseDateString {
 
     # Change 2nd, second to 2
     $tmp=0;
-    if ($daysexp ne "()"  and  /(^|[^a-z])$daysexp($|[^a-z])/i) {
+    if (/(^|[^a-z])$daysexp($|[^a-z])/i) {
       if (/^\s*$daysexp\s*$/) {
         ($d)=($1);
         $d=$dayshash{lc($d)};
@@ -1923,7 +1628,7 @@ sub ParseDateString {
     }
 
     # Another set of special dates (Nth week)
-    if (/^$D$wkexp(?:$of?\s*$YY)?$/i) {
+    if (/^$D\s*$wkexp(?:$of?\s*$YY)?$/i) {
       # 22nd sunday in 1996
       ($which,$dofw,$y)=($1,$2,$3);
       ($y,$m,$d)=&Date_NthWeekOfYear($y,$which,$dofw);
@@ -1938,7 +1643,7 @@ sub ParseDateString {
     }
 
     # Get rid of day of week
-    if ($wkexp ne '\s*()' and /(^|[^a-z])$wkexp($|[^a-z])/i) {
+    if (/(^|[^a-z])$wkexp($|[^a-z])/i) {
       $wk=$2;
       (s/(^|[^a-z])$wkexp,/$1 /i) ||
         s/(^|[^a-z])$wkexp($|[^a-z])/$1 $3/i;
@@ -2011,7 +1716,7 @@ sub ParseDateString {
 
   if (! $date) {
     return ""  if (&Date_ErrorCheck(\$y,\$m,\$d,\$h,\$mn,\$s,\$ampm,\$wk));
-    $date=&FormDate($y,$m,$d,$h,$mn,$s);
+    $date=&Date_Join($y,$m,$d,$h,$mn,$s);
   }
   $date=&Date_ConvTZ($date,$z);
   return $date;
@@ -2034,12 +1739,12 @@ sub ParseDate {
   $args=$a[0];
   $ref=ref $args;
   if (! $ref) {
-    return $args  if (&CheckDate($args));
+    return $args  if (&Date_Split($args));
     @args=($args);
   } elsif ($ref eq "ARRAY") {
     @args=@$args;
   } elsif ($ref eq "SCALAR") {
-    return $$args  if (&CheckDate($$args));
+    return $$args  if (&Date_Split($$args));
     @args=($$args);
   } else {
     print "ERROR:  Invalid arguments to ParseDate.\n";
@@ -2068,7 +1773,20 @@ sub ParseDate {
 # call Date_Init in the calc routines.
 sub DateCalc {
   print "DEBUG: DateCalc\n"  if ($Date::Manip::Debug =~ /trace/);
-  my($D1,$D2,$errref,$mode)=@_;
+  my($D1,$D2,@arg)=@_;
+  my($ref,$err,$errref,$mode)=();
+
+  $errref=shift(@arg);
+  $ref=0;
+  if (defined $errref) {
+    if (ref $errref) {
+      $mode=shift(@arg);
+      $ref=1;
+    } else {
+      $mode=$errref;
+      $errref="";
+    }
+  }
 
   my(@date,@delta,$ret,$tmp)=();
 
@@ -2083,7 +1801,7 @@ sub DateCalc {
   } elsif ($tmp=&ParseDateDelta($D1)) {
     push(@delta,$tmp);
   } else {
-    $$errref=1;
+    $$errref=1  if ($ref);
     return;
   }
 
@@ -2092,7 +1810,7 @@ sub DateCalc {
   } elsif ($tmp=&ParseDateDelta($D2)) {
     push(@delta,$tmp);
   } else {
-    $$errref=2;
+    $$errref=2  if ($ref);
     return;
   }
   $mode=$Date::Manip::Mode;
@@ -2100,7 +1818,8 @@ sub DateCalc {
   if ($#date==1) {
     $ret=&DateCalc_DateDate(@date,$mode);
   } elsif ($#date==0) {
-    $ret=&DateCalc_DateDelta(@date,@delta,$errref,$mode);
+    $ret=&DateCalc_DateDelta(@date,@delta,\$err,$mode);
+    $$errref=$err  if ($ref);
   } else {
     $ret=&DateCalc_DeltaDelta(@delta,$mode);
   }
@@ -2109,7 +1828,7 @@ sub DateCalc {
 
 sub ParseDateDelta {
   print "DEBUG: ParseDateDelta\n"  if ($Date::Manip::Debug =~ /trace/);
-  my($args,@args,@a,$ref,$date)=();
+  my($args,@args,@a,$ref)=();
   local($_)=();
   @a=@_;
 
@@ -2141,8 +1860,7 @@ sub ParseDateDelta {
   #         reference to a scalar, or a reference to an array was passed in
   # $args : the scalar or refererence passed in
 
-  my($y,$m,$w,$d,$h,$mn,$s,$ys,$ms,$ws,$ds,$hs,$mns,$ss,$dir)=();
-  my($def,@delta1,@delta2,$colon,$sign,$delta,$i,$sign)=();
+  my(@colon,@delta,$delta,$dir,$colon,$sign,$val)=();
   my($from,$to)=();
   my($workweek)=$Date::Manip::WorkWeekEnd-$Date::Manip::WorkWeekBeg+1;
 
@@ -2150,15 +1868,15 @@ sub ParseDateDelta {
   my($signexp)='([+-]?)';
   my($numexp)='(\d+)';
   my($exp1)="(?: \\s* $signexp \\s* $numexp \\s*)";
-  my($yexp,$mexp,$wexp,$dexp,$hexp,$mnexp,$sexp)=();
-  $yexp =$mexp=$wexp=$dexp=$hexp=$mnexp=$sexp="()()";
-  $yexp ="(?: $exp1 $Date::Manip::YExp)?"  if ($Date::Manip::YExp);
-  $mexp ="(?: $exp1 $Date::Manip::MExp)?"  if ($Date::Manip::MExp);
-  $wexp ="(?: $exp1 $Date::Manip::WExp)?"  if ($Date::Manip::WExp);
-  $dexp ="(?: $exp1 $Date::Manip::DExp)?"  if ($Date::Manip::DExp);
-  $hexp ="(?: $exp1 $Date::Manip::HExp)?"  if ($Date::Manip::HExp);
-  $mnexp="(?: $exp1 $Date::Manip::MnExp)?" if ($Date::Manip::MnExp);
-  $sexp ="(?: $exp1 $Date::Manip::SExp)?"  if ($Date::Manip::SExp);
+  my($yexp,$mexp,$wexp,$dexp,$hexp,$mnexp,$sexp,$i)=();
+  $yexp=$mexp=$wexp=$dexp=$hexp=$mnexp=$sexp="()()";
+  $yexp ="(?: $exp1 $Date::Manip::YExp)?";
+  $mexp ="(?: $exp1 $Date::Manip::MExp)?";
+  $wexp ="(?: $exp1 $Date::Manip::WExp)?";
+  $dexp ="(?: $exp1 $Date::Manip::DExp)?";
+  $hexp ="(?: $exp1 $Date::Manip::HExp)?";
+  $mnexp="(?: $exp1 $Date::Manip::MnExp)?";
+  $sexp ="(?: $exp1 $Date::Manip::SExp?)?";
   my($future)=$Date::Manip::Future;
   my($past)=$Date::Manip::Past;
 
@@ -2169,11 +1887,11 @@ sub ParseDateDelta {
 
     # Mode is set in DateCalc.  ParseDateDelta only overrides it if the
     # string contains a mode.
-    if      ($Date::Manip::Exact and s/$Date::Manip::Exact//) {
+    if      (s/$Date::Manip::Exact//) {
       $Date::Manip::Mode=0;
-    } elsif ($Date::Manip::Approx and s/$Date::Manip::Approx//) {
+    } elsif (s/$Date::Manip::Approx//) {
       $Date::Manip::Mode=1;
-    } elsif ($Date::Manip::Business and s/$Date::Manip::Business//) {
+    } elsif (s/$Date::Manip::Business//) {
       $Date::Manip::Mode=2;
     } elsif (! defined $Date::Manip::Mode) {
       $Date::Manip::Mode=0;
@@ -2186,77 +1904,61 @@ sub ParseDateDelta {
     }
 
     # in or ago
-    s/^\s* $future \s*//ix  if ($future ne "(?:)");
+    s/(^|[^a-z])$future($|[^a-z])/$1 $2/i;
     $dir=1;
-    $dir=-1  if ($past  and  s/\s*$past\s*//i);
+    $dir=-1  if (s/(^|[^a-z])$past($|[^a-z])/$1 $2/i);
+    s/\s*$//;
 
     # the colon part of the delta
     $colon="";
-    if (s/$signexp?$numexp?(:($signexp?$numexp)?)+$//) {
+    if (s/$signexp?$numexp?(:($signexp?$numexp)?){1,6}$//) {
       $colon=$&;
       s/\s*$//;
     }
+    @colon=split(/:/,$colon);
 
     # the non-colon part of the delta
     $sign="+";
-    s/^$yexp $mexp $wexp $dexp $hexp $mnexp $sexp$//xi;
-    ($ys,$y,$ms,$m,$ws,$w,$ds,$d,$hs,$h,$mns,$mn,$ss,$s)=
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14);
-    (defined($ys)  and $ys)  ? ($sign=$ys)  : ($ys=$sign);
-    (defined($ms)  and $ms)  ? ($sign=$ms)  : ($ms=$ys);
-    (defined($ws)  and $ws)  ? ($sign=$ws)  : ($ws=$ms);
-    (defined($ds)  and $ds)  ? ($sign=$ds)  : ($ds=$ws);
-    (defined($hs)  and $hs)  ? ($sign=$hs)  : ($hs=$ds);
-    (defined($mns) and $mns) ? ($sign=$mns) : ($mns=$hs);
-    (defined($ss)  and $ss)  ? ($sign=$ss)  : ($ss=$ms);
-
-    # keep track of the last defined element (from -1 to 5)
-    $def=-1;
-    (defined($y))  ? ($def=0) : ($y=0);
-    (defined($m))  ? ($def=1) : ($m=0);
-    (defined($d))  ? ($def=2) : ($d=0);
-    (defined($h))  ? ($def=3) : ($h=0);
-    (defined($mn)) ? ($def=4) : ($mn=0);
-    (defined($s))  ? ($def=5) : ($s=0);
-
-    # add weeks to the days
-    if (defined $w  and  $w) {
-      $d= "$ds$d" + $workweek*"$ws$w";
-      if ($d<0) {
-        $ds="-";
-        $d=-$d;
-      }
+    @delta=();
+    $i=6;
+    foreach $exp1 ($yexp,$mexp,$wexp,$dexp,$hexp,$mnexp,$sexp) {
+      last  if ($#colon>=$i--);
+      $val=0;
+      s/^$exp1//ix;
+      $val=$2  if (defined $2  &&  $2);
+      $sign=$1  if (defined $1  &&  $1);
+      push(@delta,"$sign$val");
     }
-
-    @delta1=("$ys$y","$ms$m","$ds$d","$hs$h","$mns$mn","$ss$s");
-
-    # Split the colon part and set the sign
-    @delta2=&CheckDelta($colon,$sign);
-
-    # check to see that too many fields have not been entered and that
-    # the entire argument list has been used
-    if ($_ or ($def+$#delta2)>4) {
+    if (! /^\s*$/) {
       pop(@a);
       next PARSE;
     }
 
-    # add the colon and non-colon part together (and take care of dir)
-    # (force it to carry a sign)
-    unshift (@delta2,"+0")  while ($#delta2<5);
-    for ($i=0; $i<=5; $i++) {
-      $delta1[$i] += $delta2[$i];
-      $delta1[$i] *= $dir  if ($delta1[$i] != 0);
-      $delta1[$i] = "+".$delta1[$i]  if ($delta1[$i]>0);
+    # make sure that the colon part has a sign
+    for ($i=0; $i<=$#colon; $i++) {
+      $val=0;
+      $colon[$i] =~ /^$signexp$numexp/;
+      $val=$2  if (defined $2  &&  $2);
+      $sign=$1  if (defined  $1 &&  $1);
+      $colon[$i] = "$sign$val";
+    }
+
+    # combine the two
+    push(@delta,@colon);
+    if ($dir<0) {
+      for ($i=0; $i<=$#delta; $i++) {
+        $delta[$i] =~ tr/-+/+-/;
+      }
     }
 
     # form the delta and shift off the valid part
-    $delta=join(":",@delta1);
+    $delta=join(":",@delta);
     splice(@args,0,$#a+1);
     @$args=@args  if (defined $ref  and  $ref eq "ARRAY");
     last PARSE;
   }
 
-  $delta=&NormalizeDelta($delta,$Date::Manip::Mode);
+  $delta=&Delta_Normalize($delta,$Date::Manip::Mode);
   return $delta;
 }
 
@@ -2270,7 +1972,7 @@ sub UnixDate {
   return  if (! $date);
 
   my($y,$m,$d,$h,$mn,$s)=($f{"Y"},$f{"m"},$f{"d"},$f{"H"},$f{"M"},$f{"S"})=
-    &CheckDate($date);
+    &Date_Split($date);
   $f{"y"}=substr $f{"Y"},2;
   &Date_Init()  if (! $Date::Manip::InitDone);
 
@@ -2328,7 +2030,7 @@ sub UnixDate {
     $f{"L"}=$yy;
     $f{"U"}=&Date_WeekOfYear($mm,$dd,$yy,7)+1;
   }
-  
+
   $f{"U"}="0".$f{"U"}  if (length $f{"U"} < 2);
   $f{"W"}="0".$f{"W"}  if (length $f{"W"} < 2);
 
@@ -2410,8 +2112,8 @@ sub UnixDate {
         $c=chop($format);
         if ($c eq "l") {
           &Date_Init();
-          $date1=&DateCalc_DateDelta($Date::Manip::Curr,"-0:6:0:0:0:0");
-          $date2=&DateCalc_DateDelta($Date::Manip::Curr,"+0:6:0:0:0:0");
+          $date1=&DateCalc_DateDelta($Date::Manip::Curr,"-0:6:0:0:0:0:0");
+          $date2=&DateCalc_DateDelta($Date::Manip::Curr,"+0:6:0:0:0:0:0");
           if ($date gt $date1  and  $date lt $date2) {
             $f{"l"}=qq|$f{"b"} $f{"e"} $h:$mn|;
           } else {
@@ -2436,17 +2138,760 @@ sub UnixDate {
   }
 }
 
+# Can't be in "use integer" because we're doing decimal arithmatic
+no integer;
+sub Delta_Format {
+  print "DEBUG: Delta_Format\n"  if ($Date::Manip::Debug =~ /trace/);
+  my($delta,$dec,@format)=@_;
+  $delta=&ParseDateDelta($delta);
+  return ""  if (! $delta);
+  my(@out,%f,$out,$c1,$c2,$scalar,$format)=();
+  local($_)=$delta;
+  my($y,$M,$w,$d,$h,$m,$s)=&Delta_Split($delta);
+  # Get rid of positive signs.
+  ($y,$M,$w,$d,$h,$m,$s)=map { 1*$_; }($y,$M,$w,$d,$h,$m,$s);
+
+  if (defined $dec  &&  $dec>0) {
+    $dec="%." . ($dec*1) . "f";
+  } else {
+    $dec="%f";
+  }
+
+  if (! wantarray) {
+    $format=join(" ",@format);
+    @format=($format);
+    $scalar=1;
+  }
+
+  # Length of each unit in seconds
+  my($sl,$ml,$hl,$dl,$wl)=();
+  $sl = 1;
+  $ml = $sl*60;
+  $hl = $ml*60;
+  $dl = $hl*24;
+  $wl = $dl*7;
+
+  # The decimal amount of each unit contained in all smaller units
+  my($sd,$md,$hd,$dd,$wd)=();
+  $wd = ($d*$dl + $h*$hl + $m*$ml + $s*$sl)/$wl;
+  $dd =          ($h*$hl + $m*$ml + $s*$sl)/$dl;
+  $hd =                   ($m*$ml + $s*$sl)/$hl;
+  $md =                            ($s*$sl)/$ml;
+  $sd = 0;
+
+  # The amount of each unit contained in higher units.
+  my($sh,$mh,$hh,$dh,$wh)=();
+  $wh = 0;
+  $dh = ($wh+$w)*7;
+  $hh = ($dh+$d)*24;
+  $mh = ($hh+$h)*60;
+  $sh = ($mh+$m)*60;
+
+  # Set up the formats
+
+  $f{"wv"} = $w;
+  $f{"dv"} = $d;
+  $f{"hv"} = $h;
+  $f{"mv"} = $m;
+  $f{"sv"} = $s;
+
+  $f{"wh"} = $w+$wh;
+  $f{"dh"} = $d+$dh;
+  $f{"hh"} = $h+$hh;
+  $f{"mh"} = $m+$mh;
+  $f{"sh"} = $s+$sh;
+
+  $f{"wd"} = sprintf($dec,$w+$wd);
+  $f{"dd"} = sprintf($dec,$d+$dd);
+  $f{"hd"} = sprintf($dec,$h+$hd);
+  $f{"md"} = sprintf($dec,$m+$md);
+  $f{"sd"} = sprintf($dec,$s+$sd);
+
+  $f{"wt"} = sprintf($dec,$wh+$w+$wd);
+  $f{"dt"} = sprintf($dec,$dh+$d+$dd);
+  $f{"ht"} = sprintf($dec,$hh+$h+$hd);
+  $f{"mt"} = sprintf($dec,$mh+$m+$md);
+  $f{"st"} = sprintf($dec,$sh+$s+$sd);
+
+  $f{"%"}  = "%";
+
+  foreach $format (@format) {
+    $format=reverse($format);
+    $out="";
+  PARSE: while ($format) {
+      $c1=chop($format);
+      if ($c1 eq "%") {
+        $c1=chop($format);
+        if (exists($f{$c1})) {
+          $out .= $f{$c1};
+          next PARSE;
+        }
+        $c2=chop($format);
+        if (exists($f{"$c1$c2"})) {
+          $out .= $f{"$c1$c2"};
+          next PARSE;
+        }
+        $out .= $c1;
+        $format .= $c2;
+      } else {
+        $out .= $c1;
+      }
+    }
+    push(@out,$out);
+  }
+  if ($scalar) {
+    return $out[0];
+  } else {
+    return (@out);
+  }
+}
+use integer;
+
+# Known flags:
+#   ----- any number of the following may be chosen executed in the order given
+#   PDn   means the previous day n (n=1-7) not counting today
+#   PTn   means the previous day n (n=1-7) counting today
+#   PWD   previous work day not counting today
+#   PWT   previous work day counting today
+#
+#   NDn   similar to PDn but next day
+#   NTn   similar to PTn but next day
+#   NWD   next work day not counting today
+#   NWT   next work day counting today
+#
+#   CWN   closest work day (counting tomorrow first)
+#   CWP   closest work day (counting yesterday first)
+#   CWD   closest work day (using TommorowFirst variable)
+#   ----- any number of the following may be added
+#   MDx   If you set a day-of-month to 31, but the month has only 30 days,
+#         there are two possibilities:  discard this date, or set the day
+#         as 30.  MDK will keep them (setting the date to 30).  MDD discards.
+#         Default is MDD.
+#   MWn   This defines what the first week of a month is.  n can be any
+#         day of the week (1-7).  The first week of the month is the week
+#         that contains this day.  1 (Mon) the first full work week, 3 (Wed)
+#         the first week with the majority of work days, 4 (Thu) the first
+#         week with a majority of days, 5 (Fri) the first week with any
+#         workdays, 7 (Sun) the first week with any days.  Default is MW7.
+#         Note that weeks can be numbered 1-6.
+#   BUS   Use business mode for all calculations.
+
+sub ParseRecur {
+  print "DEBUG: ParseRecur\n"  if ($Date::Manip::Debug =~ /trace/);
+  &Date_Init()  if (! $Date::Manip::InitDone);
+
+  my($recur,$dateb,$date0,$date1,$flag)=@_;
+  local($_)=$recur;
+  my($date_b,$date_0,$date_1,$flag_t,$recur_0,$recur_1,@recur0,@recur1)=();
+  my(@tmp,$tmp,$each,$mode,$num,$y,$m,$d,$w,$h,$mn,$s,$delta,$y0,$y1,$yb)=();
+  my($yy,$n,$dd,@d,@tmp2,$date,@date,@w,@tmp2,@tmp3,@m,@y)=();
+
+  $date0=""  if (! defined $date0);
+  $date1=""  if (! defined $date1);
+  $dateb=""  if (! defined $dateb);
+  $flag =""  if (! defined $flag);
+
+  if ($dateb) {
+    $dateb=&ParseDateString($dateb);
+    return ""  if (! $dateb);
+  }
+  if ($date0) {
+    $date0=&ParseDateString($date0);
+    return ""  if (! $date0);
+  }
+  if ($date1) {
+    $date1=&ParseDateString($date1);
+    return ""  if (! $date1);
+  }
+
+  # Flags
+  my($FDn) = 7;
+
+  my($R1) = '([0-9:]+)';
+  my($R2) = '(?:\*([-,0-9:]*))';
+  my($F)  = '(?:\*([^*]*))';
+
+  if (/^$R1?$R2?$F?$F?$F?$F?$/) {
+    ($recur_0,$recur_1,$flag_t,$date_b,$date_0,$date_1)=($1,$2,$3,$4,$5,$6);
+    $recur_0 = ""  if (! defined $recur_0);
+    $recur_1 = ""  if (! defined $recur_1);
+    $flag_t  = ""  if (! defined $flag_t);
+    $date_b  = ""  if (! defined $date_b);
+    $date_0  = ""  if (! defined $date_0);
+    $date_1  = ""  if (! defined $date_1);
+
+    @recur0 = split(/:/,$recur_0);
+    @recur1 = split(/:/,$recur_1);
+    return ""  if ($#recur0 + $#recur1 + 2 != 7);
+
+    if ($date_b) {
+      $date_b=&ParseDateString($date_b);
+      return ""  if (! $date_b);
+    }
+    if ($date_0) {
+      $date_0=&ParseDateString($date_0);
+      return ""  if (! $date_0);
+    }
+    if ($date_1) {
+      $date_1=&ParseDateString($date_1);
+      return ""  if (! $date_1);
+    }
+
+  } else {
+
+    my($mmm)='\s*'.$Date::Manip::MonExp;    # \s*(jan|january|...)
+    my(%mmm)=%Date::Manip::Month;           # { jan=>1, ... }
+    my($wkexp)='\s*'.$Date::Manip::WkExp;   # \s*(mon|monday|...)
+    my(%week)=%Date::Manip::Week;           # { monday=>1, ... }
+    my($day)='\s*'.$Date::Manip::DExp;      # \s*(?:d|day|days)
+    my($month)='\s*'.$Date::Manip::MExp;    # \s*(?:mon|month|months)
+    my($week)='\s*'.$Date::Manip::WExp;     # \s*(?:w|wk|week|weeks)
+    my($daysexp)=$Date::Manip::DayExp;      # (1st|first|...31st)
+    my(%dayshash)=%Date::Manip::Day;        # { 1st=>1, first=>1, ... }
+    my($of)='\s*'.$Date::Manip::Of;         # \s*(?:in|of)
+    my($lastexp)=$Date::Manip::LastExp;     # (?:last)
+    my($each)=$Date::Manip::EachExp;        # (?:each|every)
+
+    my($D)='\s*(\d+)';
+    my($Y)='\s*(\d{4}|\d{2})';
+
+    # Change 1st to 1
+    if (/(^|[^a-z])$daysexp($|[^a-z])/i) {
+      $tmp=lc($2);
+      $tmp=$dayshash{"$tmp"};
+      s/(^|[^a-z])$daysexp($|[^a-z])/$1 $tmp $3/i;
+    }
+    s/\s*$//;
+
+    # Get rid of "each"
+    if (/(^|[^a-z])$each($|[^a-z])/i) {
+      s/(^|[^a-z])$each($|[^a-z])/ /i;
+      $each=1;
+    } else {
+      $each=0;
+    }
+
+    # Find out if it's business mode.
+    $mode=0;
+#   $mode=2  if (s/$Date::Manip::Business//);
+
+    if ($each) {
+
+      if (/^$D?$day(?:$of$mmm?$Y)?$/i ||
+          /^$D?$day(?:$of$mmm())?$/i) {
+        # every [2nd] day in [june] 1997
+        # every [2nd] day [in june]
+        ($num,$m,$y)=($1,$2,$3);
+        $num=1 if (! defined $num);
+        $m=""  if (! defined $m);
+        $y=""  if (! defined $y);
+
+        $y=$Date::Manip::CurrY  if (! $y);
+        if ($m) {
+          $m=$mmm{lc($m)};
+          $date_0=&Date_Join($y,$m,1,0,0,0);
+          $date_1=&DateCalc_DateDelta($date_0,"+0:1:0:0:0:0:0",$mode);
+        } else {
+          $date_0=&Date_Join($y,1,1,0,0,0);
+          $date_1=&Date_Join($y+1,1,1,0,0,0);
+        }
+        $date_b=$date_0;
+        @recur0=(0,0,0,$num,0,0,0);
+        @recur1=();
+
+      } elsif (/^$D$day?$of$month(?:$of?$Y)?$/) {
+        # 2nd [day] of every month [in 1997]
+        ($num,$y)=($1,$2);
+        $y=$Date::Manip::CurrY  if (! defined $y  or  ! $y);
+
+        $date_0=&Date_Join($y,1,1,0,0,0);
+        $date_1=&Date_Join($y+1,1,1,0,0,0);
+        $date_b=$date_0;
+
+        @recur0=(0,1,0);
+        @recur1=($num,0,0,0);
+
+      } elsif (/^$D$wkexp$of$month(?:$of?$Y)?$/ ||
+               /^($lastexp)$wkexp$of$month(?:$of?$Y)?$/) {
+        # 2nd tuesday of every month [in 1997]
+        # last tuesday of every month [in 1997]
+        ($num,$d,$y)=($1,$2,$3);
+        $y=$Date::Manip::CurrY  if (! defined $y  or  ! $y);
+        $d=$week{lc($d)};
+        $num=-1  if ($num !~ /^$D$/);
+
+        $date_0=&Date_Join($y,1,1,0,0,0);
+        $date_1=&Date_Join($y+1,1,1,0,0,0);
+        $date_b=$date_0;
+
+        @recur0=(0,1);
+        @recur1=($num,$d,0,0,0);
+
+      } elsif (/^$D$wkexp(?:$of$mmm?$Y)?$/i ||
+               /^$D$wkexp(?:$of$mmm())?$/i) {
+        # every 2nd tuesday in june 1997
+        ($num,$d,$m,$y)=($1,$2,$3,$4);
+        $y=$Date::Manip::CurrY  if (! defined $y  or  ! $y);
+        $num=1 if (! defined $num);
+        $m=""  if (! defined $m);
+        $d=$week{lc($d)};
+
+        if ($m) {
+          $m=$mmm{lc($m)};
+          $date_0=&Date_Join($y,$m,1,0,0,0);
+          $date_1=&DateCalc_DateDelta($date_0,"+0:1:0:0:0:0:0",$mode);
+        } else {
+          $date_0=&Date_Join($y,1,1,0,0,0);
+          $date_1=&Date_Join($y+1,1,1,0,0,0);
+        }
+        $date_b=$date_0;
+
+        @recur0=(0,0,$num);
+        @recur1=($d,0,0,0);
+
+      } else {
+        return "";
+      }
+    } else {
+      return "";
+    }
+  }
+
+  $date0=$date_0  if (! $date0);
+  $date1=$date_1  if (! $date1);
+  $dateb=$date_b  if (! $dateb);
+  $flag =$flag_t  if (! $flag);
+
+  if (! wantarray) {
+    $tmp  = join(":",@recur0);
+    $tmp .= "*" . join(":",@recur1)  if (@recur1);
+    $tmp .= "*$flag*$dateb*$date0*$date1";
+    return $tmp;
+  }
+  if (@recur0) {
+    return ()  if (! $date0  ||  ! $date1); # dateb is NOT required in all case
+  }
+  ($y,$m,$w,$d,$h,$mn,$s)=(@recur0,@recur1);
+
+  @y=@m=@w=@d=();
+
+  if ($#recur0==-1) {
+    # * Y-M-W-D-H-MN-S
+    if ($y eq "0") {
+      push(@recur0,0);
+
+    } else {
+      @y=&ReturnList($y);
+      foreach $y (@y) {
+        $y=&FixYear($y)  if (length($y)==2);
+        return ()  if (length($y)!=4  ||  ! &IsInt($y));
+      }
+      @y=sort { $a<=>$b } @y;
+
+      $date0=&ParseDate("1000-01-01");
+      $date1=&ParseDate("9999-12-31 23:59:59");
+
+      if ($m eq "0"  and  $w eq "0") {
+        # * Y-0-0-0-H-MN-S
+        # * Y-0-0-DOY-H-MN-S
+        if ($d eq "0") {
+          @d=(1);
+        } else {
+          @d=&ReturnList($d);
+          return ()  if (! @d);
+          foreach $d (@d) {
+            return ()  if (! &IsInt($d,1,366));
+          }
+          @d=sort { $a<=>$b } (@d);
+        }
+
+        @tmp=();
+        foreach $yy (@y) {
+          foreach $d (@d) {
+            ($y,$m,$dd)=&Date_NthDayOfYear($yy,$d);
+            push(@tmp, &Date_Join($y,$m,$dd,0,0,0));
+          }
+        }
+        @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+      } elsif ($w eq "0") {
+        # * Y-M-0-0-H-MN-S
+        # * Y-M-0-DOM-H-MN-S
+
+        @m=&ReturnList($m);
+        return ()  if (! @m);
+        foreach $m (@m) {
+          return ()  if (! &IsInt($m,1,12));
+        }
+        @m=sort { $a<=>$b } (@m);
+
+        if ($d eq "0") {
+          @d=(1);
+        } else {
+          @d=&ReturnList($d);
+          return ()  if (! @d);
+          foreach $d (@d) {
+            return ()  if (! &IsInt($d,1,31));
+          }
+          @d=sort { $a<=>$b } (@d);
+        }
+
+        @tmp=();
+        foreach $y (@y) {
+          foreach $m (@m) {
+            foreach $d (@d) {
+              $date=&Date_Join($y,$m,$d,0,0,0);
+              push(@tmp,$date)  if ($d<29 || &Date_Split($date));
+            }
+          }
+        }
+        @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+      } elsif ($m eq "0") {
+        # * Y-0-WOY-DOW-H-MN-S
+        # * Y-0-WOY-0-H-MN-S
+        @w=&ReturnList($w);
+        return ()  if (! @w);
+        foreach $w (@w) {
+          return ()  if (! &IsInt($w,1,53));
+        }
+
+        if ($d eq "0") {
+          @d=($Date::Manip::FirstDay);
+        } else {
+          @d=&ReturnList($d);
+          return ()  if (! @d);
+          foreach $d (@d) {
+            return ()  if (! &IsInt($d,1,7));
+          }
+          @d=sort { $a<=>$b } (@d);
+        }
+
+        @tmp=();
+        foreach $y (@y) {
+          foreach $w (@w) {
+            $w="0$w"  if (length($w)==1);
+            foreach $d (@d) {
+              $date=&ParseDateString("$y-W$w-$d");
+              push(@tmp,$date);
+            }
+          }
+        }
+        @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+      } else {
+        # * Y-M-WOM-DOW-H-MN-S
+        # * Y-M-WOM-0-H-MN-S
+
+        @m=&ReturnList($m);
+        return ()  if (! @m);
+        foreach $m (@m) {
+          return ()  if (! &IsInt($m,1,12));
+        }
+        @m=sort { $a<=>$b } (@m);
+
+        @w=&ReturnList($w);
+
+        if ($d eq "0") {
+          @d=();
+        } else {
+          @d=&ReturnList($d);
+        }
+
+        @tmp=@tmp2=();
+        foreach $y (@y) {
+          foreach $m (@m) {
+            push(@tmp,$y);
+            push(@tmp2,$m);
+          }
+        }
+        @y=@tmp;
+        @m=@tmp2;
+
+        @date=&Date_Recur_WoM(\@y,\@m,\@w,\@d,$FDn);
+        @date=&Date_RecurSetTime($date0,$date1,\@date,$h,$mn,$s);
+      }
+    }
+  }
+
+  if ($#recur0==0) {
+    # Y * M-W-D-H-MN-S
+    $n=$y;
+    $n=1  if ($n==0);
+
+    @m=&ReturnList($m);
+    return ()  if (! @m);
+    foreach $m (@m) {
+      return ()  if (! &IsInt($m,1,12));
+    }
+    @m=sort { $a<=>$b } (@m);
+
+    if ($m eq "0") {
+      # Y * 0-W-D-H-MN-S   (equiv to Y-0 * W-D-H-MN-S)
+      push(@recur0,0);
+
+    } elsif ($w eq "0") {
+      # Y * M-0-DOM-H-MN-S
+      $d=1  if ($d eq "0");
+
+      @d=&ReturnList($d);
+      return ()  if (! @d);
+      foreach $d (@d) {
+        return ()  if (! &IsInt($d,1,31));
+      }
+      @d=sort { $a<=>$b } (@d);
+
+      # We need to find years that are a multiple of $n from $y(base)
+      ($y0)=( &Date_Split($date0) )[0];
+      ($y1)=( &Date_Split($date1) )[0];
+      ($yb)=( &Date_Split($dateb) )[0];
+      @tmp=();
+      for ($yy=$y0; $yy<=$y1; $yy++) {
+        if (($yy-$yb)%$n == 0) {
+          foreach $m (@m) {
+            foreach $d (@d) {
+              $date=&Date_Join($yy,$m,$d,0,0,0);
+              push(@tmp,$date)  if ($d<29 || &Date_Split($date));
+            }
+          }
+        }
+      }
+      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+    } else {
+      # Y * M-WOM-DOW-H-MN-S
+      # Y * M-WOM-0-H-MN-S
+      @m=&ReturnList($m);
+      @w=&ReturnList($w);
+      if ($d eq "0") {
+        @d=();
+      } else {
+        @d=&ReturnList($d);
+      }
+
+      ($y0)=( &Date_Split($date0) )[0];
+      ($y1)=( &Date_Split($date1) )[0];
+      ($yb)=( &Date_Split($dateb) )[0];
+      @y=();
+      for ($yy=$y0; $yy<=$y1; $yy++) {
+        if (($yy-$yb)%$n == 0) {
+          push(@y,$yy);
+        }
+      }
+
+      @date=&Date_Recur_WoM(\@y,\@m,\@w,\@d,$FDn);
+      @date=&Date_RecurSetTime($date0,$date1,\@date,$h,$mn,$s);
+    }
+  }
+
+  if ($#recur0==1) {
+    # Y-M * W-D-H-MN-S
+
+    if ($w eq "0") {
+      # Y-M * 0-D-H-MN-S   (equiv to Y-M-0 * D-H-MN-S)
+      push(@recur0,0);
+
+    } elsif ($m==0) {
+      # Y-0 * WOY-0-H-MN-S
+      # Y-0 * WOY-DOW-H-MN-S
+      $n=$y;
+      $n=1  if ($n==0);
+
+      @w=&ReturnList($w);
+      return ()  if (! @w);
+      foreach $w (@w) {
+        return ()  if (! &IsInt($w,1,53));
+      }
+
+      if ($d eq "0") {
+        @d=($Date::Manip::FirstDay);
+      } else {
+        @d=&ReturnList($d);
+        return ()  if (! @d);
+        foreach $d (@d) {
+          return ()  if (! &IsInt($d,1,7));
+        }
+        @d=sort { $a<=>$b } (@d);
+      }
+
+      # We need to find years that are a multiple of $n from $y(base)
+      ($y0)=( &Date_Split($date0) )[0];
+      ($y1)=( &Date_Split($date1) )[0];
+      ($yb)=( &Date_Split($dateb) )[0];
+      @tmp=();
+      for ($yy=$y0; $yy<=$y1; $yy++) {
+        if (($yy-$yb)%$n == 0) {
+          foreach $w (@w) {
+            $w="0$w"  if (length($w)==1);
+            foreach $tmp (@d) {
+              $date=&ParseDateString("$yy-W$w-$tmp");
+              push(@tmp,$date);
+            }
+          }
+        }
+      }
+      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+    } else {
+      # Y-M * WOM-0-H-MN-S
+      # Y-M * WOM-DOW-H-MN-S
+      @tmp=(@recur0);
+      push(@tmp,0)  while ($#tmp<6);
+      $delta=join(":",@tmp);
+      return ()  if (! $dateb);
+      @tmp=&Date_Recur($date0,$date1,$dateb,$delta);
+
+      @w=&ReturnList($w);
+      @m=();
+      if ($d eq "0") {
+        @d=();
+      } else {
+        @d=&ReturnList($d);
+      }
+
+      @date=&Date_Recur_WoM(\@tmp,\@m,\@w,\@d,$FDn);
+      @date=&Date_RecurSetTime($date0,$date1,\@date,$h,$mn,$s);
+    }
+  }
+
+  if ($#recur0==2) {
+    # Y-M-W * D-H-MN-S
+
+    if ($d eq "0") {
+      # Y-M-W * 0-H-MN-S
+      $y=1  if ($y==0 && $m==0 && $w==0);
+      $delta="$y:$m:$w:0:0:0:0";
+      return ()  if (! $dateb);
+      @tmp=&Date_Recur($date0,$date1,$dateb,$delta);
+      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+    } elsif ($m==0 && $w==0) {
+      # Y-0-0 * DOY-H-MN-S
+      $y=1  if ($y==0);
+      $n=$y;
+      return ()  if (! $dateb  &&  $y!=1);
+
+      @d=&ReturnList($d);
+      return ()  if (! @d);
+      foreach $d (@d) {
+        return ()  if (! &IsInt($d,1,366));
+      }
+      @d=sort { $a<=>$b } (@d);
+
+      # We need to find years that are a multiple of $n from $y(base)
+      ($y0)=( &Date_Split($date0) )[0];
+      ($y1)=( &Date_Split($date1) )[0];
+      ($yb)=( &Date_Split($dateb) )[0];
+      @tmp=();
+      for ($yy=$y0; $yy<=$y1; $yy++) {
+        if (($yy-$yb)%$n == 0) {
+          foreach $d (@d) {
+            ($y,$m,$dd)=&Date_NthDayOfYear($yy,$d);
+            push(@tmp, &Date_Join($y,$m,$dd,0,0,0));
+          }
+        }
+      }
+      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+    } elsif ($w>0) {
+      # Y-M-W * DOW-H-MN-S
+      @tmp=(@recur0);
+      push(@tmp,0)  while ($#tmp<6);
+      $delta=join(":",@tmp);
+      return ()  if (! $dateb);
+
+      @d=&ReturnList($d);
+      return ()  if (! @d);
+      foreach $d (@d) {
+        return ()  if (! &IsInt($d,1,7));
+      }
+
+      # Find out what DofW the basedate is.
+      @tmp2=&Date_Split($dateb);
+      $tmp=&Date_DayOfWeek($tmp2[1],$tmp2[2],$tmp2[0]);
+
+      @tmp=();
+      foreach $d (@d) {
+        $date_b=$dateb;
+        # Move basedate to DOW
+        if ($d != $tmp) {
+          if (($tmp>=$Date::Manip::FirstDay && $d<$Date::Manip::FirstDay) ||
+              ($tmp>=$Date::Manip::FirstDay && $d>$tmp) ||
+              ($tmp<$d && $d<$Date::Manip::FirstDay)) {
+            $date_b=&Date_GetNext($date_b,$d);
+          } else {
+            $date_b=&Date_GetPrev($date_b,$d);
+          }
+        }
+        push(@tmp,&Date_Recur($date0,$date1,$date_b,$delta));
+      }
+      @tmp=sort(@tmp);
+      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+    } elsif ($m>0) {
+      # Y-M-0 * DOM-H-MN-S
+      @tmp=(@recur0);
+      push(@tmp,0)  while ($#tmp<6);
+      $delta=join(":",@tmp);
+      return ()  if (! $dateb);
+
+      @d=&ReturnList($d);
+      return ()  if (! @d);
+      foreach $d (@d) {
+        return ()  if (! &IsInt($d,1,31));
+      }
+      @d=sort { $a<=>$b } (@d);
+
+      @tmp2=&Date_Recur($date0,$date1,$dateb,$delta);
+      @tmp=();
+      foreach $date (@tmp2) {
+        ($y,$m)=( &Date_Split($date) )[0..1];
+        foreach $d (@d) {
+          $tmp=&Date_Join($y,$m,$d,0,0,0);
+          push(@tmp,$tmp)  if ($d<29  ||  &Date_Split($tmp));
+        }
+      }
+      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+
+    } else {
+      return ();
+    }
+  }
+
+  if ($#recur0>2) {
+    # Y-M-W-D * H-MN-S
+    # Y-M-W-D-H * MN-S
+    # Y-M-W-D-H-MN * S
+    # Y-M-W-D-H-S
+    @tmp=(@recur0);
+    push(@tmp,0)  while ($#tmp<6);
+    $delta=join(":",@tmp);
+    return ()  if ($delta !~ /[1-9]/);    # return if "0:0:0:0:0:0:0"
+    return ()  if (! $dateb);
+    @date=&Date_Recur($date0,$date1,$dateb,$delta);
+    if (@recur1) {
+      unshift(@recur1,-1)  while ($#recur1<2);
+      @date=&Date_RecurSetTime($date0,$date1,\@date,@recur1);
+    } else {
+      shift(@date);
+      pop(@date);
+    }
+  }
+
+  @date;
+}
+
 sub Date_GetPrev {
   print "DEBUG: Date_GetPrev\n"  if ($Date::Manip::Debug =~ /trace/);
   my($date,$dow,$today,$hr,$min,$sec)=@_;
   &Date_Init()  if (! $Date::Manip::InitDone);
   my($y,$m,$d,$h,$mn,$s,$err,$curr_dow,%dow,$num,$delta,$th,$tm,$ts)=();
 
-  if (! &CheckDate($date)) {
+  if (! &Date_Split($date)) {
     $date=&ParseDateString($date);
     return ""  if (! $date);
   }
-  ($y,$m,$d)=( &CheckDate($date) )[0..2];
+  ($y,$m,$d)=( &Date_Split($date) )[0..2];
 
   if (defined $dow and $dow ne "") {
     $curr_dow=&Date_DayOfWeek($m,$d,$y);
@@ -2458,26 +2903,26 @@ sub Date_GetPrev {
       $dow=$dow{lc($dow)};
     }
     if ($dow == $curr_dow) {
-      $date=&DateCalc_DateDelta($date,"-0:0:7:0:0:0",\$err,0)  if (! $today);
+      $date=&DateCalc_DateDelta($date,"-0:0:1:0:0:0:0",\$err,0)  if (! $today);
     } else {
       $dow -= 7  if ($dow>$curr_dow); # make sure previous day is less
       $num = $curr_dow - $dow;
-      $date=&DateCalc_DateDelta($date,"-0:0:$num:0:0:0",\$err,0);
+      $date=&DateCalc_DateDelta($date,"-0:0:0:$num:0:0:0",\$err,0);
     }
     $date=&Date_SetTime($date,$hr,$min,$sec)  if (defined $hr);
 
   } else {
-    ($h,$mn,$s)=( &CheckDate($date) )[3..5];
-    ($th,$tm,$ts)=&ParseTime($hr,$min,$sec);
+    ($h,$mn,$s)=( &Date_Split($date) )[3..5];
+    ($th,$tm,$ts)=&Date_ParseTime($hr,$min,$sec);
     if (defined $hr and $hr ne "") {
       ($hr,$min,$sec)=($th,$tm,$ts);
-      $delta="-0:0:1:0:0:0";
+      $delta="-0:0:0:1:0:0:0";
     } elsif (defined $min and $min ne "") {
       ($hr,$min,$sec)=($h,$tm,$ts);
-      $delta="-0:0:0:1:0:0";
+      $delta="-0:0:0:0:1:0:0";
     } elsif (defined $sec and $sec ne "") {
       ($hr,$min,$sec)=($h,$mn,$ts);
-      $delta="-0:0:0:0:1:0";
+      $delta="-0:0:0:0:0:1:0";
     } else {
       confess "ERROR: invalid arguments in Date_GetPrev.\n";
     }
@@ -2499,11 +2944,11 @@ sub Date_GetNext {
   &Date_Init()  if (! $Date::Manip::InitDone);
   my($y,$m,$d,$h,$mn,$s,$err,$curr_dow,%dow,$num,$delta,$th,$tm,$ts)=();
 
-  if (! &CheckDate($date)) {
+  if (! &Date_Split($date)) {
     $date=&ParseDateString($date);
     return ""  if (! $date);
   }
-  ($y,$m,$d)=( &CheckDate($date) )[0..2];
+  ($y,$m,$d)=( &Date_Split($date) )[0..2];
 
   if (defined $dow and $dow ne "") {
     $curr_dow=&Date_DayOfWeek($m,$d,$y);
@@ -2515,26 +2960,26 @@ sub Date_GetNext {
       $dow=$dow{lc($dow)};
     }
     if ($dow == $curr_dow) {
-      $date=&DateCalc_DateDelta($date,"+0:0:7:0:0:0",\$err,0)  if (! $today);
+      $date=&DateCalc_DateDelta($date,"+0:0:1:0:0:0:0",\$err,0)  if (! $today);
     } else {
       $curr_dow -= 7  if ($curr_dow>$dow); # make sure next date is greater
       $num = $dow - $curr_dow;
-      $date=&DateCalc_DateDelta($date,"+0:0:$num:0:0:0",\$err,0);
+      $date=&DateCalc_DateDelta($date,"+0:0:0:$num:0:0:0",\$err,0);
     }
     $date=&Date_SetTime($date,$hr,$min,$sec)  if (defined $hr);
 
   } else {
-    ($h,$mn,$s)=( &CheckDate($date) )[3..5];
-    ($th,$tm,$ts)=&ParseTime($hr,$min,$sec);
+    ($h,$mn,$s)=( &Date_Split($date) )[3..5];
+    ($th,$tm,$ts)=&Date_ParseTime($hr,$min,$sec);
     if (defined $hr and $hr ne "") {
       ($hr,$min,$sec)=($th,$tm,$ts);
-      $delta="+0:0:1:0:0:0";
+      $delta="+0:0:0:1:0:0:0";
     } elsif (defined $min and $min ne "") {
       ($hr,$min,$sec)=($h,$tm,$ts);
-      $delta="+0:0:0:1:0:0";
+      $delta="+0:0:0:0:1:0:0";
     } elsif (defined $sec and $sec ne "") {
       ($hr,$min,$sec)=($h,$mn,$ts);
-      $delta="+0:0:0:0:1:0";
+      $delta="+0:0:0:0:0:1:0";
     } else {
       confess "ERROR: invalid arguments in Date_GetNext.\n";
     }
@@ -2552,8 +2997,8 @@ sub Date_GetNext {
 }
 
 ###
-# NOTE: This routine may be called in the routines below with very little
-#       time penalty.
+# NOTE: The following routines may be called in the routines below with very
+#       little time penalty.
 ###
 sub Date_SetTime {
   print "DEBUG: Date_SetTime\n"  if ($Date::Manip::Debug =~ /trace/);
@@ -2561,17 +3006,52 @@ sub Date_SetTime {
   &Date_Init()  if (! $Date::Manip::InitDone);
   my($y,$m,$d)=();
 
-  if (! &CheckDate($date)) {
+  if (! &Date_Split($date)) {
     $date=&ParseDateString($date);
     return ""  if (! $date);
   }
 
-  ($y,$m,$d)=( &CheckDate($date) )[0..2];
-  ($h,$mn,$s)=&ParseTime($h,$mn,$s);
+  ($y,$m,$d)=( &Date_Split($date) )[0..2];
+  ($h,$mn,$s)=&Date_ParseTime($h,$mn,$s);
 
   my($ampm,$wk);
   return ""  if (&Date_ErrorCheck(\$y,\$m,\$d,\$h,\$mn,\$s,\$ampm,\$wk));
-  &FormDate($y,$m,$d,$h,$mn,$s);
+  &Date_Join($y,$m,$d,$h,$mn,$s);
+}
+
+sub Date_SetDateField {
+  print "DEBUG: Date_SetDateField\n"  if ($Date::Manip::Debug =~ /trace/);
+  my($date,$field,$val,$nocheck)=@_;
+  my($y,$m,$d,$h,$mn,$s)=();
+  $nocheck=0  if (! defined $nocheck);
+
+  ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
+
+  if (! $y) {
+    $date=&ParseDateString($date);
+    return "" if (! $date);
+    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
+  }
+
+  if      (lc($field) eq "y") {
+    $y=$val;
+  } elsif (lc($field) eq "m") {
+    $m=$val;
+  } elsif (lc($field) eq "d") {
+    $d=$val;
+  } elsif (lc($field) eq "h") {
+    $h=$val;
+  } elsif (lc($field) eq "mn") {
+    $mn=$val;
+  } elsif (lc($field) eq "s") {
+    $s=$val;
+  } else {
+    confess "ERROR: Date_SetDateField: invalid field: $field\n";
+  }
+
+  $date=&Date_Join($y,$m,$d,$h,$mn,$s);
+  return $date  if ($nocheck  ||  &Date_Split($date));
+  return "";
 }
 
 ########################################################################
@@ -2579,8 +3059,8 @@ sub Date_SetTime {
 ########################################################################
 # NOTE: These routines should not call any of the routines above as
 #       there will be a severe time penalty (and the possibility of
-#       infinite recursion).  The one exception is Date_SetTime which
-#       is reasonably safe.
+#       infinite recursion).  The last couple routines above are
+#       exceptions.
 # NOTE: Date_Init is a special case.  It should be called (conditionally)
 #       in every routine that uses any variable from the Date::Manip
 #       namespace.
@@ -2589,8 +3069,7 @@ sub Date_SetTime {
 sub Date_DaysInMonth {
   print "DEBUG: Date_DaysInMonth\n"  if ($Date::Manip::Debug =~ /trace/);
   my($m,$y)=@_;
-  confess "ERROR: Date_DayOfWeek requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
   my(@d_in_m)=(0,31,28,31,30,31,30,31,31,30,31,30,31);
   $d_in_m[2]=29  if (&Date_LeapYear($y));
   return $d_in_m[$m];
@@ -2599,8 +3078,7 @@ sub Date_DaysInMonth {
 sub Date_DayOfWeek {
   print "DEBUG: Date_DayOfWeek\n"  if ($Date::Manip::Debug =~ /trace/);
   my($m,$d,$y)=@_;
-  confess "ERROR: Date_DayOfWeek requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
   my($dayofweek,$dec31)=();
 
   $dec31=2;                     # Dec 31, 0999 was Tuesday
@@ -2614,8 +3092,7 @@ no integer;
 sub Date_SecsSince1970 {
   print "DEBUG: Date_SecsSince1970\n"  if ($Date::Manip::Debug =~ /trace/);
   my($m,$d,$y,$h,$mn,$s)=@_;
-  confess "ERROR: Date_SecsSince1970 requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
   my($sec_now,$sec_70)=();
   $sec_now=(&Date_DaysSince999($m,$d,$y)-1)*24*3600 + $h*3600 + $mn*60 + $s;
 # $sec_70 =(&Date_DaysSince999(1,1,1970)-1)*24*3600;
@@ -2627,8 +3104,7 @@ sub Date_SecsSince1970GMT {
   print "DEBUG: Date_SecsSince1970GMT\n"  if ($Date::Manip::Debug =~ /trace/);
   my($m,$d,$y,$h,$mn,$s)=@_;
   &Date_Init()  if (! $Date::Manip::InitDone);
-  confess "ERROR: Date_SecsSince1970GMT requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
 
   my($sec)=&Date_SecsSince1970($m,$d,$y,$h,$mn,$s);
   return $sec   if ($Date::Manip::ConvTZ eq "IGNORE");
@@ -2648,8 +3124,7 @@ use integer;
 sub Date_DaysSince999 {
   print "DEBUG: Date_DaysSince999\n"  if ($Date::Manip::Debug =~ /trace/);
   my($m,$d,$y)=@_;
-  confess "ERROR: Date_DaysSince999 requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
   my($Ny,$N4,$N100,$N400,$dayofyear,$days)=();
   my($cc,$yy)=();
 
@@ -2679,8 +3154,7 @@ sub Date_DaysSince999 {
 sub Date_DayOfYear {
   print "DEBUG: Date_DayOfYear\n"  if ($Date::Manip::Debug =~ /trace/);
   my($m,$d,$y)=@_;
-  confess "ERROR: Date_DayOfYear requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
   # DinM    = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
   my(@days) = ( 0, 31, 59, 90,120,151,181,212,243,273,304,334,365);
   my($ly)=0;
@@ -2691,8 +3165,7 @@ sub Date_DayOfYear {
 sub Date_DaysInYear {
   print "DEBUG: Date_DaysInYear\n"  if ($Date::Manip::Debug =~ /trace/);
   my($y)=@_;
-  confess "ERROR: Date_DaysInYear requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
   return 366  if (&Date_LeapYear($y));
   return 365;
 }
@@ -2701,8 +3174,7 @@ sub Date_WeekOfYear {
   print "DEBUG: Date_WeekOfYear\n"  if ($Date::Manip::Debug =~ /trace/);
   my($m,$d,$y,$f)=@_;
   &Date_Init()  if (! $Date::Manip::InitDone);
-  confess "ERROR: Date_WeekOfWeek requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
 
   my($day,$dow,$doy)=();
   $doy=&Date_DayOfYear($m,$d,$y);
@@ -2726,8 +3198,7 @@ sub Date_WeekOfYear {
 sub Date_LeapYear {
   print "DEBUG: Date_LeapYear\n"  if ($Date::Manip::Debug =~ /trace/);
   my($y)=@_;
-  confess "ERROR: Date_LeapYear requires a 4 digit year.\n"
-    if ($y!~/^\d{4}$/);
+  $y=&Date_FixYear($y)  if (length($y)!=4);
   return 0 unless $y % 4 == 0;
   return 1 unless $y % 100 == 0;
   return 0 unless $y % 400 == 0;
@@ -2787,7 +3258,7 @@ sub Date_ConvTZ {
 
   my($s1,$h1,$m1,$s2,$h2,$m2,$d,$h,$m,$sign,$delta,$err,$yr,$mon,$sec)=();
   # We're going to try to do the calculation without calling DateCalc.
-  ($yr,$mon,$d,$h,$m,$sec)=&CheckDate($date);
+  ($yr,$mon,$d,$h,$m,$sec)=&Date_Split($date);
 
   # Convert $date from $from to GMT
   $from=~/([+-])(\d{2})(\d{2})/;
@@ -2814,20 +3285,20 @@ sub Date_ConvTZ {
     $delta=$h/24;
     $h -= $delta*24;
     if (($d + $delta) > 28) {
-      $date=&FormDate($yr,$mon,$d,$h,$m,$sec);
-      return &DateCalc_DateDelta($date,"+0:0:$delta:0:0:0",\$err,0);
+      $date=&Date_Join($yr,$mon,$d,$h,$m,$sec);
+      return &DateCalc_DateDelta($date,"+0:0:0:$delta:0:0:0",\$err,0);
     }
     $d+= $delta;
   } elsif ($h<0) {
     $delta=-$h/24 + 1;
     $h += $delta*24;
     if (($d - $delta) < 1) {
-      $date=&FormDate($yr,$mon,$d,$h,$m,$sec);
-      return &DateCalc_DateDelta($date,"-0:0:$delta:0:0:0",\$err,0);
+      $date=&Date_Join($yr,$mon,$d,$h,$m,$sec);
+      return &DateCalc_DateDelta($date,"-0:0:0:$delta:0:0:0",\$err,0);
     }
     $d-= $delta;
   }
-  return &FormDate($yr,$mon,$d,$h,$m,$sec);
+  return &Date_Join($yr,$mon,$d,$h,$m,$sec);
 }
 
 sub Date_TimeZone {
@@ -2908,7 +3379,7 @@ sub Date_IsWorkDay {
     if (! defined $time  or  ! $time);
 
   my($y,$mon,$day,$tmp,$h,$m,$dow)=();
-  ($y,$mon,$day,$h,$m,$tmp)=&CheckDate($d);
+  ($y,$mon,$day,$h,$m,$tmp)=&Date_Split($d);
   $dow=&Date_DayOfWeek($mon,$day,$y);
 
   return 0  if ($dow<$Date::Manip::WorkWeekBeg or
@@ -2947,7 +3418,7 @@ sub Date_NextWorkDay {
       }
     } else {
       while (1) {
-        $date=&DateCalc_DateDelta($date,"+0:0:1:0:0:0",\$err,0);
+        $date=&DateCalc_DateDelta($date,"+0:0:0:1:0:0:0",\$err,0);
         last  if (&Date_IsWorkDay($date,$time));
       }
     }
@@ -2955,7 +3426,7 @@ sub Date_NextWorkDay {
 
   while ($off>0) {
     while (1) {
-      $date=&DateCalc_DateDelta($date,"+0:0:1:0:0:0",\$err,0);
+      $date=&DateCalc_DateDelta($date,"+0:0:0:1:0:0:0",\$err,0);
       last  if (&Date_IsWorkDay($date,$time));
     }
     $off--;
@@ -2993,7 +3464,7 @@ sub Date_PrevWorkDay {
       }
     } else {
       while (1) {
-        $date=&DateCalc_DateDelta($date,"-0:0:1:0:0:0",\$err,0);
+        $date=&DateCalc_DateDelta($date,"-0:0:0:1:0:0:0",\$err,0);
         last  if (&Date_IsWorkDay($date,$time));
       }
     }
@@ -3001,7 +3472,7 @@ sub Date_PrevWorkDay {
 
   while ($off>0) {
     while (1) {
-      $date=&DateCalc_DateDelta($date,"-0:0:1:0:0:0",\$err,0);
+      $date=&DateCalc_DateDelta($date,"-0:0:0:1:0:0:0",\$err,0);
       last  if (&Date_IsWorkDay($date,$time));
     }
     $off--;
@@ -3024,11 +3495,11 @@ sub Date_NearestWorkDay {
 
   # Find the nearest one.
   if ($tomorrow) {
-    $dela="+0:0:1:0:0:0";
-    $delb="-0:0:1:0:0:0";
+    $dela="+0:0:0:1:0:0:0";
+    $delb="-0:0:0:1:0:0:0";
   } else {
-    $dela="-0:0:1:0:0:0";
-    $delb="+0:0:1:0:0:0";
+    $dela="-0:0:0:1:0:0:0";
+    $delb="+0:0:0:1:0:0:0";
   }
   $a=$b=$date;
 
@@ -3043,6 +3514,41 @@ sub Date_NearestWorkDay {
 ########################################################################
 # NOT FOR EXPORT
 ########################################################################
+
+# This is used in Date_Init to fill in a hash based on international
+# data.  It takes a list of keys and values and returns both a hash
+# with these values and a regular expression of keys.
+
+sub Date_InitHash {
+  print "DEBUG: Date_InitHash\n"  if ($Date::Manip::Debug =~ /trace/);
+  my($data,$regexp,$opts,$hash)=@_;
+  my(@data)=@$data;
+  my($key,$val,@list)=();
+
+  # Parse the options
+  my($lc,$sort,$back)=(0,0,0);
+  $lc=1     if ($opts =~ /lc/i);
+  $sort=1   if ($opts =~ /sort/i);
+  $back=1   if ($opts =~ /back/i);
+
+  # Create the hash
+  while (@data) {
+    ($key,$val,@data)=@data;
+    $key=lc($key)  if ($lc);
+    $$hash{$key}=$val;
+  }
+
+  # Create the regular expression
+  if ($regexp) {
+    @list=keys(%$hash);
+    @list=sort sortByLength(@list)  if ($sort);
+    if ($back) {
+      $$regexp="(" . join("|",@list) . ")";
+    } else {
+      $$regexp="(?:" . join("|",@list) . ")";
+    }
+  }
+}
 
 # This is used in Date_Init to fill in regular expressions, lists, and
 # hashes based on international data.  It takes a list of lists which have
@@ -3295,13 +3801,13 @@ sub Date_Regexp {
 # signs will be in it normally (one before the year, and one in front of
 # the day), but if appropriate, signs will be in front of all elements.
 # Also, as many of the signs will be equivalent as possible.
-sub NormalizeDelta {
-  print "DEBUG: NormalizeDelta\n"  if ($Date::Manip::Debug =~ /trace/);
+sub Delta_Normalize {
+  print "DEBUG: Delta_Normalize\n"  if ($Date::Manip::Debug =~ /trace/);
   my($delta,$mode)=@_;
   return "" if (! defined $delta  or  ! $delta);
-  return "+0:+0:+0:+0:+0:+0"
-    if ($delta =~ /^([+-]?0+:){5}[+-]?0+/ and $Date::Manip::DeltaSigns);
-  return "+0:0:0:0:0:0" if ($delta =~ /^([+-]?0+:){5}[+-]?0+/);
+  return "+0:+0:+0:+0:+0:+0:+0"
+    if ($delta =~ /^([+-]?0+:){6}[+-]?0+/ and $Date::Manip::DeltaSigns);
+  return "+0:0:0:0:0:0:0" if ($delta =~ /^([+-]?0+:){6}[+-]?0+/);
 
   my($tmp,$sign1,$sign2,$len)=();
 
@@ -3313,7 +3819,7 @@ sub NormalizeDelta {
   # or "+0" doesn't get lost by treating it numerically (i.e. "-0:0:2" must
   # be a negative delta).
 
-  my($y,$mon,$d,$h,$m,$s)=&CheckDelta($delta);
+  my($y,$mon,$w,$d,$h,$m,$s)=&Delta_Split($delta);
 
   # We need to make sure that the signs of all parts of a delta are the
   # same.  The easiest way to do this is to convert all of the large
@@ -3335,9 +3841,9 @@ sub NormalizeDelta {
   $y=0    if ($y eq "-0");               # get around silly -0 problem
   $mon=0  if ($mon eq "-0");
 
-  # Do the day/hour/min/sec part
+  # Do the wk/day/hour/min/sec part
 
-  $s += $d*$len*60 + $h*3600 + $m*60;    # convert d/h/m to s
+  $s += ($d+7*$w)*$len*60 + $h*3600 + $m*60; # convert w/d/h/m to s
   $sign2="+";
   if ($s<0) {
     $s*=-1;
@@ -3350,33 +3856,36 @@ sub NormalizeDelta {
   $m -= $d*$len;
   $h  = $m/60;                           # convert m to h
   $m -= $h*60;
+  $w  = $d/7;                            # convert d to w
+  $d -= $w*7;
 
-  $d=0    if ($d eq "-0");               # get around silly -0 problem
+  $w=0    if ($w eq "-0");               # get around silly -0 problem
+  $d=0    if ($d eq "-0");
   $h=0    if ($h eq "-0");
   $m=0    if ($m eq "-0");
   $s=0    if ($s eq "-0");
 
   # Only include two signs if necessary
   $sign1=$sign2  if ($y==0 and $mon==0);
-  $sign2=$sign1  if ($d==0 and $h==0 and $m==0 and $s==0);
+  $sign2=$sign1  if ($w==0 and $d==0 and $h==0 and $m==0 and $s==0);
   $sign2=""  if ($sign1 eq $sign2  and  ! $Date::Manip::DeltaSigns);
 
   if ($Date::Manip::DeltaSigns) {
-    return "$sign1$y:$sign1$mon:$sign2$d:$sign2$h:$sign2$m:$sign2$s";
+    return "$sign1$y:$sign1$mon:$sign2$w:$sign2$d:$sign2$h:$sign2$m:$sign2$s";
   } else {
-    return "$sign1$y:$mon:$sign2$d:$h:$m:$s";
+    return "$sign1$y:$mon:$sign2$w:$d:$h:$m:$s";
   }
 }
 
 # This checks a delta to make sure it is valid.  If it is, it splits
 # it and returns the elements with a sign on each.  The 2nd argument
 # specifies the default sign.  Blank elements are set to 0.  If the
-# third element is non-nil, exactly 6 elements must be included.
-sub CheckDelta {
-  print "DEBUG: CheckDelta\n"  if ($Date::Manip::Debug =~ /trace/);
+# third element is non-nil, exactly 7 elements must be included.
+sub Delta_Split {
+  print "DEBUG: Delta_Split\n"  if ($Date::Manip::Debug =~ /trace/);
   my($delta,$sign,$exact)=@_;
   my(@delta)=split(/:/,$delta);
-  return ()  if (defined $exact  and  $exact  and $#delta != 5);
+  return ()  if (defined $exact  and  $exact  and $#delta != 6);
   my($i)=();
   $sign="+"  if (! defined $sign);
   for ($i=0; $i<=$#delta; $i++) {
@@ -3390,8 +3899,8 @@ sub CheckDelta {
 
 # Reads up to 3 arguments.  $h may contain the time in any international
 # fomrat.  Any empty elements are set to 0.
-sub ParseTime {
-  print "DEBUG: ParseTime\n"  if ($Date::Manip::Debug =~ /trace/);
+sub Date_ParseTime {
+  print "DEBUG: Date_ParseTime\n"  if ($Date::Manip::Debug =~ /trace/);
   my($h,$m,$s)=@_;
   my($t)=&CheckTime("one");
 
@@ -3409,8 +3918,8 @@ sub ParseTime {
 
 # Forms a date with the 6 elements passed in (all of which must be defined).
 # No check as to validity is made.
-sub FormDate {
-  print "DEBUG: FormDate\n"  if ($Date::Manip::Debug =~ /trace/);
+sub Date_Join {
+  print "DEBUG: Date_Join\n"  if ($Date::Manip::Debug =~ /trace/);
   my($y,$m,$d,$h,$mn,$s)=@_;
   my($ym,$md,$dh,$hmn,$mns)=();
 
@@ -3427,7 +3936,7 @@ sub FormDate {
     $hmn=$mns=":";
 
   } else {
-    confess "ERROR: Invalid internal format in Date_FormDate.\n";
+    confess "ERROR: Invalid internal format in Date_Join.\n";
   }
   $m="0$m"    if (length($m)==1);
   $d="0$d"    if (length($d)==1);
@@ -3471,8 +3980,8 @@ sub CheckTime {
 
 # This checks a date.  If it is valid, it splits it and returns the elements.
 # If no date is passed in, it returns a regular expression for the date.
-sub CheckDate {
-  print "DEBUG: CheckDate\n"  if ($Date::Manip::Debug =~ /trace/);
+sub Date_Split {
+  print "DEBUG: Date_Split\n"  if ($Date::Manip::Debug =~ /trace/);
   my($date)=@_;
   my($ym,$md,$dh,$hmn,$mns)=();
   my($y)='(\d{4})';
@@ -3495,11 +4004,11 @@ sub CheckDate {
     $hmn=$mns=":";
 
   } else {
-    confess "ERROR: Invalid internal format in Date_CheckDate.\n";
+    confess "ERROR: Invalid internal format in Date_Split.\n";
   }
 
   my($t)="^$y$ym$m$md$d$dh$h$hmn$mn$mns$s\$";
-  return $t  if (! $date);
+  return $t  if ($date eq "");
 
   if ($date =~ /$t/) {
     ($y,$m,$d,$h,$mn,$s)=($1,$2,$3,$4,$5,$6);
@@ -3511,6 +4020,229 @@ sub CheckDate {
   return ();
 }
 
+# This takes a list of years, months, WeekOfMonth's, and optionally
+# DayOfWeek's, and returns a list of dates.  Optionally, a list of dates
+# can be passed in as the 1st argument (with the 2nd argument the null list)
+# and the year/month of these will be used.
+sub Date_Recur_WoM {
+  my($y,$m,$w,$d,$FDn)=@_;
+  my(@y)=@$y;
+  my(@m)=@$m;
+  my(@w)=@$w;
+  my(@d)=@$d;
+  my($date0,$date1,@tmp,@date,$d0,$d1,@tmp2)=();
+
+  if (@m) {
+    @tmp=();
+    foreach $y (@y) {
+      return ()  if (length($y)==1 || length($y)==3 || ! &IsInt($y,1,9999));
+      $y=&Date_FixYear($y)  if (length($y)==2);
+      push(@tmp,$y);
+    }
+    @y=sort { $a<=>$b } (@tmp);
+
+    return ()  if (! @m);
+    foreach $m (@m) {
+      return ()  if (! &IsInt($m,1,12));
+    }
+    @m=sort { $a<=>$b } (@m);
+
+    @tmp=@tmp2=();
+    foreach $y (@y) {
+      foreach $m (@m) {
+        push(@tmp,$y);
+        push(@tmp2,$m);
+      }
+    }
+
+    @y=@tmp;
+    @m=@tmp2;
+
+  } else {
+    foreach $d0 (@y) {
+      @tmp=&Date_Split($d0);
+      return ()  if (! @tmp);
+      push(@tmp2,$tmp[0]);
+      push(@m,$tmp[1]);
+    }
+    @y=@tmp2;
+  }
+
+  return ()  if (! @w);
+  foreach $w (@w) {
+    return ()  if ($w==0  ||  ! &IsInt($w,-5,5));
+  }
+
+  if (@d) {
+    foreach $d (@d) {
+      return ()  if (! &IsInt($d,1,7));
+    }
+    @d=sort { $a<=>$b } (@d);
+  }
+
+  @date=();
+  foreach $y (@y) {
+    $m=shift(@m);
+
+    # Find 1st day of this month and next month
+    $date0=&Date_Join($y,$m,1,0,0,0);
+    $date1=&DateCalc($date0,"+0:1:0:0:0:0:0");
+
+    if (@d) {
+      foreach $d (@d) {
+        # Find 1st occurence of DOW (in both months)
+        $d0=&Date_GetNext($date0,$d,1);
+        $d1=&Date_GetNext($date1,$d,1);
+
+        @tmp=();
+        while ($d0 lt $d1) {
+          push(@tmp,$d0);
+          $d0=&DateCalc($d0,"+0:0:1:0:0:0:0");
+        }
+
+        @tmp2=();
+        foreach $w (@w) {
+          if ($w>0) {
+            push(@tmp2,$tmp[$w-1]);
+          } else {
+            push(@tmp2,$tmp[$#tmp+1+$w]);
+          }
+        }
+        @tmp2=sort(@tmp2);
+        push(@date,@tmp2);
+      }
+
+    } else {
+      # Find 1st day of 1st week
+      $date0=&Date_GetNext($date0,$FDn,1);
+      $date0=&Date_GetPrev($date0,$Date::Manip::FirstDay,1);
+
+      # Find 1st day of 1st week of next month
+      $date1=&Date_GetNext($date1,$FDn,1);
+      $date1=&Date_GetPrev($date1,$Date::Manip::FirstDay,1);
+
+      @tmp=();
+      while ($date0 lt $date1) {
+        push(@tmp,$date0);
+        $date0=&DateCalc($date0,"+0:0:1:0:0:0:0");
+      }
+
+      @tmp2=();
+      foreach $w (@w) {
+        if ($w>0) {
+          push(@tmp2,$tmp[$w-1]);
+        } else {
+          push(@tmp2,$tmp[$#tmp+1+$w]);
+        }
+      }
+      @tmp2=sort(@tmp2);
+      push(@date,@tmp2);
+    }
+  }
+
+  @date;
+}
+
+# This returns a sorted list of dates formed by adding/subtracting
+# $delta to $dateb in the range $date0<=$d<$dateb.  The first date int
+# the list is actually the first date<$date0 and the last date in the
+# list is the first date>=$date1 (because sometimes the set part will
+# move the date back into the range).
+sub Date_Recur {
+  my($date0,$date1,$dateb,$delta)=@_;
+  my(@ret,$d)=();
+
+  while ($dateb lt $date0) {
+    $dateb=&DateCalc_DateDelta($dateb,$delta);
+  }
+  while ($dateb ge $date1) {
+    $dateb=&DateCalc_DateDelta($dateb,"-$delta");
+  }
+
+  # Add the dates $date0..$dateb
+  $d=$dateb;
+  while ($d ge $date0) {
+    unshift(@ret,$d);
+    $d=&DateCalc_DateDelta($d,"-$delta");
+  }
+  # Add the first date earler than the range
+  unshift(@ret,$d);
+
+  # Add the dates $dateb..$date1
+  $d=&DateCalc_DateDelta($dateb,$delta);
+  while ($d lt $date1) {
+    push(@ret,$d);
+    $d=&DateCalc_DateDelta($d,$delta);
+  }
+  # Add the first date later than the range
+  push(@ret,$d);
+
+  @ret;
+}
+
+# This sets the values in each date of a recurrence.
+#
+# $h,$m,$s can each be values or lists "1-2,4".  If any are equal to "-1",
+# they are not set (and none of the larger elements are set).
+sub Date_RecurSetTime {
+  my($date0,$date1,$dates,$h,$m,$s)=@_;
+  my(@dates)=@$dates;
+  my(@h,@m,@s,$date,@tmp)=();
+
+  $m="-1"  if ($s eq "-1");
+  $h="-1"  if ($m eq "-1");
+
+  if ($h ne "-1") {
+    @h=&ReturnList($h);
+    return ()  if ! (@h);
+    @h=sort { $a<=>$b } (@h);
+
+    @tmp=();
+    foreach $date (@dates) {
+      foreach $h (@h) {
+        push(@tmp,&Date_SetDateField($date,"h",$h,1));
+      }
+    }
+    @dates=@tmp;
+  }
+
+  if ($m ne "-1") {
+    @m=&ReturnList($m);
+    return ()  if ! (@m);
+    @m=sort { $a<=>$b } (@m);
+
+    @tmp=();
+    foreach $date (@dates) {
+      foreach $m (@m) {
+        push(@tmp,&Date_SetDateField($date,"mn",$m,1));
+      }
+    }
+    @dates=@tmp;
+  }
+
+  if ($s ne "-1") {
+    @s=&ReturnList($s);
+    return ()  if ! (@s);
+    @s=sort { $a<=>$b } (@s);
+
+    @tmp=();
+    foreach $date (@dates) {
+      foreach $s (@s) {
+        push(@tmp,&Date_SetDateField($date,"s",$s,1));
+      }
+    }
+    @dates=@tmp;
+  }
+
+  @tmp=();
+  foreach $date (@dates) {
+    push(@tmp,$date)  if ($date ge $date0  &&  $date lt $date1  &&
+                          &Date_Split($date));
+  }
+
+  @tmp;
+}
+
 sub DateCalc_DateDate {
   print "DEBUG: DateCalc_DateDate\n"  if ($Date::Manip::Debug =~ /trace/);
   my($D1,$D2,$mode)=@_;
@@ -3519,14 +4251,14 @@ sub DateCalc_DateDate {
 
   # Exact mode
   if ($mode==0) {
-    my($y1,$m1,$d1,$h1,$mn1,$s1)=&CheckDate($D1);
-    my($y2,$m2,$d2,$h2,$mn2,$s2)=&CheckDate($D2);
+    my($y1,$m1,$d1,$h1,$mn1,$s1)=&Date_Split($D1);
+    my($y2,$m2,$d2,$h2,$mn2,$s2)=&Date_Split($D2);
     my($i,@delta,$d,$delta,$y)=();
 
     # form the delta for hour/min/sec
-    $delta[3]=$h2-$h1;
-    $delta[4]=$mn2-$mn1;
-    $delta[5]=$s2-$s1;
+    $delta[4]=$h2-$h1;
+    $delta[5]=$mn2-$mn1;
+    $delta[6]=$s2-$s1;
 
     # form the delta for yr/mon/day
     $delta[0]=$delta[1]=0;
@@ -3547,14 +4279,15 @@ sub DateCalc_DateDate {
     } else {
       $d=&Date_DayOfYear($m2,$d2,$y2) - &Date_DayOfYear($m1,$d1,$y1);
     }
-    $delta[2]=$d;
+    $delta[2]=0;
+    $delta[3]=$d;
 
     for ($i=0; $i<6; $i++) {
       $delta[$i]="+".$delta[$i]  if ($delta[$i]>=0);
     }
 
     $delta=join(":",@delta);
-    $delta=&NormalizeDelta($delta,0);
+    $delta=&Delta_Normalize($delta,0);
     return $delta;
   }
 
@@ -3577,23 +4310,23 @@ sub DateCalc_DateDate {
     $sign="+";
   }
   if ($date1 eq $date2) {
-    return "+0:+0:+0:+0:+0:+0"  if ($Date::Manip::DeltaSigns);
-    return "+0:0:0:0:0:0";
+    return "+0:+0:+0:+0:+0:+0:+0"  if ($Date::Manip::DeltaSigns);
+    return "+0:0:0:0:0:0:0";
   }
 
-  my($y1,$m1,$d1,$h1,$mn1,$s1)=&CheckDate($date1);
-  my($y2,$m2,$d2,$h2,$mn2,$s2)=&CheckDate($date2);
-  my($dy,$dm,$dd,$dh,$dmn,$ds,$ddd)=();
+  my($y1,$m1,$d1,$h1,$mn1,$s1)=&Date_Split($date1);
+  my($y2,$m2,$d2,$h2,$mn2,$s2)=&Date_Split($date2);
+  my($dy,$dm,$dw,$dd,$dh,$dmn,$ds,$ddd)=();
 
   # Do years
   $dy=$y2-$y1;
   $dm=0;
   if ($dy>0) {
-    $tmp=&DateCalc_DateDelta($date1,"+$dy:0:0:0:0:0",\$err,0);
+    $tmp=&DateCalc_DateDelta($date1,"+$dy:0:0:0:0:0:0",\$err,0);
     if ($tmp gt $date2) {
       $dy--;
       $tmp=$date1;
-      $tmp=&DateCalc_DateDelta($date1,"+$dy:0:0:0:0:0",\$err,0)  if ($dy>0);
+      $tmp=&DateCalc_DateDelta($date1,"+$dy:0:0:0:0:0:0",\$err,0)  if ($dy>0);
       $dm=12;
     }
     $date1=$tmp;
@@ -3602,18 +4335,17 @@ sub DateCalc_DateDate {
   # Do months
   $dm+=$m2-$m1;
   if ($dm>0) {
-    $tmp=&DateCalc_DateDelta($date1,"+0:$dm:0:0:0:0",\$err,0);
+    $tmp=&DateCalc_DateDelta($date1,"+0:$dm:0:0:0:0:0",\$err,0);
     if ($tmp gt $date2) {
       $dm--;
       $tmp=$date1;
-      $tmp=&DateCalc_DateDelta($date1,"+0:$dm:0:0:0:0",\$err,0)  if ($dm>0);
+      $tmp=&DateCalc_DateDelta($date1,"+0:$dm:0:0:0:0:0",\$err,0)  if ($dm>0);
     }
     $date1=$tmp;
   }
 
   # At this point, check to see that we're on a business day again so that
-  # Aug 3 (Monday) -> Sep 3 (Sunday) = Aug 3 (Monday) -> Sep 4 (Monday)
-  #   = 1 month
+  # Aug 3 (Monday) -> Sep 3 (Sunday) -> Sep 4 (Monday)  = 1 month
   if ($mode==2) {
     if (! &Date_IsWorkDay($date1,0)) {
       $date1=&Date_NextWorkDay($date1,0,1);
@@ -3634,7 +4366,7 @@ sub DateCalc_DateDate {
     }
 
   } else {
-    ($y1,$m1,$d1)=( &CheckDate($date1) )[0..2];
+    ($y1,$m1,$d1)=( &Date_Split($date1) )[0..2];
     $dd=0;
     # If we're jumping across months, set $d1 to the first of the next month
     # (or possibly the 0th of next month which is equivalent to the last day
@@ -3643,11 +4375,11 @@ sub DateCalc_DateDate {
       $d_in_m[2]=29  if (&Date_LeapYear($y1));
       $dd=$d_in_m[$m1]-$d1+1;
       $d1=1;
-      $tmp=&DateCalc_DateDelta($date1,"+0:0:$dd:0:0:0",\$err,0);
+      $tmp=&DateCalc_DateDelta($date1,"+0:0:0:$dd:0:0:0",\$err,0);
       if ($tmp gt $date2) {
         $dd--;
         $d1--;
-        $tmp=&DateCalc_DateDelta($date1,"+0:0:$dd:0:0:0",\$err,0);
+        $tmp=&DateCalc_DateDelta($date1,"+0:0:0:$dd:0:0:0",\$err,0);
       }
       $date1=$tmp;
     }
@@ -3655,10 +4387,10 @@ sub DateCalc_DateDate {
     $ddd=0;
     if ($d1<$d2) {
       $ddd=$d2-$d1;
-      $tmp=&DateCalc_DateDelta($date1,"+0:0:$ddd:0:0:0",\$err,0);
+      $tmp=&DateCalc_DateDelta($date1,"+0:0:0:$ddd:0:0:0",\$err,0);
       if ($tmp gt $date2) {
         $ddd--;
-        $tmp=&DateCalc_DateDelta($date1,"+0:0:$ddd:0:0:0",\$err,0);
+        $tmp=&DateCalc_DateDelta($date1,"+0:0:0:$ddd:0:0:0",\$err,0);
       }
       $date1=$tmp;
     }
@@ -3667,29 +4399,29 @@ sub DateCalc_DateDate {
 
   # in business mode, make sure h1 comes before h2 (if not find delta between
   # now and end of day and move to start of next business day)
-  $d1=( &CheckDate($date1) )[2];
+  $d1=( &Date_Split($date1) )[2];
   $dh=$dmn=$ds=0;
   if ($mode==2  and  $d1 != $d2) {
     $tmp=&Date_SetTime($date1,$Date::Manip::WorkDayEnd);
-    $tmp=&DateCalc_DateDelta($tmp,"+0:0:0:0:1:0")
+    $tmp=&DateCalc_DateDelta($tmp,"+0:0:0:0:0:1:0")
       if ($Date::Manip::WorkDay24Hr);
     $tmp=&DateCalc_DateDate($date1,$tmp,0);
-    ($tmp,$tmp,$tmp,$dh,$dmn,$ds)=&CheckDelta($tmp);
+    ($tmp,$tmp,$tmp,$tmp,$dh,$dmn,$ds)=&Delta_Split($tmp);
     $date1=&Date_NextWorkDay($date1,1,0);
     $date1=&Date_SetTime($date1,$Date::Manip::WorkDayBeg);
-    $d1=( &CheckDate($date1) )[2];
+    $d1=( &Date_Split($date1) )[2];
     confess "ERROR: DateCalc DateDate Business.\n"  if ($d1 != $d2);
   }
 
   # Hours, minutes, seconds
   $tmp=&DateCalc_DateDate($date1,$date2,0);
-  @tmp=&CheckDelta($tmp);
-  $dh  += $tmp[3];
-  $dmn += $tmp[4];
-  $ds  += $tmp[5];
+  @tmp=&Delta_Split($tmp);
+  $dh  += $tmp[4];
+  $dmn += $tmp[5];
+  $ds  += $tmp[6];
 
-  $tmp="$sign$dy:$dm:$dd:$dh:$dmn:$ds";
-  &NormalizeDelta($tmp,$mode);
+  $tmp="$sign$dy:$dm:0:$dd:$dh:$dmn:$ds";
+  &Delta_Normalize($tmp,$mode);
 }
 
 sub DateCalc_DeltaDelta {
@@ -3698,15 +4430,15 @@ sub DateCalc_DeltaDelta {
   my(@delta1,@delta2,$i,$delta,@delta)=();
   $mode=0  if (! defined $mode);
 
-  @delta1=&CheckDelta($D1);
-  @delta2=&CheckDelta($D2);
-  for ($i=0; $i<6; $i++) {
+  @delta1=&Delta_Split($D1);
+  @delta2=&Delta_Split($D2);
+  for ($i=0; $i<7; $i++) {
     $delta[$i]=$delta1[$i]+$delta2[$i];
     $delta[$i]="+".$delta[$i]  if ($delta[$i]>=0);
   }
 
   $delta=join(":",@delta);
-  $delta=&NormalizeDelta($delta,$mode);
+  $delta=&Delta_Normalize($delta,$mode);
   return $delta;
 }
 
@@ -3732,8 +4464,9 @@ sub DateCalc_DateDelta {
   }
 
   # Date, delta
-  my($y,$m,$d,$h,$mn,$s)=&CheckDate($D1);
-  my($dy,$dm,$dd,$dh,$dmn,$ds)=&CheckDelta($D2);
+  my($y,$m,$d,$h,$mn,$s)=&Date_Split($D1);
+  my($dy,$dm,$dw,$dd,$dh,$dmn,$ds)=&Delta_Split($D2);
+  $dd += $dw*7;
 
   # do the month/year part
   $y+=$dy;
@@ -3750,8 +4483,8 @@ sub DateCalc_DateDelta {
   # stuff will work out
   if ($mode==2) {
     $d=$d_in_m[$m] if ($d>$d_in_m[$m]);
-    $date=&Date_NextWorkDay(&FormDate($y,$m,$d,$h,$mn,$s),0,1);
-    ($y,$m,$d,$h,$mn,$s)=&CheckDate($date);
+    $date=&Date_NextWorkDay(&Date_Join($y,$m,$d,$h,$mn,$s),0,1);
+    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
   }
 
   # seconds, minutes, hours
@@ -3800,11 +4533,11 @@ sub DateCalc_DateDelta {
   # days
   if ($mode==2) {
     if ($dd>=0) {
-      $date=&Date_NextWorkDay(&FormDate($y,$m,$d,$h,$mn,$s),$dd,1);
+      $date=&Date_NextWorkDay(&Date_Join($y,$m,$d,$h,$mn,$s),$dd,1);
     } else {
-      $date=&Date_PrevWorkDay(&FormDate($y,$m,$d,$h,$mn,$s),-$dd,1);
+      $date=&Date_PrevWorkDay(&Date_Join($y,$m,$d,$h,$mn,$s),-$dd,1);
     }
-    ($y,$m,$d,$h,$mn,$s)=&CheckDate($date);
+    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
 
   } else {
     $d_in_m[2]=29  if (&Date_LeapYear($y));
@@ -3842,7 +4575,7 @@ sub DateCalc_DateDelta {
     $$errref=3;
     return;
   }
-  &FormDate($y,$m,$d,$h,$mn,$s);
+  &Date_Join($y,$m,$d,$h,$mn,$s);
 }
 
 sub Date_UpdateHolidays {
@@ -3906,8 +4639,8 @@ sub Date_SetConfigVariable {
 }
 
 # This reads an init file.
-sub ReadInitFile {
-  print "DEBUG: ReadInitFile\n"  if ($Date::Manip::Debug =~ /trace/);
+sub Date_InitFile {
+  print "DEBUG: Date_InitFile\n"  if ($Date::Manip::Debug =~ /trace/);
   my($file)=@_;
   local($_)=();
   my($section)="vars";
@@ -3946,7 +4679,7 @@ sub ReadInitFile {
   close(IN);
 }
 
-# Get rid of a problem on old versions of perl
+# Get rid of a problem with old versions of perl
 no strict "vars";
 # This sorts from longest to shortest element
 sub sortByLength {
@@ -4051,9 +4784,20 @@ sub Date_FixYear {
   print "DEBUG: Date_FixYear\n"  if ($Date::Manip::Debug =~ /trace/);
   my($y)=@_;
   my($curr_y)=$Date::Manip::CurrY;
-  my($y1,$y2)=();
   $y=$curr_y  if (! defined $y  or  ! $y);
-  if (length($y)==2) {
+  return $y  if (length($y)==4);
+  confess "ERROR: Invalid year ($y)\n"  if (length($y)!=2);
+  my($y1,$y2)=();
+
+  if (lc($Date::Manip::YYtoYYYY) eq "c") {
+    $y1=substring($y,0,2);
+    $y="$y1$y";
+
+  } elsif ($Date::Manip::YYtoYYYY =~ /^c(\d{2})$/) {
+    $y1=$1;
+    $y="$y1$y";
+
+  } else {
     $y1=$curr_y-$Date::Manip::YYtoYYYY;
     $y2=$y1+99;
     $y="19$y";
@@ -4096,21 +4840,21 @@ sub Date_NthWeekOfYear {
 
   $y=&Date_FixYear($y)  if (length($y)<4);
   if ($Date::Manip::Jan1Week1) {
-    $date=&FormDate($y,1,1,0,0,0);
+    $date=&Date_Join($y,1,1,0,0,0);
   } else {
-    $date=&FormDate($y,1,4,0,0,0);
+    $date=&Date_Join($y,1,4,0,0,0);
   }
   $date=&Date_GetPrev($date,$Date::Manip::FirstDay,1);
   $date=&Date_GetNext($date,$dow,1)  if ($dow ne "");
 
   if ($flag) {
-    ($tmp)=&CheckDate($date);
+    ($tmp)=&Date_Split($date);
     $n++  if ($tmp != $y);
   }
 
-  $date=&DateCalc_DateDelta($date,"+0:0:". ($n-1)*7 . ":0:0:0",\$err,0)
+  $date=&DateCalc_DateDelta($date,"+0:0:". ($n-1) . ":0:0:0:0",\$err,0)
     if ($n>1);
-  ($y,$m,$d)=&CheckDate($date);
+  ($y,$m,$d)=&Date_Split($date);
   ($y,$m,$d);
 }
 
@@ -4156,13 +4900,47 @@ sub Date_NthDayOfYear {
 #   @ day_name        day names                 Monday Tuesday ...
 #   @ day_abb         day abbreviations         Mon Tue ...
 #   @ day_char        day character abbrevs     M T ...
+#
 #   @ num_suff        number with suffix        1st 2nd ...
 #     num_word        numbers spelled out       first second ...
+#
 #   $ last            words which mean last     last final ...
 #   $ each            words which mean each     each every ...
 #   $ of              of (as in a member of)    in of ...
 #                     ex.  4th day OF June
+#   $ at              at 4:00                   at
+#   $ on              on Sunday                 on
+#   $ future          in the future             in
+#   $ past            in the past               ago
+#   $ next            next item                 next
+#   $ prev            previous item             last previous
 #
+#   % times           a hash of times           { noon->12:00:00 ... }
+#
+#   $ years           words for year            y yr year ...
+#   $ months          words for month
+#   $ weeks           words for week
+#   $ days            words for day
+#   $ hours           words for hour
+#   $ minutes         words for minute
+#   $ seconds         words for second
+#   % replace
+#       The replace element is quite important.  In English (and probably
+#       other languages), one of the abbreviations for the word month that
+#       would be nice is "m".  The problem is that "m" matches the "m" in
+#       "minute" which causes the string to be improperly matched in some
+#       cases.  Hence, the list of abbreviations for month is given as:
+#         "mon month months"
+#       In order to allow you to enter "m", replacements can be done.
+#       $replace is a list of pairs of words which are matched and replaced
+#       AS ENTIRE WORDS.  Having $replace equal to "m"->"month" means that
+#       the entire word "m" will be replaced with "month".  This allows the
+#       desired abbreviation to be used.  Make sure that replace contains
+#       an even number of words (i.e. all must be pairs).
+#
+#   $ exact           exact mode                exactly
+#   $ approx          approximate mode          approximately
+#   $ business        business mode             business
 #
 #   Elements marked with an asterix (@) are returned as a set of lists.
 #   Each list contains the strings for each element.  The first set is used
@@ -4172,6 +4950,8 @@ sub Date_NthDayOfYear {
 #   3rd set used if desired.
 #
 #   Elements marked with a dollar ($) are returned as a simple list of words.
+#
+#   Elements marked with a percent (%) are returned as a hash list.
 #
 # 8-bit international characters can be gotten by "\xXX".  I don't know
 # how to get 16-bit characters.
@@ -4270,6 +5050,9 @@ sub Date_NthDayOfYear {
 #     S<    0160    s<    0161
 #     T<    0164    t<    0165
 #     Z<    017d    z<    017e
+#
+# ***NOTE*** Every hash element (unless otherwise noted) MUST be defined in
+# every language.
 
 sub Date_Init_English {
   print "DEBUG: Date_Init_English\n"  if ($Date::Manip::Debug =~ /trace/);
@@ -4304,10 +5087,30 @@ sub Date_Init_English {
       "twenty-fourth","twenty-fifth","twenty-sixth","twenty-seventh",
       "twenty-eighth","twenty-ninth","thirtieth","thirty-first"]];
 
-  $d{"last"}=["last","final"];
+  $d{"last"}    =["last","final"];
+  $d{"each"}    =["each","every"];
+  $d{"of"}      =["in","of"];
+  $d{"at"}      =["at"];
+  $d{"on"}      =["on"];
+  $d{"future"}  =["in"];
+  $d{"past"}    =["ago"];
+  $d{"next"}    =["next"];
+  $d{"prev"}    =["previous","last"];
 
-  $d{"each"}=["each","every"];
-  $d{"of"}=["in","of"];
+  $d{"exact"}   =["exactly"];
+  $d{"approx"}  =["approximately"];
+  $d{"business"}=["business"];
+
+  $d{"times"}   =["noon","12:00:00","midnight","00:00:00"];
+
+  $d{"years"}   =["y","yr","year","yrs","years"];
+  $d{"months"}  =["mon","month","months"];
+  $d{"weeks"}   =["w","wk","wks","week","weeks"];
+  $d{"days"}    =["d","day","days"];
+  $d{"hours"}   =["h","hr","hrs","hour","hours"];
+  $d{"minutes"} =["mn","min","minute","minutes"];
+  $d{"seconds"} =["s","sec","second","seconds"];
+  $d{"replace"} =["m","month"];
 
   \%d;
 }
@@ -4348,10 +5151,30 @@ sub Date_Init_French {
       "vingt-neuf","trente","trente et un"],
      ["1re"]];
 
-  $d{"last"}=["dernier"];
+  $d{"last"}    =["dernier"];
+  $d{"each"}    =["chaque","tout les","toute les","toutes les"];
+  $d{"of"}      =["en","de"];
+  $d{"at"}      =["a","\xe0"];
+  $d{"on"}      =["sur"];
+  $d{"future"}  =["en"];
+  $d{"past"}    =["il y a"];
+  $d{"next"}    =["suivant"];
+  $d{"prev"}    =["precedent","pr\xe9c\xe9dent"];
 
-  $d{"each"}=["chaque","tout les","toute les","toutes les"];
-  $d{"of"}=["en","de"];
+  $d{"exact"}   =["exactement"];
+  $d{"approx"}  =["approximativement"];
+  $d{"business"}=["professionel"];
+
+  $d{"times"}   =["noon","12:00:00","midnight","00:00:00"];
+
+  $d{"years"}   =["an","annee","ans","annees","ann\xe9e","ann\xe9es"];
+  $d{"months"}  =["mois"];
+  $d{"weeks"}   =["sem","semaine"];
+  $d{"days"}    =["j","jour","jours"];
+  $d{"hours"}   =["h","heure","heures"];
+  $d{"minutes"} =["mn","min","minute","minutes"];
+  $d{"seconds"} =["s","sec","seconde","secondes"];
+  $d{"replace"} =["m","mois"];
 
   \%d;
 }
@@ -4386,10 +5209,30 @@ sub Date_Init_Swedish {
       "tjugosjatte","tjugosjunde","tjugoottonde","tjugonionde",
       "trettionde","trettiofursta"]];
 
-  $d{"last"}=["furra","senaste"];
+  $d{"last"}    =["furra","senaste"];
+  $d{"each"}    =["every","each"];
+  $d{"of"}      =["om"];
+  $d{"at"}      =["kl","kl.","klockan"];
+  $d{"on"}      =["on"];
+  $d{"future"}  =["in"];
+  $d{"past"}    =["ago"];
+  $d{"next"}    =["next"];
+  $d{"prev"}    =["previous","last"];
 
-  $d{"each"}=["every","each"];
-  $d{"of"}=["om"];
+  $d{"exact"}   =["exactly"];
+  $d{"approx"}  =["approximately"];
+  $d{"business"}=["business"];
+
+  $d{"times"}   =["noon","12:00:00","midnight","00:00:00"];
+
+  $d{"years"}   =["o","or"];
+  $d{"months"}  =["mon","monad","monader"];
+  $d{"weeks"}   =["w","wk","week","weeks"];
+  $d{"days"}    =["d","dag","dagar"];
+  $d{"hours"}   =["t","tim","timme","timmar"];
+  $d{"minutes"} =["mn","min","minut","minuter"];
+  $d{"seconds"} =["s","sek","sekund","sekunder"];
+  $d{"replace"} =["m","monad"];
 
   \%d;
 }
@@ -4738,6 +5581,38 @@ sub SearchPath {
 }
 #&&
 
+#++ ReturnList :: Num.pl
+#!! ReturnList
+# @list=&ReturnList($str);
+#    This takes a string which should be a comma separated list of integers
+#    or ranges (5-7).  It returns a sorted list of all integers referred to
+#    by the string, or () if there is an invalid element.
+#
+#    Negative integers are also handled.  "-2--1" is equivalent to "-2,-1".
+#!!
+#&& ReturnList
+sub ReturnList {
+  my($str)=@_;
+  my(@ret,@str,$from,$to,$tmp)=();
+  @str=split(/,/,$str);
+  foreach $str (@str) {
+    if ($str =~ /^[-+]?\d+$/) {
+      push(@ret,$str);
+    } elsif ($str =~ /^([-+]?\d+)-([-+]?\d+)$/) {
+      ($from,$to)=($1,$2);
+      if ($from>$to) {
+        $tmp=$from;
+        $from=$to;
+        $to=$tmp;
+      }
+      push(@ret,$from..$to);
+    } else {
+      return ();
+    }
+  }
+  @ret;
+}
+#&&
 
 1;
 
@@ -4766,10 +5641,18 @@ Date::Manip - date manipulation routines
  $delta=&ParseDateDelta($string)
  $delta=&ParseDateDelta(\$string)
 
- $d=&DateCalc($d1,$d2,$errref,$del)
+ @str=&Delta_Format($delta,$dec,@format)
+ $str=&Delta_Format($delta,$dec,@format)
+
+ $recur=&ParseRecur($string,$base,$date0,$date1,$flags)
+ @dates=&ParseRecur($string,$base,$date0,$date1,$flags)
+
+ $d=&DateCalc($d1,$d2 [,$errref] [,$del])
 
  $date=&Date_SetTime($date,$hr,$min,$sec)
  $date=&Date_SetTime($date,$time)
+
+ $date=&Date_SetDateField($date,$field,$val [,$nocheck])
 
  $date=&Date_GetPrev($date,$dow,$today,$hr,$min,$sec)
  $date=&Date_GetPrev($date,$dow,$today,$time)
@@ -4788,11 +5671,12 @@ Date::Manip - date manipulation routines
  $date=&Date_PrevWorkDay($date,$off [,$time]);
 
 The following routines are used by the above routines (though they can also
-be called directly).  Make sure that $y is entered as the full 4 digit year
-(it will die if a 2 digit years is entered).  Month and day should be
-numeric in all cases.  Most (if not all) of the information below can be
-gotten from UnixDate which is really the way I intended it to be gotten,
-but there are reasons to use these.
+be called directly).  $y may be entered as either a 2 or 4 digit year (it
+will be converted to a 4 digit year based on the variable YYtoYYYY
+described below).  Month and day should be numeric in all cases.  Most (if
+not all) of the information below can be gotten from UnixDate which is
+really the way I intended it to be gotten, but there are reasons to use
+these (these are significantly faster).
 
  $day=&Date_DayOfWeek($m,$d,$y)
  $secs=&Date_SecsSince1970($m,$d,$y,$h,$mn,$s)
@@ -4810,13 +5694,19 @@ but there are reasons to use these.
 This is a set of routines designed to make any common date/time
 manipulation easy to do.  Operations such as comparing two times,
 calculating a time a given amount of time from another, or parsing
-international times are all easily done.
+international times are all easily done.  From the very beginning, the main
+focus of Date::Manip has been to be able to do ANY desired date/time
+operation easily, not necessarily quickly.  There are other modules that
+can do a small subset of the operations available in Date::Manip much
+quicker than those presented here, so if speed is a primary issue, you
+should look elsewhere.  But for sheer flexibility, I believe that
+Date::Manip is your best bet.
 
-Date::Manip deals only with the Gregorian calendar (the one currently in
-use).  The Julian calendar defined leap years as every 4th year.  The
-Gregorian calendar improved this by making every 100th year NOT a leap
-year, unless it was also the 400th year.  The Gregorian calendar has been
-extrapolated back to the year 1000 AD and forward to the year 9999 AD.
+Date::Manip deals with time as it is presented the Gregorian calendar (the
+one currently in use).  The Julian calendar defined leap years as every 4th
+year.  The Gregorian calendar improved this by making every 100th year NOT
+a leap year, unless it was also the 400th year.  The Gregorian calendar has
+been extrapolated back to the year 1000 AD and forward to the year 9999 AD.
 Note that in historical context, the Julian calendar was in use until 1582
 when the Gregorian calendar was adopted by the Catholic church.  Protestant
 countries did not accept it until later; Germany and Netherlands in 1698,
@@ -4828,6 +5718,47 @@ No attempt is made to correct for that.
 Date::Manip is therefore not equipped to truly deal with historical dates,
 but should be able to perform (virtually) any operation dealing with a
 modern time and date.
+
+Date::Manip has (or will have) functionality to work with several fundamental
+types of data.
+
+=over 4
+
+=item DATE
+
+Although the word date is used extensively here, it is actually somewhat
+misleading.  Date::Manip works with the full date AND time (year, month,
+day, hour, minute, second).  It doesn't work with fractional seconds.
+Timezones are also supported.
+
+NOTE:  Much better support for timezones (including Daylight Savings Time)
+is planned for the future.
+
+=item DELTA
+
+This refers to a duration or elapsed time.  One thing to note is that, as
+used in this module, a delta refers only to the amount of time elapsed.  It
+includes no information about a starting or ending time.
+
+=item RECURRENCE
+
+A recurrence is simply a notation for defining when a recurring event
+occurs.  For example, if an event occurs every other Friday or every
+4 hours, this can be defined as a recurrence.  With a recurrence and a
+starting and ending date, you can get a list of dates in that period when
+a recurring event occurs.
+
+=item GRAIN
+
+The granularity of a time basically refers to how accurate you wish to
+treat a date.  For example, if you want to compare two dates to see if
+they are identical at a granularity of days, then they only have to occur
+on the same day.  At a granularity of an hour, they have to occur within
+an hour of each other, etc.
+
+NOTE:  Support for this will be added soon.
+
+=back
 
 Among other things, Date::Manip allow you to:
 
@@ -4847,16 +5778,14 @@ Among other things, Date::Manip allow you to:
 6.  Work with dates with dates using international formats (foreign month
     names, 12/10/95 referring to October rather than December, etc.).
 
+7.  To find a list of dates where a recurring event happens.
+
 Each of these tasks is trivial (one or two lines at most) with this package.
 
-Although the word date is used extensively here, it is actually somewhat
-misleading.  Date::Manip works with the full date AND time (year, month,
-day, hour, minute, second).
+=head1 EXAMPLES
 
 In the documentation below, US formats are used, but in most (if not all)
 cases, a non-English equivalent will work equally well.
-
-=head1 EXAMPLES
 
 1.  Parsing a date from any conveniant format
 
@@ -4908,6 +5837,11 @@ cases, a non-English equivalent will work equally well.
 
   &Date_Init("Language=French","DateFormat=non-US");
   $date=&ParseDate("1er decembre 1990");
+
+7.  To find a list of dates where a recurring event happens.
+
+  # To find the 2nd tuesday of every month
+  @date=&ParseRecur("0:1*2:2:0:0:0",$base,$start,$stop);
 
 NOTE: Some date forms do not work as well in languages other than English,
 but this is not because DateManip is incapable of doing so (almost nothing
@@ -5007,7 +5941,7 @@ dates are all equivalent:
 In some cases, this may actually be TOO flexible, but not attempt is made
 to trap this.
 
-Valid date formats include all ISO 8601 formats:
+Valid date formats include the ISO 8601 formats:
 
    YYYYMMDDHHMNSSFFFF
    YYYYMMDDHHMNSS
@@ -5094,12 +6028,13 @@ All strings are case insensitive.  "December" and "DEceMBer" both work.
 When a part of the date is not given, defaults are used: year defaults
 to current year; hours, minutes, seconds to 00.
 
-The year may be entered as 2 or 4 digits.  If entered as 2 digits, it is
-taken to be the year in the range CurrYear-89 to CurrYear+10 (the 89/10
-can be adjusted using the YYtoYYYY variable described below).  So, if the
-current year is 1996, the range is [1907 to 2006] so entering the year 00
-refers to 2000, 05 to 2005, but 07 refers to 1907.  Use 4 digit years to
-avoid confusion!
+The year may be entered as 2 or 4 digits.  If entered as 2 digits, it must
+first be converted to a 4 digit year.  There are a couple of ways to do
+this based on the value of the YYtoYYYY variable (described below).  The
+default behavior it to force the 2 digit year to be in the 100 year period
+CurrYear-89 to CurrYear+10.  So in 1996, the range is [1907 to 2006], so
+the 2 digit year 05 would refer to 2005 but 07 would refer to 1907.  See
+CUSTOMIZING DATE::MANIP below for information on YYtoYYYY for other methods.
 
 Dates are always checked to make sure they are valid.
 
@@ -5128,6 +6063,11 @@ time format is that two times can be compared using simple string comparisons
 to find out which is later.  Also, it is readily understood by a human.
 Alternate forms can be used if that is more conveniant.  See Date_Init below
 and the config variable Internal.
+
+NOTE: The format for the date is going to change at some point in the future
+to YYYYMMDDHH:MN:SS+HHMN (i.e. it'll include the timezone).  In order to
+maintain compatibility, you should use UnixDate to extract information from
+a date.
 
 =item UnixDate
 
@@ -5176,9 +6116,9 @@ The format options are:
  Minute, Second, Timezone
      %M     minute                   - 00 to 59
      %S     second                   - 00 to 59
-     %s     seconds from Jan 1, 1970 GMT
-                                     - negative if before 1/1/1970
-     %o     seconds from Jan 1, 1970 in the current time zone
+     %s     seconds from 1/1/1970 GMT- negative if before 1/1/1970
+     %o     seconds from Jan 1, 1970
+            in the current time zone
      %z,%Z  timezone (3 characters)  - "EDT"
  Date, Time
      %c     %a %b %e %H:%M:%S %Y     - Fri Apr 28 17:23:15 1995
@@ -5210,21 +6150,24 @@ The format options are:
 
 If a lone percent is the final character in a format, it is ignored.
 
-Note that the ls format applies to date within the past OR future 6 months!
+Note that the ls format (%l) applies to date within the past OR future 6
+months!
 
 The formats %U and %W return a week from 01 to 53.  Because days at the
 beginning or end of the year may actually appear in a week in the previous
 or next year, the %L and %G formats were added to handle this case.  %L and %G
 give the year of the week for %U and %W respectively.  So Jan 1, 1993 is
 written in ISO-8601 format as 1992-W53-5.  In this case, %Y is 1993, but %G
-is 1992 and %W are 53.  %L and %U are similar for weeks starting with Sunday.
+is 1992 and %W is 53.  %L and %U are similar for weeks starting with Sunday.
 %J returns the full ISO-8601 format.
 
 Note that the %s format was introduced in version 5.07.  Prior to that,
 %s referred to the seconds since 1/1/70.  This was moved to %o in 5.07.
 
-This routine is loosely based on date.pl (version 3.2) by Terry McGonigal.
-No code was used, but many of his formats were.
+The formats used in this routine were originally based on date.pl (version
+3.2) by Terry McGonigal, as well as a couple taken from different versions
+of the date(1).  Also, several have been added which are unique to
+Date::Manip.
 
 =item ParseDateDelta
 
@@ -5239,9 +6182,9 @@ from the array.  Recognized deltas are of the form:
          +4 hours +3mn -2second
          + 4 hr 3 minutes -2
          4 hour + 3 min -2 s
-  +Y:+M:+D:+H:+MN:+S
+  +Y:+M:+W:+D:+H:+MN:+S
       examples:
-         0:0:0:4:3:-2
+         0:0:0:0:4:3:-2
          +4:3:-2
   mixed format
       examples:
@@ -5262,9 +6205,9 @@ are:
 Also, the "s" string may be omitted.  The sign, number, and string may
 all be separated from each other by any number of whitespaces.
 
-In the date, all fields must be given in the order: y m d h mn s.  Any
+In the date, all fields must be given in the order: Y M W D H MN S.  Any
 number of them may be omitted provided the rest remain in the correct
-order.  In the 2nd (colon) format, from 2 to 6 of the fields may be given.
+order.  In the 2nd (colon) format, from 2 to 7 of the fields may be given.
 For example +D:+H:+MN:+S may be given to specify only four of the fields.
 In any case, both the MN and S field may be present.  No spaces may be
 present in the colon format.
@@ -5281,33 +6224,156 @@ components of the delta.  I.e. "-12 yr 6 mon ago" is identical to "+12yr
 because when no sign is explicitely given, it carries the previously
 entered sign).
 
-The "week" field does not occur in the colon separated delta.  The reason
-for this is to maintain backward compatibility with previous versions of
-Date::Manip.  Parsing of weeks was only added in version 5.07.  At this
-point, rather than change the internal format of the delta to
-"Y:M:W:D:H:MN:S", I simply added the weeks to the days (1 week = 7 days) in
-order to be compatible with previous versions.  So, they are not parsed in
-the colon format, only in the first format.  Hopefully, this will not
-result in too much confusion.
-
 One thing is worth noting.  The year/month and day/hour/min/sec parts are
 returned in a "normalized" form.  That is, the signs are adjusted so as to
 be all positive or all negative.  For example, "+ 2 day - 2hour" does not
-return "0:0:2:-2:0:0".  It returns "+0:0:1:22:0:0" (1 day 22 hours which is
-equivalent).  I find (and I think most others agree) that this is a more
-useful form.
+return "0:0:0:2:-2:0:0".  It returns "+0:0:0:1:22:0:0" (1 day 22 hours
+which is equivalent).  I find (and I think most others agree) that this is
+a more useful form.
 
 Since the year/month and day/hour/min/sec parts must be normalized
 separately there is the possibility that the sign of the two parts will be
 different.  So, the delta "+ 2years -10 months - 2 days + 2 hours" produces
-the delta "+1:2:-1:22:0:0".
+the delta "+1:2:-0:1:22:0:0".
 
-For backwards compatibility, it is possible to include a sign for all
-elements that is output.  See the configuration variable DeltaSigns below.
+It is possible to include a sign for all elements that is output.  See the
+configuration variable DeltaSigns below.
+
+NOTE: The internal format of the delta changed in version 5.30 from
+Y:M:D:H:MN:S to Y:M:W:D:H:MN:S .  Also, it is going to change again at some
+point in the future to Y:M:W:D:H:MN:S*FLAGS .  Use the routine Delta_Format
+to extract information rather than parsing it yourself.
+
+=item Delta_Format
+
+ @str=&Delta_Format($delta,$dec,@format)
+ $str=&Delta_Format($delta,$dec,@format)
+
+This is similar to the UnixDate routine except that it extracts information
+from a delta.  Unlike the UnixDate routine, most of the formats are 2
+characters instead of 1.
+
+NOTE:  For the time being, Delta_Format only understands the "exact" parts of
+a delta (W/D/H/MN/S).  Additional formats to handle the remainder will be
+added shortly.
+
+Formats currently understood are:
+
+   %Xv     : the value of the field named X
+   %Xd     : the value of the field X, and all smaller fields, expressed in
+             units of X
+   %Xh     : the value of field X, and all larger fields, expressed in units
+             of X
+   %Xt     : the value of all fields expressed in units of X
+
+   X is one of w,d,h,m,s (case sensitive).
+
+   %%      : returns a "%"
+
+So, the format "%hd" means the values of H, MN, and S expressed in hours.
+So for the delta "0:0:0:0:2:30:0", this format returns 2.5.
+
+The format "%hh" returns the value of W, D, and H expressed in hours.
+
+If $dec is non-zero, the %Xd and %Xt values are formatted to contain $dec
+decimal places.
+
+=item ParseRecur
+
+ $recur=&ParseRecur($string [,$base,$date0,$date1,$flags])
+ @dates=&ParseRecur($string [,$base,$date0,$date1,$flags])
+
+A recurrence refers to a recurring event.  A fully specified recurrence
+requires (in most cases) 4 items: a recur description (describing the
+frequency of the event), a base date (a date when the event occurred and
+which other occurences are based on), and a start and end date.  There may
+be one or more flags included which modify the behavior of the recur
+description.  It is written as:
+
+  recur*flags*base*date0*date1
+
+Here, base, date0, and date1 are any strings (which must not contain any
+asterixes) which can be parsed by ParseDate.  flags is a comma separated
+list of flags (described below), and recur is a string describing a
+recurring event.
+
+If called in scalar context, it returns a string containing a fully
+specified recurrence (or as much of it as can be determined with
+unspecified fields left blank).  In list context, it returns a list of all
+dates referred to by a recurrence if enough information is given in the
+recurrence.  All dates returned are in the range:
+
+  date0 <= date < date1
+
+The argument $string can contain any of the parts of a full recurrence.
+For example:
+
+  recur
+  recur*flags
+  recur**base*date0*date1
+
+The only part which is required is the recur description.  Any values
+contained in $string are overridden by values passed in as parameters to
+ParseRecur.
+
+A recur description is a string of the format Y:M:W:D:H:MN:S .  Exactly one
+of the colons may optionally be replaced by an asterix, or an asterix may
+be prepended to the string.
+
+Any value "N" to the left of the asterix refers to the "Nth" one.  Any value
+to the right of the asterix refers to a value as it appears on a calendar.
+Values right of the asterix can be a comma separated list of values or ranges.
+In a few cases, negative values are appropriate.
+
+This is best illustrated by example.
+
+  0:0:2:1:0:0:0        every 2 weeks and 1 day
+  0:0:0:0:5:30:0       every 5 hours and 30 minutes
+  0:0:0:2*12:30:0      every 2 days at 12:30 (each day)
+  3*1:0:2:12:0:0       every 3 years on Jan 2 at noon
+  0:1*0:2:12,14:0:0    2nd of every month at 12:00 and 14:00
+  1:0:0*45:0:0:0       45th day of every year
+  0:1*4:2:0:0:0        4th tuesday (day 2) of every month
+  0:1*-1:2:0:0:0       last tuesday of every month
+  0:0:3*2:0:0:0        every 3rd tuesday (every 3 weeks on 2nd day of week)
+  1:0*12:2:0:0:0       tuesday of the 12th week of each year
+  *1990-1995:12:0:1:0:0:0
+                       Dec 1 in 1990 through 1995
+
+  0:1*2:0:0:0:0        the start of the 2nd week of every month (see Note 2)
+  1*1:2:0:0:0:0        the start of the 2nd week in January each year (Note 2)
+
+Note 1: There is no way to express the following with a single recurrence:
+
+  every day at 12:30 and 1:00
+
+Note 2: A recurrence specifying the week of a month is NOT clearly defined
+in common usage.  What is the 1st week in a month?  The behavior (with
+respect to this module) is well defined (using some of the flags below),
+but in common usage, this is so ambiguous that this form should probably
+never be used.
+
+There are a small handful of English strings which can be parsed in place
+of a numerical recur description.  These include:
+
+  every 2nd day [in 1997]
+  every 2nd day in June [1997]
+  2nd day of every month [in 1997]
+  2nd tuesday of every month [in 1997]
+  last tuesday of every month [in 1997]
+  every 2nd tuesday [in 1997]
+  every 2nd tuesday in June [1997]
+
+Each of these set base, date0, and date1 to a default value (the current
+year with Jan 1 being the base date is the default if the year and month
+are missing).
+
+Flags are not yet implemented, but will allow even more complex behaviors
+to be easily defined.
 
 =item DateCalc
 
- $d=&DateCalc($d1,$d2,\$err [,$mode])
+ $d=&DateCalc($d1,$d2 [,\$err] [,$mode])
 
 This takes two dates, deltas, or one of each and performs the appropriate
 calculation with them.  Dates must be a string that can be parsed by
@@ -5387,10 +6453,11 @@ because the mode keyword is removed from a date/delta by the parse routines,
 and the mode is reset each time a parse routine is called.  Since DateCalc
 parses both of its arguments, whatever mode was previously set is ignored.
 
-$err is set to:
+If \$err is passed in, it is set to:
    1 is returned if $d1 is not a delta or date
    2 is returned if $d2 is not a delta or date
    3 is returned if the date is outside the years 1000 to 9999
+This argument is optional, but if included, it must come before $mode.
 
 Nothing is returned if an error occurs.
 
@@ -5422,6 +6489,16 @@ works, but
    $date=&Date_SetTime($date,"1:30 PM")
 
 doesn't.
+
+=item Date_SetDateField
+
+ $date=&Date_SetDateField($date,$field,$val [,$nocheck])
+
+This takes a date and sets one of it's fields to a new value.  $field is
+any of the strings "y", "m", "d", "h", "mn", "s" (case insensitive) and
+$val is the new value.
+
+If $nocheck is non-zero, no check is made as to the validity of the date.
 
 =item Date_GetPrev
 
@@ -5479,7 +6556,7 @@ Similar to Date_GetPrev.
 Returns the day of the week (0 for Sunday, 6 for Saturday).  Dec 31, 0999
 was Tuesday.
 
-All arguments must be numeric.  Year must be 4 digits.
+All arguments must be numeric.
 
 =item Date_SecsSince1970
 
@@ -5488,7 +6565,7 @@ All arguments must be numeric.  Year must be 4 digits.
 Returns the number of seconds since Jan 1, 1970 00:00 (negative if date is
 earlier).
 
-All arguments must be numeric.  Year must be 4 digits.
+All arguments must be numeric.
 
 =item Date_SecsSince1970GMT
 
@@ -5498,7 +6575,7 @@ Returns the number of seconds since Jan 1, 1970 00:00 GMT (negative if date
 is earlier).  If CurrTZ is "IGNORE", the number will be identical to
 Date_SecsSince1970 (i.e. the date given will be treated as being in GMT).
 
-All arguments must be numeric.  Year must be 4 digits.
+All arguments must be numeric.
 
 =item Date_DaysSince999
 
@@ -5506,7 +6583,7 @@ All arguments must be numeric.  Year must be 4 digits.
 
 Returns the number of days since Dec 31, 0999.
 
-All arguments must be numeric.  Year must be 4 digits.
+All arguments must be numeric.
 
 =item Date_DayOfYear
 
@@ -5514,7 +6591,7 @@ All arguments must be numeric.  Year must be 4 digits.
 
 Returns the day of the year (001 to 366)
 
-All arguments must be numeric.  Year must be 4 digits.
+All arguments must be numeric.
 
 =item Date_DaysInYear
 
@@ -5522,15 +6599,11 @@ All arguments must be numeric.  Year must be 4 digits.
 
 Returns the number of days in the year (365 or 366)
 
-Year must be 4 digits.
-
 =item Date_DaysInMonth
 
  $days=&Date_DaysInMonth($m,$y);
 
 Returns the number of days in the month.
-
-Year must be 4 digits.
 
 =item Date_WeekOfYear
 
@@ -5540,7 +6613,7 @@ Figure out week number.  $first is the first day of the week which is
 usually 0 (Sunday) or 1 (Monday), but could be any number between 0 and 6
 in practice.
 
-All arguments must be numeric.  Year must be 4 digits.
+All arguments must be numeric.
 
 =item Date_LeapYear
 
@@ -5548,8 +6621,6 @@ All arguments must be numeric.  Year must be 4 digits.
 
 Returns 1 if the argument is a leap year
 Written by David Muir Sharnoff <muir@idiom.com>
-
-Year must be 4 digits.
 
 =item Date_DaySuffix
 
@@ -5864,7 +6935,12 @@ in the Manip.pm file.
 
 Each user can have a personal config file which is of the same form as
 the global config file.  The variables PersonalCnf and PersonalCnfPath
-set the name and search path for the personal config file.
+set the name and search path for the personal config file.  This file is
+also optional.
+
+NOTE: if you use business mode calculations, you must have a config file
+(either global or personal) since this is the only place where you can
+define holidays.
 
 Finally, any variables passed in through Date_Init override all other
 values.
@@ -6022,11 +7098,10 @@ format).
 =item FirstDay
 
 It is sometimes necessary to know what day of week is regarded as first.
-By default, this is set to sunday, but many countries and people will
-prefer monday (and in a few cases, a different day may be desired).  Set
-the FirstDay variable to be the first day of the week (1=monday, 7=sunday)
-Incidentally, monday should be chosen as the default to be in complete
-accordance with ISO 8601.
+By default, this is set to Monday, but many countries and people will
+prefer Sunday (and in a few cases, a different day may be desired).  Set
+the FirstDay variable to be the first day of the week (1=Monday, 7=Sunday)
+Monday should be chosen to to comply with ISO 8601.
 
 =item WorkWeekBeg, WorkWeekEnd
 
@@ -6081,12 +7156,16 @@ week of the year contains Jan 1.
 =item YYtoYYYY
 
 By default, a 2 digit year is treated as falling in the 100 year period of
-CURR-89 to CURR+10.  YYtoYYYY may be set to any integer between 0 and 99
-to adjust this to the period CURR-N to CURR+(99-N).  A value of 0 forces
+CURR-89 to CURR+10.  YYtoYYYY may be set to any integer N to force a 2
+digit year into the period CURR-N to CURR+(99-N).  A value of 0 forces
 the year to be the current year or later.  A value of 99 forces the year
 to be the current year or earlier.  Since I do no checking on the value of
 YYtoYYYY, you can actually have it any positive or negative value to force
 it into any century you want.
+
+YYtoYYYY can also be set to "C" to force it into the current century, or
+to "C##" to force it into a specific century.  So, no (1998), "C" forces
+2 digit years to be 1900-1999 and "C18" would force it to be 1800-1899.
 
 =item UpdateCurrTZ
 
@@ -6121,23 +7200,87 @@ format given above.
 
 For the most part, Date::Manip has remained backward compatible at every
 release.  There have been a few minor incompatibilities introduced at
-various stages.
+various stages.  Major differences are marked with bullets.
 
-Version 5.07 introduced 2 minor incompatibilities.  In the UnixDate
-command, the "%s" format changed.  In version 5.06, "%s" returned the
-number of seconds since Jan 1, 1970 in the current timezone.  In 5.07,
-it returns the number of seconds since Jan 1, 1970 GMT.  The "%o" format
-was added to return what "%s" previously did.
+=over 4
 
-Also in 5.07, the format for the deltas returned by ParseDateDelta changed.
-Previously, each element of a delta had a sign attached to it
-(+1:+2:+3:+4:+5:+6).  The new format removes all unnecessary signs by
-default (+1:2:3:4:5:6).  Also, because of the way deltas are normalized
-(see documentation on ParseDateDelta), at most two signs are included.
-For backwards compatibility, the config variable DeltaSigns was added.  If
-set to 1, all deltas include all 6 signs.
+=item VERSION 5.30
 
-Finally, in 5.07 the format of the Date_Init calling arguments changed.  The
+=over 4
+
+=item * Delta format changed
+
+A week field has been added to the internal format of the delta.  It now
+reads "Y:M:W:D:H:MN:S" instead of "Y:M:D:H:MN:S".
+
+=back
+
+=item VERSION 5.21
+
+=over 4
+
+=item Long running processes may give incorrect timezone
+
+A process that runs during a timezone change (Daylight Saving Time
+specifically) may report the wrong timezone.  See the UpdateCurrTZ variable
+for more information.
+
+=item UnixDate "%J", "%W", and "%U" formats fixed
+
+The %J, %W, and %U will no longer report a week 0 or a week 53 if it should
+really be week 1 of the following year.  They now report the correct week
+number according to ISO 8601.
+
+=back
+
+=item VERSION 5.20
+
+=over 4
+
+=item * ParseDate formats removed (ISO 8601 compatibility)
+
+Full support for ISO 8601 formats was added.  As a result, some formats
+which previously worked may no longer be parsed since they conflict with an
+ISO 8601 format.  These include MM-DD-YY (conflicts with YY-MM-DD) and
+YYMMDD (conflicts with YYYYMM).  MM/DD/YY still works, so the first form
+can be kept easily by changing "-" to "/".  YYMMDD can be changed to
+YY-MM-DD before being parsed.  Whenever parsing dates using dashes as
+separators, they will be treated as ISO 8601 dates.  You can get around
+this by converting all dashes to slashes.
+
+=item * Week day numbering
+
+The day numbering was changed from 0-6 (sun-sat) to 1-7 (mon-sun) to be
+ISO 8601 compatible.  Weeks start on Monday (though this can be overridden
+using the FirstDay config variable) and the 1st week of the year contains
+Jan 4 (though it can be forced to contain Jan 1 with the Jan1Week1 config
+variable).
+
+=back
+
+=item VERSION 5.07
+
+=over 4
+
+=item UnixDate "%s" format
+
+Used to return the number of seconds since 1/1/1970 in the current
+timezone.  It now returns the number of seconds since 1/1/1970 GMT.
+The "%o" format was added which returns what "%s" previously did.
+
+=item Internal format of delta
+
+The format for the deltas returned by ParseDateDelta changed.  Previously,
+each element of a delta had a sign attached to it (+1:+2:+3:+4:+5:+6).  The
+new format removes all unnecessary signs by default (+1:2:3:4:5:6).  Also,
+because of the way deltas are normalized (see documentation on
+ParseDateDelta), at most two signs are included.  For backwards
+compatibility, the config variable DeltaSigns was added.  If set to 1, all
+deltas include all 6 signs.
+
+=item Date_Init arguments
+
+The format of the Date_Init calling arguments changed.  The
 old method
 
   &Date_Init($language,$format,$tz,$convtz);
@@ -6147,20 +7290,9 @@ Use the new calling format instead:
 
   &Date_Init("var=val","var=val",...);
 
-Version 5.20 has some more noticable incompatibilities in it.  Full support
-for ISO 8601 formats was added.  As a result, some formats which previously
-worked may no longer be parsed since they conflict with an ISO 8601 format.
-These include MM-DD-YY (conflicts with YY-MM-DD) and YYMMDD (conflicts with
-YYYYMM).  MM/DD/YY still works, so the first form can be kept easily by
-changing "-" to "/".  YYMMDD can be changed to YY-MM-DD before being parsed.
-Whenever parsing dates using dashes as separators, they will be treated as
-ISO 8601 dates.  You can get around this by converting all dashes to slashes.
+=back
 
-The day numbering was changed from 0-6 (sun-sat) to 1-7 (mon-sun) to be
-ISO 8601 compatible.  Weeks start on Monday (though this can be overridden
-using the FirstDay config variable) and the 1st week of the year contains
-Jan 4 (though it can be forced to contain Jan 1 with the Jan1Week1 config
-variable).
+=back
 
 =head1 COMMON PROBLEMS
 
@@ -6225,54 +7357,15 @@ days, today at noon, etc.).  These take a lot longer to parse.
    5.21 took 29.1 seconds (these were run on a slow, overloaded computer with
    little memory... but the ratios should be reliable on a faster computer).
 
-Don't do business date calculations.  They are just plain slow.  There will
-be an approximate business mode in one of the next versions which will be
-much faster (though less accurate).  Whenever possible, use this mode.  And
-who needs a business date more accurate than "6 to 8 weeks" anyway huh :-)
+Business date calculations are extremely.  You should consider alternatives
+if possible (i.e. doing the calculation in exact mode and then multiplying
+by 5/7).  There will be an approximate business mode in one of the next
+versions which will be much faster (though less accurate) which will do
+something like this.  Whenever possible, use this mode.  And who needs a
+business date more accurate than "6 to 8 weeks" anyway huh :-)
 
 Never call Date_Init more than once.  Unless you're doing something very
 strange, there should never be a reason to anyway.
-
-=back
-
-=head1 KNOWN BUGS
-
-=over 4
-
-=item Daylight Savings Times
-
-Date::Manip does not handle daylight savings time, though it does handle
-timezones to a certain extent.  Converting from EST to PST works fine.
-Going from EST to PDT is unreliable.
-
-The following examples are run in the winter of the US East coast (i.e.
-in the EST timezone).
-
-	print UnixDate(ParseDate("6/1/97 noon"),"%u"),"\n";
-        => Sun Jun  1 12:00:00 EST 1997
-
-June 1 EST does not exist.  June 1st is during EDT.  It should print:
-
-        => Sun Jun  1 00:00:00 EDT 1997
-
-Even explicitely adding the timezone doesn't fix things (if anything, it
-makes them worse):
-
-	print UnixDate(ParseDate("6/1/97 noon EDT"),"%u"),"\n";
-        => Sun Jun  1 11:00:00 EST 1997
-
-Date::Manip converts everything to the current timezone (EST in this case).
-
-Related problems occur when trying to do date calculations over a timezone
-change.  These calculations may be off by an hour.
-
-Also, if you are running a script which uses Date::Manip over a period of
-time which starts in one time zone and ends in another (i.e. it switches
-form Daylight Savings Time to Standard Time or vice versa), many things may
-be wrong (especially elapsed time).
-
-I hope to fix these problems in a future release so that it would convert
-everything to the current zones (EST or EDT).
 
 =item Sorting Problems
 
@@ -6316,6 +7409,47 @@ not worried about it.
 
 =back
 
+=head1 KNOWN BUGS
+
+=over 4
+
+=item Daylight Savings Times
+
+Date::Manip does not handle daylight savings time, though it does handle
+timezones to a certain extent.  Converting from EST to PST works fine.
+Going from EST to PDT is unreliable.
+
+The following examples are run in the winter of the US East coast (i.e.
+in the EST timezone).
+
+	print UnixDate(ParseDate("6/1/97 noon"),"%u"),"\n";
+        => Sun Jun  1 12:00:00 EST 1997
+
+June 1 EST does not exist.  June 1st is during EDT.  It should print:
+
+        => Sun Jun  1 00:00:00 EDT 1997
+
+Even explicitely adding the timezone doesn't fix things (if anything, it
+makes them worse):
+
+	print UnixDate(ParseDate("6/1/97 noon EDT"),"%u"),"\n";
+        => Sun Jun  1 11:00:00 EST 1997
+
+Date::Manip converts everything to the current timezone (EST in this case).
+
+Related problems occur when trying to do date calculations over a timezone
+change.  These calculations may be off by an hour.
+
+Also, if you are running a script which uses Date::Manip over a period of
+time which starts in one time zone and ends in another (i.e. it switches
+form Daylight Savings Time to Standard Time or vice versa), many things may
+be wrong (especially elapsed time).
+
+I hope to fix these problems in a future release so that it would convert
+everything to the current zones (EST or EDT).
+
+=back
+
 =head1 BUGS AND QUESTIONS
 
 If you find a bug in Date::Manip, please send it directly to me (see the
@@ -6333,5 +7467,10 @@ newsgroup).
 =head1 AUTHOR
 
 Sullivan Beck (sbeck@cise.ufl.edu)
+
+You can always get the newest beta version of Date::Manip (which may fix
+problems in the current CPAN version) from my home page:
+
+http://www.cise.ufl.edu/~sbeck/
 
 =cut

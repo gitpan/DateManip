@@ -23,26 +23,22 @@ The internal format of a delta has changed (a week field has been added).
 I realize that this is going to cause some problems, but I am adding two
 other types of data (granularity and recurrence) to Date::Manip.  Both
 will resemble a delta, and both will have week fields, and I wanted all three
-to be as similar as possible.  You should use FormatDelta to extract
-information from a delta rather than doing it manually.  This is especially
-important since the format for a delta will be changed again in one of the
-next versions from Y:M:W:D:H:MN:S to Y:M:W:D:H:MN:S*FLAGS.
+to be as similar as possible.  You should use Delta_Format to extract
+information from a delta from now on rather than doing it manually.  This is
+especially important since the format for a delta will be changed again in one
+of the next versions from Y:M:W:D:H:MN:S to Y:M:W:D:H:MN:S*FLAGS.
 
 I also plan on changing the internal format for a date to include
 the timezone ( YYYYMMDDHH:MN:SS+HHMN ).  Using UnixDate to extract information
 from a date is recommended.
 
 
-Notes for version 5.20:
-  Added ISO 8601 date formats.
-  Added ParseDateString for speed.
-  Changed week handling to meet ISO 8601 standards.
-  Added %J and %K UnixDate formats.
-  Added some speedups (more to come).
-  Added more Parse formats:
-     last day in mmm in YY             "last day of October"
-     dofw                              "Friday" (Friday of current week)
-     Nth                               "12th", "1st" (day of current month)
+Notes for version 5.30:
+  *** Deltas now have a week field: Y:M:W:D:H:Mn:S
+  *** Added ParseRecur.
+  Added the Delta_Format function.
+  Added Date_SetDateField function.
+  All routines now handle 2 or 4 digit years.
 
 Notes for version 5.21:
   Now passes taint checks (for 5.004_03 ... I haven't checked 5.004_04
@@ -50,7 +46,7 @@ Notes for version 5.21:
   Several speedups (significantly faster now).
   Added some config variables:
     YYtoYYYY, UpdateCurrTZ, TomorrowFirst
-  Added the Date_NearestWorkDay and Date_SetDateField functions.
+  Added the Date_NearestWorkDay function
   Some minor bugfixes.
   Fixed handling of ISO 8601 weeks 01, 52, and 53 (and added %G and %L formats
     to UnixDate to acommadate this).
@@ -61,8 +57,29 @@ Notes for version 5.21:
     Time can be written as 5pm
   Added ForceDate variable.
   Tests now work for all years.
-  
+
+Notes for version 5.20:
+  *** Added ISO 8601 date formats.
+  Added ParseDateString for speed.
+  Changed week handling to meet ISO 8601 standards.
+  Added %J and %K UnixDate formats.
+  Added some speedups (more to come).
+  Added more Parse formats:
+     last day in mmm in YY             "last day of October"
+     dofw                              "Friday" (Friday of current week)
+     Nth                               "12th", "1st" (day of current month)
+
 Backwards incompatibilities:
+
+  Version 5.30
+    The internal format of a delta has changed.  This will cause some people
+       problems.  Use the routine Delta_Format to extract information from
+       a delta.
+
+  Version 5.21
+    When running processes (running over time zone changes).  See UpdateCurrTZ
+       documentation.
+    The UnixDate formats %W and %U no longer return week 00.
 
   Version 5.20
     Some old formats were removed since they conflicted with ISO 8601
@@ -74,11 +91,6 @@ Backwards incompatibilities:
        the first day.
     By default, the 1st week of the year contains Jan 4 (ISO 8601).  See
        the Jan1Week1 variable for overriding this.
-
-  Version 5.21
-    When running processes (running over time zone changes).  See UpdateCurrTZ
-       documentation.
-    The UnixDate formats %W and %U no longer return week 00.
 
   ############################################################################
   If you would like to stay informed about future versions of this module,
@@ -93,7 +105,7 @@ Backwards incompatibilities:
 
   The current (non-beta) version of this module is available from you nearest
   CPAN site and is NOT available from my home page.  I will announce new
-  (non-beta) releases in comp.lang.perl.misc and comp.lang.perl.announce.  
+  (non-beta) releases in comp.lang.perl.misc and comp.lang.perl.announce.
   ############################################################################
 
 
@@ -136,6 +148,8 @@ Among other things, Date::Manip allow you to:
 
 6.  Work with dates with dates using international formats (foreign month
     names, 12/10/95 referring to October rather than December, etc.).
+
+7.  To find a list of dates where a recurring event happens.
 
 Each of these tasks is trivial (one or two lines at most) with this package.
 
@@ -198,6 +212,11 @@ EXAMPLES:
 
   &Date_Init("Language=French","DateFormat=non-US");
   $date=&ParseDate("1er decembre 1990");
+
+7.  To find a list of dates where a recurring event happens.
+
+  # To find the 2nd tuesday of every month
+  @date=&ParseRecur("0:1*2:2:0:0:0",$base,$start,$stop);
 
 NOTE: Some date forms do not work as well in languages other than English,
 but this is not because DateManip is incapable of doing so (almost nothing

@@ -37,7 +37,6 @@ Mer Nov 20 1996 12:00
 
 &Date_Init("Language=French","WorkDayBeg=08:00","WorkDayEnd=17h00");
 print "DateCalc (French,date,delta,business 8:00-5:00)...\n";
-$err=0;
-&test_Func($ntest,\&DateCalc,$calcs,$runtests,\$err,2);
+&test_Func($ntest,\&DateCalc,$calcs,$runtests,2);
 
 1;

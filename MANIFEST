@@ -24,6 +24,8 @@ t/delta_delta_0.t
 t/delta_delta_1.t
 t/delta_delta_2a.t
 t/delta_delta_2b.t
+t/delta_format.t
+t/parserecur.t
 t/unixdate.t
 t/runtests
 t/test.pl

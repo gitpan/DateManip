@@ -6,11 +6,20 @@
 #   ARGn
 #   NOTE
 #   EXP
-# where ARGi are a list of arguments to pass to the appropriate function
+# or
+#   ARG1
+#   ...
+#   ARGn
+#   NOTE
+#   ~
+#   EXP1
+#   ...
+#   EXPm
+# where ARGi are a list of arguments to pass to the appropriate function,
 # NOTE is an optional note to print if the test fails, and EXP is the
-# expected parse value.  NOTE must begin with the character ">".  All tests
-# must be separated by a blank line from the next test.  If EXP starts with
-# a "~", it is treated as approximate.
+# expected result (or list of results).  NOTE must begin with the character
+# ">".  All tests must be separated by a blank line from the next test.  If
+# EXP starts with a "~", it is treated as approximate.
 #
 # $funcref is the function to pass the arguments to, $tests is the list of
 # newline separated strings, $runtests is a value passed in if it is called
@@ -25,7 +34,7 @@ sub test_Func {
   my($ntest,$funcref,$tests,$runtests,@extra)=@_;
   my(@tests)=split(/\n/,$tests);
   my($comment)="#";
-  my($test,@args,$note,$exp,$ans,$approx,$ans1,$ans2,$t)=();
+  my($test,@args,$note,$exp,$ans,$approx,$ans1,$ans2,$t,@exp)=();
 
   $t=0;
   while (@tests) {
@@ -41,6 +50,8 @@ sub test_Func {
     $t++;
     # Read all arguments, note, and expected value
     @args=();
+    @exp=();
+    $exp=-1;
     while(@tests) {
       $test=shift(@tests);
       $test =~ s/^\s+//;
@@ -48,6 +59,8 @@ sub test_Func {
       next  if ($test =~ /^$comment/);
       if ($test eq "nil") {
         push(@args,"");
+      } elsif ($test eq "~") {
+        $exp=$#args;
       } else {
         push(@args,$test);
       }
@@ -57,9 +70,14 @@ sub test_Func {
     next  if (defined $runtests and $runtests>0 and $t<$runtests);
 
     # Separate out the note and expected value
-    $exp=pop(@args);
-    $exp=~ s/\s+//g;
-    $exp=~ s/_/ /g;
+    if ($exp == -1) {
+      $exp=pop(@args);
+      $exp=~ s/\s+//g;
+      $exp=~ s/_/ /g;
+    } else {
+      @exp=splice(@args,$exp+1);
+      $exp=join(" ",@exp);
+    }
 
     $note="";
     if ($args[$#args] =~ /^>/) {
@@ -76,7 +94,11 @@ sub test_Func {
       $ans2=DateCalc($exp,"+10");
     }
 
-    $ans=&$funcref(@args,@extra);
+    if (@exp) {
+      $ans=join(" ",&$funcref(@args,@extra));
+    } else {
+      $ans=&$funcref(@args,@extra);
+    }
     $bad=1;
     $bad=0  if ($exp eq $ans  or  $exp eq "nil" && $ans eq "");
     $bad=0  if ($approx  and  $ans ge $ans1 && $ans le $ans2);

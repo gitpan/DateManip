@@ -23,7 +23,7 @@ Jan1Week1   		= 0
 YYtoYYYY                = 89
 UpdateCurrTZ            = 0
 IntCharSet              = 0
-#ForceDate               =
+#ForceDate		=
 
 ################################
 # HOLIDAYS

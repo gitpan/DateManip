@@ -57,7 +57,6 @@ Mar 31 1997 16:59:59
 
 &Date_Init("WorkDayBeg=08:00","WorkDayEnd=17:00");
 print "DateCalc (date,delta,business 8:00-5:00)...\n";
-$err=0;
-&test_Func($ntest,\&DateCalc,$calcs,$runtests,\$err,2);
+&test_Func($ntest,\&DateCalc,$calcs,$runtests,2);
 
 1;

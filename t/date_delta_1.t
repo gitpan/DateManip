@@ -56,7 +56,6 @@ Jan 31 1997 23:59:59
 ";
 
 print "DateCalc (date,delta,approx)...\n";
-$err=0;
-&test_Func($ntest,\&DateCalc,$calcs,$runtests,\$err,1);
+&test_Func($ntest,\&DateCalc,$calcs,$runtests,1);
 
 1;
