@@ -11,28 +11,32 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
-$ntest=22;
+$ntest=23;
 
 print "1..$ntest\n"  if (! $runtests);
 &Date_Init(@Date::Manip::TestArgs);
 
 $calcs="
 
+Jun 1 1999
+Jun 4 1999
+  +0:0:0:2:0:0:0
+
 Wed Jan 10 1996 noon
 Wed Jan  7 1998 noon
-  +1:11:2:4:0:0:0
+  +1:11:0:18:0:0:0
 
 Wed Jan  7 1998 noon
 Wed Jan 10 1996 noon
-  -1:11:2:4:0:0:0
+  -1:11:0:18:0:0:0
 
 Wed Jan 10 1996 noon
 Wed Jan  8 1997 noon
-  +0:11:2:5:0:0:0
+  +0:11:0:19:0:0:0
 
 Wed Jan  8 1997 noon
 Wed Jan 10 1996 noon
-  -0:11:2:5:0:0:0
+  -0:11:0:19:0:0:0
 
 Wed May  8 1996 noon
 Wed Apr  9 1997 noon
@@ -52,11 +56,11 @@ Wed Apr 10 1996 noon
 
 Wed Jan 10 1996 noon
 Wed Feb  7 1996 noon
-  +0:0:2:5:0:0:0
+  +0:0:0:19:0:0:0
 
 Wed Feb  7 1996 noon
 Wed Jan 10 1996 noon
-  -0:0:2:5:0:0:0
+  -0:0:0:19:0:0:0
 
 Mon Jan  8 1996 noon
 Fri Feb  9 1996 noon
@@ -108,7 +112,7 @@ Mon Dec 30 1996 noon
 
 ";
 
-&Date_Init("WorkDayBeg=08:00","WorkDayEnd=17:00");
+&Date_Init("WorkDayBeg=8:00","WorkDayEnd=17:00");
 print "DateCalc (date,date,business 8:00-5:00)...\n";
 &test_Func($ntest,\&DateCalc,$calcs,$runtests,2);
 

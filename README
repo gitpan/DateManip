@@ -1,61 +1,66 @@
-Copyright (c) 1995-1998 Sullivan Beck. All rights reserved.
+Copyright (c) 1995-1999 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
 For information on installing Date::Manip, see the INSTALL file included in
-the distribution.
+the distribution.  For other documentation, see the Manip.pod file.
 
 Please send questions or bug reports to me rather than posting them to
 a newsgroup since I may miss them there, BUT read the next paragraph
 before you automatically start firing off email to me!
 
-If you have questions about Date::Manip, refer to the Date::Manip man page
-included as pod documentation in the Manip.pm file.  Don't know what I'm
-talking about?  Read the perlpod man page.  Alternately, an online version
-of the Date::Manip man page is included in my home page given below.
-PLEASE read the man page thoroughly before posting any questions about
-Date::Manip to a newsgroup or emailing me.  If you've done this, I'll be
-glad to answer any questions not covered in the man page.
+If you have questions about Date::Manip, refer to the Date::Manip pod file.
+Don't know what I'm talking about?  Read the perlpod man page.  Alternately,
+an online version of the Date::Manip man page is included in my home page
+given below.  PLEASE read the man page thoroughly before posting any questions
+about Date::Manip to a newsgroup or emailing me.  If you've done this, I'll be
+glad to answer any questions not covered or unclear in the man page.
 
 
-** IMPORTANT NOTE (5.30) **
-The internal format of a delta has changed (a week field has been added).
-I realize that this is going to cause some problems, but I am adding two
-other types of data (granularity and recurrence) to Date::Manip.  Both
-will resemble a delta, and both will have week fields, and I wanted all three
-to be as similar as possible.  You should use Delta_Format to extract
-information from a delta from now on rather than doing it manually.  This is
-especially important since the format for a delta will be changed again in one
-of the next versions from Y:M:W:D:H:MN:S to Y:M:W:D:H:MN:S*FLAGS.
+** IMPORTANT NOTE (5.35) **
 
-I also plan on changing the internal format for a date to include
-the timezone ( YYYYMMDDHH:MN:SS+HHMN ).  Using UnixDate to extract information
-from a date is recommended.
+I am considering going OO... so everyone should use the appropriate
+functions (UnixDate, Date_Cmp, Delta_Format) to extract information
+from dates and deltas.  Any script which parses a date or delta as
+a string will stop working when/if I make this change.  Even if I
+don't, the internal format for both will change, so the above routines
+should be used.
+
+Also, the Date_DaysSince999 routine is deprecated (replace by
+Date_DaysSince1BC) and will be removed in one of the next releases.
 
 
-Notes for version 5.32:
-  Mainly a bug fix release.
-  Added Polish and Dutch support.
-  *** Changed .DateManip.cnf to Manip.cnf (to get rid of problems on OS's
-     that insist on 8.3 filenames) for all non-Unix platforms (Wintel, VMS,
-     Mac).  For all Unix platforms, it's still .DateManip.cnf .  It will only
-     look in the user's home directory on VMS and Unix.
-  Added "in N days" and "N days ago" parse formats.
-  Added "N days/weeks/months later" parse formats (both dates and deltas).
-  Allow timezones in the formats "STD-#DST-#" and "+HHMM (NAME)".
-  Added several timezones.
-  Added "A.M." parsing (not just "AM").
+Notes for version 5.35:
+   Bug fixes and documentaion changes.
+   Added Romanian, Italian; corrections to Swedish, German translation.
+   Modified Date_GetPrev/Date_GetNext to take $curr=2.
+   Added Apache log file format "dd/mmm/yyyy:hh:mm:ss (time zone)".
+   Added OS/2 support.
+   Deprecated the function Date_DaysSince999. 
+   Fixed support for years 0000-0999.
+   Many changes to recurrences including:
+      *** Flags are now supported
+      Added test suite
+      Added support for Easter
+      Fixed a bug where base/date0/date1 not treated correctly
+   Added some timezones.
+   Improved holiday support considerably:
+      *** Added support for recurrences and one-year-only holidays
+      Fixed Veteren's day, added Good Friday (off by default)
+   Added Date_IsHoliday routine.
+   *** Added the PathSep config variable to improve support for non-Unix paths.
+   *** Date_Init can now return a list of config variables if called in
+      array context.
+
 
 Backwards incompatibilities:
 
-  Version 5.32
-    Old style Date_Init arguments no longer supported.
-    *** .DateManip.cnf changed to Manip.cnf on all non-Unix platforms.
+  Version 5.35
+  Deprecated the function Date_DaysSince999.  It's been replaced by
+    Date_DaysSince1BC.  It will disappear in the next version.
+  *** Added the PathSep variable which may cause problems on WinXX platforms
+    with old config files where a colon is assumed.
 
-  Version 5.30
-    The internal format of a delta has changed.  This will cause some people
-       problems.  Use the routine Delta_Format to extract information from
-       a delta.
 
   ############################################################################
   If you would like to stay informed about future versions of this module,
@@ -74,161 +79,8 @@ Backwards incompatibilities:
   ############################################################################
 
 
-This is a set of routines designed to make any common date/time
-manipulation easy to do.  Operations such as comparing two times,
-calculating a time a given amount of time from another, or parsing
-international times are all easily done.  From the very beginning, the main
-focus of Date::Manip has been to be able to do ANY desired date/time
-operation easily, not necessarily quickly.  There are other modules that
-can do a small subset of the operations available in Date::Manip much
-quicker than those presented here, so if speed is a primary issue, you
-should look elsewhere.  Check out the CPAN listing of Time and Date
-modules.  But for sheer flexibility, I believe that Date::Manip is your
-best bet.
-
-Date::Manip deals with time as it is presented the Gregorian calendar (the
-one currently in use).  The Julian calendar defined leap years as every 4th
-year.  The Gregorian calendar improved this by making every 100th year NOT
-a leap year, unless it was also the 400th year.  The Gregorian calendar has
-been extrapolated back to the year 1000 AD and forward to the year 9999 AD.
-Note that in historical context, the Julian calendar was in use until 1582
-when the Gregorian calendar was adopted by the Catholic church.  Protestant
-countries did not accept it until later; Germany and Netherlands in 1698,
-British Empire in 1752, Russia in 1918.  Note that the Gregorian calendar
-is itself imperfect.  Each year is on average 26 seconds too long, which
-means that every 3,323 years, a day should be removed from the calendar.
-No attempt is made to correct for that.
-
-Date::Manip is therefore not equipped to truly deal with historical dates,
-but should be able to perform (virtually) any operation dealing with a
-modern time and date.
-
-Date::Manip has (or will have) functionality to work with several fundamental
-types of data.
-
-DATE
-
-Although the word date is used extensively here, it is actually somewhat
-misleading.  Date::Manip works with the full date AND time (year, month,
-day, hour, minute, second).  It doesn't work with fractional seconds.
-Timezones are also supported.
-
-NOTE:  Much better support for timezones (including Daylight Savings Time)
-is planned for the future.
-
-DELTA
-
-This refers to a duration or elapsed time.  One thing to note is that, as
-used in this module, a delta refers only to the amount of time elapsed.  It
-includes no information about a starting or ending time.
-
-RECURRENCE
-
-A recurrence is simply a notation for defining when a recurring event
-occurs.  For example, if an event occurs every other Friday or every
-4 hours, this can be defined as a recurrence.  With a recurrence and a
-starting and ending date, you can get a list of dates in that period when
-a recurring event occurs.
-
-GRAIN
-
-The granularity of a time basically refers to how accurate you wish to
-treat a date.  For example, if you want to compare two dates to see if
-they are identical at a granularity of days, then they only have to occur
-on the same day.  At a granularity of an hour, they have to occur within
-an hour of each other, etc.
-
-NOTE:  Support for this will be added soon.
-
-Among other things, Date::Manip allow you to:
-
-1.  Enter a date and be able to choose any format conveniant
-
-2.  Compare two dates, entered in widely different formats to determine
-    which is earlier
-
-3.  Extract any information you want from ANY date using a format string
-    similar to the Unix date command
-
-4.  Determine the amount of time between two dates
-
-5.  Add a time offset to a date to get a second date (i.e. determine the
-    date 132 days ago or 2 years and 3 months after Jan 2, 1992)
-
-6.  Work with dates with dates using international formats (foreign month
-    names, 12/10/95 referring to October rather than December, etc.).
-
-7.  To find a list of dates where a recurring event happens.
-
-Each of these tasks is trivial (one or two lines at most) with this package.
-
-EXAMPLES:
-
-1.  Parsing a date from any conveniant format
-
-  $date=&ParseDate("today");
-  $date=&ParseDate("1st thursday in June 1992");
-  $date=&ParseDate("05/10/93");
-  $date=&ParseDate("12:30 Dec 12th 1880");
-  $date=&ParseDate("8:00pm december tenth");
-  if (! $date) {
-    # Error in the date
-  }
-
-2.  Compare two dates
-
-  $date1=&ParseDate($string1);
-  $date2=&ParseDate($string2);
-  if ($date1 lt $date2) {
-    # date1 is earlier
-  } else {
-    # date2 is earlier (or the two dates are identical)
-  }
-
-3.  Extract information from a date.
-
-  print &UnixDate("today","The time is now %T on %b %e, %Y.");
-  =>  "The time is now 13:24:08 on Feb  3, 1996."
-
-4.  The amount of time between two dates.
-
-  $date1=&ParseDate($string1);
-  $date2=&ParseDate($string2);
-  $delta=&DateCalc($date1,$date2,\$err);
-  => 0:0:DD:HH:MM:SS   the days, hours, minutes, and seconds between the two
-  $delta=&DateCalc($date1,$date2,\$err,1);
-  => YY:MM:DD:HH:MM:SS  the years, months, etc. between the two
-
-  Read the documentation in the man page for an explanation of the difference.
-
-5.  To determine a date a given offset from another.
-
-  $date=&DateCalc("today","+ 3hours 12minutes 6 seconds",\$err);
-  $date=&DateCalc("12 hours ago","12:30 6Jan90",\$err);
-
-  It even works with business days:
-
-  $date=&DateCalc("today","+ 3 business days",\$err);
-
-6.  To work with dates in another language.
-
-  &Date_Init("Language=French","DateFormat=non-US");
-  $date=&ParseDate("1er decembre 1990");
-
-7.  To find a list of dates where a recurring event happens.
-
-  # To find the 2nd tuesday of every month
-  @date=&ParseRecur("0:1*2:2:0:0:0",$base,$start,$stop);
-
-NOTE: Some date forms do not work as well in languages other than English,
-but this is not because DateManip is incapable of doing so (almost nothing
-in this module is language dependent).  It is simply that I do not have the
-correct translation available for some words.  If there is a date form that
-works in English but does not work in a language you need, let me know and
-if you can provide me the translation, I will fix DateManip.
-
-For documentation on all of the date manipulation routines, read the
-man page.
+All documentation is now contained in the Manip.pod file so I don't have
+to keep it up-to-date in two places.
 
 AUTHOR
 

@@ -462,8 +462,105 @@ Version 5.32  1998-08-17
       Frank Cusack <fcusack@iconnet.net>.
    Added a bit to the Makefile.PL (as it was distributed in the Win32
       Perl Resource Kit).  Murray Nesbitt <murray@ActiveState.com>
-   Fixed a German initialization problem.  Christian Reithmaier
+   Fixed a German initialization problem.  Thomas Horster-Moller
+      <horster-moeller@vivai.de> and Christian Reithmaier
       <reithmaier@04.blf01.telekom400.dbp.de>
+
+Version 5.33  1998-08-20
+   Added Spanish support.  Bautista Jasso Javier <jbautist@autrey.com>
+   Fixed a bug where "1 month ago" was no longer working (and added it
+      to the test cases).  This broke when I fixed the "-1second" bug
+      above.  A result of this is that a number of "deltas" can be parsed
+      as dates (i.e. &ParseDate("1 hour 20 minutes ago") is equivalent to
+      &DateCalc("now","1 hour 20 minutes ago")).  Only text deltas can
+      be used in this way (i.e. &ParseDate("-0:0:0:0:1:20:0") will not
+      work).
+
+Version 5.34  1999-04-13
+   Fixed a bug where a date passed in as an array wasn't getting the
+      date removed from the array.  Rick Wise <rwise@lcc.com>
+   Added tests for MPE/iX OS.  John Testa <JOHN.TESTA@w-j.com>
+   Fixed a bug where WorkDayBeg=8:00 went into an infinite loop.
+      Mark Martinec <Mark.Martinec@nsc.ijs.si>
+   A number of typos fixed.  Ron Pero <rpero@boone.net>
+   Added exact business mode.  Ian Duplisse <duplisse@rentwks1.golden.csc.com>
+   Changed a business week to be the same as an exact week.  Abigal
+      <abigail@fnx.com>
+   Added Portuguese.  Rui Pedro da Silva Leite Pereira <rui@um.geira.pt>
+   *** Switched all variables from Date::Manip::VAR to my(VAR).  This means
+      no more access to Date::Manip internals.  Based on suggestion by
+      Tom Christiansen <tchrist@jhereg.perl.com>
+   Changed %z UnixDate format to return the GMT offset.  TTSG <ttsg@ttsg.com>
+   The format "22nd sunday" now returns the real 22nd sunday, NOT the sunday
+      of week 22 (based on whatever definition of week 1 is active).
+   Fixed a bug where "sunday week 0" didn't work (only affected week 0)
+      Gerald Rinske <Gerald.Rinske@mch.sni.de>
+   Minor bug (my variable declared twice).  Paul J. Schinder
+      <schinder@pobox.com>
+   Added "mmmYYYY" and "YYYYmmm" formats.  As a result, "DDYYmmm" and
+      "mmmDDYY" formats changed to "DD/YYmmm" and "mmmDD/YY".  David Twomey
+      <dtwomey@northernlight.com>
+   *** Added Date_Cmp routine.  This will work even after the new internal
+      format goes into affect.  Added now in response to a question by
+      Al Sorrell <alsorrell@troweprice.com> (I should have added it earlier).
+   At the request of the UN, I added the SAT timezone.  :-)  Howard Hendler
+      <hendler@un.org>.
+   Fixed a bug where "epoch SECONDS" was getting parsed wrong (for SECONDS
+      which could be interpreted as an ISO-8601 date).  N. Thomas
+      <nthomas@cise.ufl.edu>.
+   Fixed a problem where init files were not being read.  Mike Reetz
+      <miker@iiug.org>
+   Fixed a bug where timezones were converted multiple times if ConvTZ was
+      set and DateCalc called.  Steven Hartland <steven_hartland@pa.press.net>
+
+Version 5.35  1999-07-06
+   Added Romanian support (including 2 test files).  Iosif Fettich
+      <ifettich@netsoft.ro>
+   Made "epoch" not case sensitive and fixed a bug where it would fail in
+      some languages.  Caught because of Iosif's thorough Romanian test file.
+   Fixed a problem where "in 5 days/weeks/months" sometimes wouldn't get
+      correctly parsed in other languages.  Caught because of Iosif's
+      thorough Romanian test file.
+   Fixed a weakness in ParseDateDelta brought out by the Romanian delta test
+      file.
+   Corrected Swedish translations.  Danne Solli <dsi@xinit.se>
+   Documentation updates.
+   Modified Date_GetPrev/Date_GetNext to take $curr=2.
+   Now parses the Apache log file format "dd/mmm/yyyy:hh:mm:ss (time zone)".
+      Mark Ferguson <Mark.Ferguson@Stanford.EDU>
+   Added OS/2 support.  Michael B. Babakov <M.Babakov@tnet.sochi.net>
+   Fixed a bug causing warnings in the beta version of perl.  Patch by
+      Paul Johnson <pjcj@transeda.com>.
+   Some fixes to German translations.  Peter Ehrenberg <pe@dipe.de>
+   Deprecated the function Date_DaysSince999.  It's been replaced by
+      Date_DaysSince1BC.  It will disappear in the next version.
+   Fixed support for years 0000-0999.  Requested by Chris Vaughan
+      <chris@lim.com>
+   Many changes to recurrences including:
+      *** Flags are now supported
+      Some bug fixes and documentation changes
+      Added test suite
+      Added support for Easter (first suggested by Abigal <abigail@fnx.com>)
+      Fixed a bug where base/date0/date1 not treated correctly
+   Put all the my'ed global variables in a couple hashes to clean up the
+      namespace and to make a few future enhancements easier to do.
+   Added Italian.  Nicola Pedrozzi <pedrozzi@cscs.ch>
+   Added Israel timezones.  Oded Cohen <macman@netvision.net.il>
+   Fixed a bug where business weeks weren't being used correctly.  Qian Miao
+      <qmiao@ml.com>
+   Improved holiday support considerably:
+      *** Added support for recurrences and one-year-only holidays (the latter
+         requested first by Vishal Bhatia <vishalb@hotmail.com>)
+      Cleaned up holiday variables and redid holiday routines.
+      Fixed Veteren's day, added Good Friday (off by default).  Peter Chen
+         <petechen@lehman.com>
+   Fixed a serious typo in the DaysSince1BC routine.  Qian Miao <qmiao@ml.com>
+   Added Date_IsHoliday routine.  Joe Pepin <joepepin@att.com>
+   *** Added the PathSep config variable to improve support for non-Unix paths.
+   *** Date_Init can now return a list of config variables if called in
+      array context.  Based on a suggestion by Matt Tuttle
+      <mtuttle@new-breed.com>
+
 
 #########################################################################
 # Backwards incompatibilities
@@ -495,3 +592,21 @@ In 5.30
 In 5.32
   Old style Date_Init arguments no longer supported.
   The DateManip.cnf file's name has changed for ALL non-Unix platforms.
+
+In 5.34
+  A business week is now interpreted the same as an exact week.
+  *** All Date::Manip variables are declared with my(VAR), so no
+    more access to internals.
+  %z UnixDate format now returns the timezone as a GMT offset.  %Z still
+    returns the abbreviation.
+  The format "22nd sunday" now returns the real 22nd sunday, NOT the sunday
+    of week 22 (based on whatever definition of week 1 is active).
+  "DDYYmmm" and "mmmDDYY" formats changed to "DD/YYmmm" and "mmmDD/YY".
+  *** Date_Cmp added in preparation for the change in internal format to
+    include the timezone.
+
+In 5.35
+  Deprecated the function Date_DaysSince999.  It's been replaced by
+    Date_DaysSince1BC.  It will disappear in the next version.
+  *** Added the PathSep variable which may cause problems on WinXX platforms
+    with old config files where a colon is assumed.

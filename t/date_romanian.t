@@ -11,7 +11,7 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
-$ntest=233;
+$ntest=196;
 
 print "1..$ntest\n"  if (! $runtests);
 &Date_Init(@Date::Manip::TestArgs,"ForceDate=1997-03-08-12:30:00");
@@ -30,65 +30,56 @@ $dates="
 # Test built in strings like today and yesterday.  A few may fail on a
 # slow computer.  On the 1st or last day of the month, the yesterday/today
 # test will fail because of the simplicity of the test.
-now
+acum
     >Ignore failure on a slow computer.
     ~$today
 
-today
+astazi
     >Ignore failure on a slow computer.
     ~$today
 
-yesterday
+ieri
     >Ignore failure on a slow computer or on the 1st day of the month.
     ~$yesterday
 
-tomorrow
+miine
     >Ignore failure on a slow computer or on the last day of the month.
     ~$tomorrow
 
-today at 4:00
+astazi la 4:00
     $todaydate 04:00:00
 
-today at 4:00 pm
+astazi la 4:00 pm
     $todaydate 16:00:00
 
-today at 16:00:00:05
+astazi la 16:00:00
     $todaydate 16:00:00
 
-today at 12:00 am
+astazi la 12:00 am
     $todaydate 00:00:00
 
-today at 12:00 GMT
+astazi la 12:00 GMT
     $todaydate 07:00:00
 
-today at 4:00 PST
+astazi la 4:00 PST
     $todaydate 07:00:00
 
-today at 4:00 -0800
+astazi la 4:00 -0800
     $todaydate 07:00:00
 
-today at noon
+astazi la amiaza
     $todaydate 12:00:00
 
-tomorrow at noon
+miine la amiaza 
     >Ignore failure on a slow computer or on the last day of the month.
     $tomorrowdate 12:00:00
 
-1 month ago
+1 luna in urma 
     1997020812:30:00
 
 # Test weeks
-22nd sunday
+a 22-a duminica
     1997060100:00:00
-
-97W227
-    1997060100:00:00
-
-1997W22-7
-    1997060100:00:00
-
-1997W23
-    1997060200:00:00
 
 1997023
     1997012300:00:00
@@ -102,214 +93,122 @@ tomorrow at noon
 97035
     1997020400:00:00
 
-twenty-second sunday 1996
+a douazecisidoua duminica 1996
     1996060200:00:00
 
-22 sunday in 1996
+22 duminica in 1996
     1996060200:00:00
 
-22nd sunday 12:00
+a 22-a duminica 12:00
     1997060112:00:00
 
-22nd sunday at 12:00
+a 22-a duminica la 12:00
     1997060112:00:00
 
-22nd sunday at 12:00 EST
+a 22-a duminica la 12:00 EST
     1997060112:00:00
 
-22nd sunday in 1996 at 12:00 EST
+a 22-a duminica in 1996 la 12:00 EST
     1996060212:00:00
 
-sunday week 1 1999
+duminica saptamina 1 1999
     1999011000:00:00
 
-thursday week 0 1999
+joi saptamina 0 1999
     1998123100:00:00
 
-1st thursday in 1999
+prima joi in 1999
     1999010700:00:00
 
-1st sunday in 1999
+prima duminica in 1999
     1999010300:00:00
 
-sunday wk 22
+duminica saptamina 22
     1997060100:00:00
 
-sunday week twenty-second 1996
+duminica saptamina a douazecisidoua 1996
     1996060200:00:00
 
-sunday w 22 in 1996
+duminica sapt 22 in 1996
     1996060200:00:00
 
-sunday wks 22 12:00
+duminica saptamina 22 12:00
     1997060112:00:00
 
-sunday week 22 at 12:00
+duminica saptamina 22  12:00
     1997060112:00:00
 
-sunday week 22 at 12:00 EST
+duminica saptamina 22 la 12:00 EST
     1997060112:00:00
 
-sunday week 22 in 1996 at 12:00 EST
+duminica saptamina 22 in 1996 la 12:00 EST
     1996060212:00:00
 
-sunday 22 wk
+duminica 22 saptamini 
     1997060100:00:00
 
-sunday twenty-second week 1996
+duminica a douazecisidoua saptamina 1996
     1996060200:00:00
 
-sunday 22 w in 1996
+duminica 22 sapt in 1996
     1996060200:00:00
 
-sunday 22 wks 12:00
+duminica saptamina 22 12:00
     1997060112:00:00
 
-sunday 22 week at 12:00
+duminica saptamina 22 la 12:00
     1997060112:00:00
 
-sunday 22 week at 12:00 EST
+duminica saptamina 22 la 12:00 EST
     1997060112:00:00
 
-sunday 22 week in 1996 at 12:00 EST
+duminica saptamina 22 in 1996 la 12:00 EST
     1996060212:00:00
 
 # Tests 'which day in mon' formats
-last tue in Jun 96
+ultima marti in iun 96
     1996062500:00:00
 
-last tueSday of June
+ultima marti din iunie
     1997062400:00:00
 
-first tue in Jun 1996
+prima marti in iun 1996
     1996060400:00:00
 
-1st tue in June
+prima marti in iunie
     1997060300:00:00
 
-3rd tuesday in Jun 96
+a 3-a marti in iun 96
     1996061800:00:00
 
-3rd tuesday in Jun 96 at 12:00:00.05
+a 3-a marti in iun 96 la 12:00:00
     1996061812:00:00
 
-3rd tuesday in Jun 96 at 10:30am
+a 3-a marti in iun 96 la 10:30am
     1996061810:30:00
 
-3rd tuesday in Jun 96 at 10:30 pm
+a 3-a marti in iun 96 la 10:30 pm
     1996061822:30:00
 
-3rd tuesday in Jun 96 at 10:30 pm GMT
+a 3-a marti in iun 96 la 10:30 pm GMT
     1996061817:30:00
 
-3rd tuesday in Jun 96 at 10:30 pm CET
+a 3-a marti in iun 96 la 10:30 pm CET
     1996061816:30:00
-
-# Tests YYMMDD time
-1996061800:00:00
-    1996061800:00:00
-
-1996061800:00
-    1996061800:00:00
-
-96-06-1800:00:00
-    1996061800:00:00
-
-96-06-1800:00
-    1996061800:00:00
-
-93-12-01
-    1993120100:00:00
-
-19931201
-    1993120100:00:00
-
-93-12-0105:30
-    1993120105:30:00
-
-1993120105:30
-    1993120105:30:00
-
-1992022905:30
-    1992022905:30:00
-
-1990022905:30
-    nil
-
-1993120105:30:25
-    1993120105:30:25
-
-1992022905:30:61
-    nil
-
-1993120105:30:25.05 am
-    1993120105:30:25
-
-1993120105:30:25:05 pM
-    1993120117:30:25
-
-1993120105:30:25 pM GMT
-    1993120112:30:25
-
-19931201 at 05:30:25 pM GMT
-    1993120112:30:25
-
-19931201at05:30:25 pM GMT
-    1993120112:30:25
-
-# Tests YYMMDDHHMNSS
-19960618000000
-    1996061800:00:00
 
 # Tests Date Time
 #       Date%Time
 # Date=mm%dd
-12/10/1965
-    1965121000:00:00
-
-12/10/65
-    1965121000:00:00
-
-12.10.65
-    1965121000:00:00
-
-12 10 65
-    1965121000:00:00
-
-12/10/65 5:30:25
+12/10/65 la 5:30:25
     1965121005:30:25
 
-12/10/65/5:30 pm
-    1965121017:30:00
-
-12/10/65/5:30 pm GMT
-    1965121012:30:00
-
-12/10/65 at 5:30:25
+12-10-65 la 5:30:25
     1965121005:30:25
 
-12-10-1965 5:30:25
+12  10  65 la 5:30:25
     1965121005:30:25
 
-12-10-65 5:30:25
-    1965121005:30:25
-
-12-10-65-5:30 pm
-    1965121017:30:00
-
-12-10-65 at 5:30:25
-    1965121005:30:25
-
-12  10  65 5:30:25
-    1965121005:30:25
-
-12  10  65  5:30 pm
-    1965121017:30:00
-
-12  10  65 at 5:30:25
-    1965121005:30:25
-
-12  10  1965 at 5:30:25
+12  10  1965 la 5:30:25
     1965121005:30:25
 
 12.10.1965 05:61
@@ -324,10 +223,10 @@ first tue in Jun 1996
 12/10 05:30
     $currY 121005:30:00
 
-12/10 at 05:30:25
+12/10 la 05:30:25
     $currY 121005:30:25
 
-12/10 at 05:30:25 GMT
+12/10 la 05:30:25 GMT
     $currY 121000:30:25
 
 12/10  5:30
@@ -358,7 +257,7 @@ first tue in Jun 1996
 Dec/10/1965
     1965121000:00:00
 
-December/10/65
+Decembrie/10/65
     1965121000:00:00
 
 Dec-10-65
@@ -367,10 +266,10 @@ Dec-10-65
 Dec 10 65
     1965121000:00:00
 
-DecEMBER10 65
+DecEMBRIE10 65
     1965121000:00:00
 
-December/10/65 5:30:25
+Decembrie/10/65 5:30:25
     1965121005:30:25
 
 Dec/10/65/5:30 pm
@@ -379,19 +278,19 @@ Dec/10/65/5:30 pm
 Dec/10/65/5:30 pm GMT
    1965121012:30:00
 
-Dec/10/65 at 5:30:25
+Dec/10/65 la 5:30:25
     1965121005:30:25
 
 Dec-10-1965 5:30:25
     1965121005:30:25
 
-December-10-65 5:30:25
+Decembrie-10-65 5:30:25
     1965121005:30:25
 
 Dec-10-65-5:30 pm
     1965121017:30:00
 
-Dec-10-65 at 5:30:25
+Dec-10-65 la 5:30:25
     1965121005:30:25
 
 Dec  10  65 5:30:25
@@ -400,10 +299,10 @@ Dec  10  65 5:30:25
 Dec  10  65  5:30 pm
     1965121017:30:00
 
-December  10  65 at 5:30:25
+Decembrie  10  65 la 5:30:25
     1965121005:30:25
 
-Dec  10  1965 at 5:30:25
+Dec  10  1965 la 5:30:25
     1965121005:30:25
 
 Dec-10-1965 05:61
@@ -412,16 +311,16 @@ Dec-10-1965 05:61
 Dec-10-1965 05:30:61
     nil
 
-December/10
+Decembrie/10
     $currY 121000:00:00
 
 Dec/10 05:30
     $currY 121005:30:00
 
-Dec/10 at 05:30:25
+Dec/10 la 05:30:25
     $currY 121005:30:25
 
-Dec/10 at 05:30:25 GMT
+Dec/10 la 05:30:25 GMT
    $currY 121000:30:25
 
 Dec/10  5:30
@@ -436,10 +335,10 @@ Dec-10  5:30
 Dec-10  05:30
     $currY 121005:30:00
 
-December10  05:30
+Decembrie10  05:30
     $currY 121005:30:00
 
-DeC first 1965
+DeC intii 1965
     1965120100:00:00
 
 # Tests Date Time
@@ -449,7 +348,7 @@ DeC first 1965
 10/Dec/1965
     1965121000:00:00
 
-10/December/65
+10/Decembrie/65
     1965121000:00:00
 
 10-Dec-65
@@ -458,7 +357,7 @@ DeC first 1965
 10 Dec 65
     1965121000:00:00
 
-10/December/65 5:30:25
+10/Decembrie/65 5:30:25
     1965121005:30:25
 
 10/Dec/65/5:30 pm
@@ -467,19 +366,19 @@ DeC first 1965
 10/Dec/65/5:30 pm GMT
    1965121012:30:00
 
-10/Dec/65 at 5:30:25
+10/Dec/65 la 5:30:25
     1965121005:30:25
 
 10-Dec-1965 5:30:25
     1965121005:30:25
 
-10-December-65 5:30:25
+10-Decembrie-65 5:30:25
     1965121005:30:25
 
 10-Dec-65-5:30 pm
     1965121017:30:00
 
-10-Dec-65 at 5:30:25
+10-Dec-65 la 5:30:25
     1965121005:30:25
 
 10  Dec   65 5:30:25
@@ -488,19 +387,19 @@ DeC first 1965
 10  Dec 65  5:30 pm
     1965121017:30:00
 
-10December  65 at 5:30:25
+10Decembrie  65 la 5:30:25
     1965121005:30:25
 
-10 Dec  1965 at 5:30:25
+10 Dec  1965 la 5:30:25
     1965121005:30:25
 
-10Dec  1965 at 5:30:25
+10Dec  1965 la 5:30:25
     1965121005:30:25
 
-10 Dec1965 at 5:30:25
+10 Dec1965 la 5:30:25
     1965121005:30:25
 
-10Dec1965 at 5:30:25
+10Dec1965 la 5:30:25
     1965121005:30:25
 
 10-Dec-1965 05:61
@@ -509,16 +408,16 @@ DeC first 1965
 10-Dec-1965 05:30:61
     nil
 
-10/December
+10/Decembrie
     $currY 121000:00:00
 
 10/Dec 05:30
     $currY 121005:30:00
 
-10/Dec at 05:30:25
+10/Dec la 05:30:25
     $currY 121005:30:25
 
-10-Dec at 05:30:25 GMT
+10-Dec la 05:30:25 GMT
    $currY 121000:30:25
 
 10-Dec  5:30
@@ -527,10 +426,10 @@ DeC first 1965
 10/Dec  05:30
     $currY 121005:30:00
 
-10December 05:30
+10Decembrie 05:30
     $currY 121005:30:00
 
-1st DeC 65
+Intii DeC 65
     1965120100:00:00
 
 # Tests time only formats
@@ -552,12 +451,6 @@ DeC first 1965
     1965121012:30:00
 
 5:30:25/12/10/65
-    1965121005:30:25
-
-5:30:25.05/12/10/65
-    1965121005:30:25
-
-5:30:25:05/12/10/65
     1965121005:30:25
 
 5:30:25 12-10-1965
@@ -627,52 +520,52 @@ DeC first 1965
 4:50  DeC  10
     $currY 121004:50:00
 
-4:50  DeCember  10
+4:50  DeCembrie  10
     $currY 121004:50:00
 
 4:50:40  DeC  10
     $currY 121004:50:40
 
-4:50:42  DeCember  10
+4:50:42  DeCembrie  10
     $currY 121004:50:42
 
 4:50  10  DeC
     $currY 121004:50:00
 
-4:50  10  DeCember
+4:50  10  DeCembrie
     $currY 121004:50:00
 
 4:50 10DeC
     $currY 121004:50:00
 
-4:50 10DeCember
+4:50 10DeCembrie
     $currY 121004:50:00
 
 4:50:51  10  DeC
     $currY 121004:50:51
 
-4:50:52  10  DeCember
+4:50:52  10  DeCembrie
     $currY 121004:50:52
 
 4:50:53 10DeC
     $currY 121004:50:53
 
-4:50:54  10DeCember
+4:50:54  10DeCembrie
     $currY 121004:50:54
 
-4:50:54DeCember10
+4:50:54DeCembrie10
     $currY 121004:50:54
 
-4:50:54DeCember10/65
+4:50:54DeCembrie10/65
     1965121004:50:54
 
-4:50:54DeCember1965
+4:50:54DeCembrie1965
     1965120104:50:54
 
 Sept 1995
     1995090100:00:00
 
-1995 september
+1995 septembrie
     1995090100:00:00
 
 5:30 DeC 1
@@ -684,49 +577,49 @@ Sept 1995
 05:30:11 DeC 10
     $currY 121005:30:11
 
-5:30 DeCember 1
+5:30 DeCembrie 1
     $currY 120105:30:00
 
-05:30 DeCember 10
+05:30 DeCembrie 10
     $currY 121005:30:00
 
-05:30:12 DeCember 10
+05:30:12 DeCembrie 10
     $currY 121005:30:12
 
 # Test ctime formats
-DeCember 10 05:30:12 1996
+DeCembrie 10 05:30:12 1996
     1996121005:30:12
 
 DeC10 05:30:12 96
     1996121005:30:12
 
 # Test some tricky timezone conversions
-Feb 28 1997 23:00-0900
+Febr 28 1997 23:00-0900
     1997030103:00:00
 
-Feb 27 1997 23:00-0900
+Febr 27 1997 23:00-0900
     1997022803:00:00
 
-Feb 01 1997 01:00-0100
+Febr 01 1997 01:00-0100
     1997013121:00:00
 
-Feb 02 1997 01:00-0100
+Febr 02 1997 01:00-0100
     1997020121:00:00
 
-Feb 02 1997 01:00+0100
+Febr 02 1997 01:00+0100
     1997020119:00:00
 
-Feb 02 1997 01:00+01
+Febr 02 1997 01:00+01
     1997020119:00:00
 
-Feb 02 1997 01:00+01:00
+Febr 02 1997 01:00+01:00
     1997020119:00:00
 
 19970202010000+0100
     1997020119:00:00
 
 # More tests...
-last day in October 1997
+ultima zi din octombrie 1997
     1997103100:00:00
 
 epoch 400000
@@ -738,13 +631,10 @@ epoch 400000
 19980102030405E
     1998010203:04:05
 
-Mon, 19 Jan 1998 08:11:34 +1030
+Luni, 19 ian 1998 08:11:34 +1030
     1998011816:41:34
 
-Tue, 26 May 1998 13:23:15 -0500 (EST)
-    1998052613:23:15
-
-Tue, 26 May 1998 13:23:15 -0500 (EST Blah)
+Marti, 26 Mai 1998 13:23:15 -0500 (EST)
     1998052613:23:15
 
 Dec101965
@@ -756,13 +646,10 @@ Dec101965
 101965Dec
     1965121000:00:00
 
-10/dec/1965:12:00:00 EST
-    1965121012:00:00
-
 ";
 
-print "Date...\n";
-&test_Func($ntest,\&ParseDateString,$dates,$runtests);
+print "Date (Romanian)...\n";
+&Date_Init("Language=Romanian","DateFormat=US","Internal=0");
+&test_Func($ntest,\&ParseDate,$dates,$runtests);
 
 1;
-

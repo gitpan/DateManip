@@ -1,10 +1,10 @@
 Before you install Date::Manip, check out the variables at the top of
 Manip.pm.  You may want to modify some of the configuration variables.
 All variables are documented in the POD documentation included in the
-Manip.pm file.
+Manip.pod file.
 
-The $Date::Manip::TZ variable is perhaps the most important of these
-variables.  If you get the error:
+The TZ variable is perhaps the most important of these variables.  If
+you get the error:
   ERROR: Date::Manip unable to determine TimeZone.
 Date::Manip was unable to automatically determine your timezone.  In
 this case, you will need to set the TZ variable appropriately.
@@ -52,12 +52,3 @@ computer (it will compare two different times that were supposed to be the
 same but aren't because a measurable amount of time passed between
 determining the time in two different ways).
 
-Some of the tests may fail if they are run on either the first or last day
-of the month.  The test suite checks dates of the form "tomorrow".
-Unfortunately, there is no trivial way (that I could think of) to find
-tomorrows date using standard perl or Unix commands (which is one of the
-reasons you need this module).  So to get the value to compare
-Date::Manip's value with, I just add 1 to todays date (which returns Jan 32
-instead of Feb 1, for example).  So, the "tomorrow" tests fail on the last
-day of the month and the "yesterday" tests fail on the first day of the
-month.

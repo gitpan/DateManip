@@ -2,6 +2,34 @@
 # MISC
 ########################################################################
 
+If TZ=XXX (where XXX is not known), report an error.  Aharon (Al) Schkolnik
+   <aharon@deltathree.com>
+
+As part of language initialization, store ALL ParseDateString regexps in
+a hash (LangRE) in precompiled format.  Then, "require 5.005".
+
+Support timezones of the format +500.  David Coppit <dwc3q@cs.virginia.edu>
+
+Store the holiday desc/name as two lists instead of a hash so that the
+order of parsing can be forced to be the same.
+
+Use autoloader.  Ted Ashton <ashted@southern.edu>
+
+Switch to Math::BigInt instead of using "no integer".  Vishal Bhatia
+   <vishalb@hotmail.com>
+
+Add a path separator config variable so PersonalCnfPath can be separated
+by something other than a colon.
+
+Delete DaysSince999.
+
+Make sure that &DateCalc($date1,"") returns an error.  Jim Anderson
+  <jander@ml.com>
+
+Document that a number of seconds as a Delta should have "sec".  Otherwise
+it'll likely get interpreted as YY, YYYY, YYYYMM, etc.  Disallow bare
+numbers as deltas ?
+
 If it can't determine the local timezone, set TZ to IGNORED ???
 
 Add another INIT variable to NOT initialize any language variable unless
@@ -13,10 +41,6 @@ test using it (with the parsed dates including "next week Sunday" types
 strings to test most routines).
 
 Use of holidays and other named days in ParseDate ("Christmas 1995")
-Abigal <abigail@fnx.com>
-
-A business week in a delta should be treated as an exact week (i.e. from
-Monday to Monday regardless of the number of work days)
 Abigal <abigail@fnx.com>
 
 Change the Jan1Week1 variable to accept the values "m1-m7" (1st week contains
@@ -44,13 +68,6 @@ If not, add a variable which will allow you to skip the sections where
    backticks are used since they are a performance sink.  Suggested by
    Bowen Dwelle.
 
-Combine GetNext and GetPrev (?)
-
-Add a "SPECIAL HOLIDAY" section to fully specify holidays so weird ones
-can be defined for each year.  Add Easter calculations here as well:
-  Easter = easter
-means that Easter is calculated using the method easter.
-
 Add
   Spanish
   German
@@ -59,7 +76,7 @@ Add
 
 Fill in some of the language variables ($past, $future, $zones).
 
-Check Swedish/French special characters.
+Check French special characters.
 
 Change EXPORT to EXPORT_OK (message 9 by Peter Bray)
 

@@ -46,13 +46,20 @@ last Monday in May              = Memorial Day
 1st Monday in Sep               = Labor Day
 second Monday in Oct            = Columbus Day (observed)
 # 10/31                         = Halloween
-second Mon in Nov               = Veterans' Day (observed)
+#second Mon in Nov               = Veterans' Day (observed)
 fourth Thu in Nov               = Thanksgiving
 # 12/24                         = Christmas Eve
 12/25                           = Christmas
 # 12/31                         = New Year's Eve
 
-# More complex holidays (date + delta, date - delta)
+# You can also use recurrences.
+
+1*0:0:0:0:0:0*EASTER		= Easter
+1*11:0:11:0:0:0*CWD             = Veteren's Day (observed)
+#1*0:0:0:0:0:0*EASTER,PD5	= Good Friday
+
+
+# Other complex holidays (date + delta, date - delta)
 
 # first Monday in Nov + 1 day   = Election day
 # The Friday after Thanksgiving is an unnamed holiday some places
@@ -68,4 +75,8 @@ fourth Thu in Nov               = Thanksgiving
 
 # Only for MA, ME
 #3rd Monday in Apr              = Patriots' Day
+
+# You can define specific holidays for specific years
+# 1/5/1999                      = A one-year-only holiday
+# 1st Monday in Sep 1998        = Another one.
 

@@ -2,7 +2,9 @@
 
 # Sets a couple standard arguments:
 @Date::Manip::TestArgs=();
-@Date::Manip::TestArgs=("PersonalCnf=Manip.cnf","PersonalCnfPath=./t:.",
+@Date::Manip::TestArgs=("PersonalCnf=Manip.cnf",
+                        "PathSep=!",
+                        "PersonalCnfPath=./t!.",
                         "IgnoreGlobalCnf=1","TZ=EST");
 
 # This takes a list of strings of the form:
