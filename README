@@ -1,4 +1,4 @@
-Copyright (c) 1995-1999 Sullivan Beck. All rights reserved.
+Copyright (c) 1995-2000 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
@@ -29,6 +29,9 @@ should be used.
 Also, the Date_DaysSince999 routine is deprecated (replace by
 Date_DaysSince1BC) and will be removed in one of the next releases.
 
+
+Notes for version 5.37:
+   5.36 introduced a serious bug.  Please use 5.37 instead.
 
 Notes for version 5.36:
    Primarily a bug fix release.  Nothing major, but I want to get the

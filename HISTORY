@@ -576,6 +576,13 @@ Version 5.36  2000-01-21
    Rewrote IsInt routine based on discussion with Sean Hunter
       <sean@uncarved.co.uk> (approximately 30% faster on a SPARC).
 
+Version 5.37  2000-02-22
+   Fixed the sign on the military timezones.  John Scott
+      <jwscott@aircharter.com>
+   Set ENV{PATH} to help with taint checking.  Joe Lipson <joe@axe.net.au>
+   Fixed a serious bug where HH:24:00 was broken due to support from 24:00:00.
+      Scott Egashira <egashira@drizzle.com>
+
 
 #########################################################################
 # Backwards incompatibilities

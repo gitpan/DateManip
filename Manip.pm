@@ -1,6 +1,6 @@
 package Date::Manip;
 
-# Copyright (c) 1995-1999 Sullivan Beck.  All rights reserved.
+# Copyright (c) 1995-2000 Sullivan Beck.  All rights reserved.
 # This program is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
@@ -193,11 +193,15 @@ use strict;
 use integer;
 use Carp;
 use Cwd;
+
+# To handle -T taint checking (must be after use Cwd).
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+
 use IO::File;
 require VMS::Filespec  if ($OS eq "VMS");
 
 use vars qw($VERSION);
-$VERSION="5.36";
+$VERSION="5.37";
 
 ########################################################################
 ########################################################################
@@ -589,10 +593,10 @@ sub Date_Init {
       "nzt    +1200 ".  # New Zealand
       "nzdt   +1300 ".  # New Zealand Daylight
       "z +0000 ".
-      "a -0100 b -0200 c -0300 d -0400 e -0500 f -0600 g -0700 h -0800 ".
-      "i -0900 k -1000 l -1100 m -1200 ".
-      "n +0100 o +0200 p +0300 q +0400 r +0500 s +0600 t +0700 u +0800 ".
-      "v +0900 w +1000 x +1100 y +1200";
+      "a +0100 b +0200 c +0300 d +0400 e +0500 f +0600 g +0700 h +0800 ".
+      "i +0900 k +1000 l +1100 m +1200 ".
+      "n -0100 o -0200 p -0300 q -0400 r -0500 s -0600 t -0700 u -0800 ".
+      "v -0900 w -1000 x -1100 y -1200";
 
     $Zone{"n2o"} = {};
     ($Zone{"zones"},%{ $Zone{"n2o"} })=
@@ -723,7 +727,7 @@ sub ParseDateString {
   return ""  if (! $_);
 
   my($y,$m,$d,$h,$mn,$s,$i,$wofm,$dofw,$wk,$tmp,$z,$num,$err,$iso,$ampm)=();
-  my($date,$z2,$delta,$from,$to,$which,$midnight)=();
+  my($date,$z2,$delta,$from,$falsefrom,$to,$which,$midnight)=();
 
   # We only need to reinitialize if we have to determine what NOW is.
   &Date_Init()  if (! $Curr{"InitDone"}  or  $Cnf{"UpdateCurrTZ"});
@@ -853,8 +857,9 @@ sub ParseDateString {
     $iso=1;
     $midnight=0;
     $from="24${hm}00(?:${ms}00)?";
+    $falsefrom="${hm}24${ms}00";   # Don't trap XX:24:00
     $to="00${hm}00${ms}00";
-    $midnight=1  if (s/$from/$to/);
+    $midnight=1  if (!/$falsefrom/  &&  s/$from/$to/);
   
     if (/$D$mnsec/i || /$ampmexp/i) {
       $iso=0;

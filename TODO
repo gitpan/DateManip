@@ -2,6 +2,9 @@
 # MISC
 ########################################################################
 
+Change UpdateCurrTZ to UpdateCurrTime and fix docs.  Paul Stone
+  <paul@milestone.com>
+
 Make sure there is a correspondance between:
   time,localtime,gmtime
   Date_SecsSince1970,Date_SecsSince1970GMT
