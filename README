@@ -1,0 +1,102 @@
+Copyright (c) 1995,1996 Sullivan Beck. All rights reserved.
+This program is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
+
+This is a set of routines to work with the Gregorian calendar (the one
+currently in use).  The Julian calendar defined leap years as every 4th
+year.  The Gregorian calendar improved this by making every 100th year
+NOT a leap year, unless it was also the 400th year.  The Gregorian
+calendar has been extrapolated back to the year 1000 AD and forward to
+the year 9999 AD.  Note that in historical context, the Julian calendar
+was in use until 1582 when the Gregorian calendar was adopted by the
+Catholic church.  Protestant countries did not accept it until later;
+Germany and Netherlands in 1698, British Empire in 1752, Russia in 1918.
+
+Note that the Gregorian calendar is itself imperfect.  Each year is on
+average 26 seconds too long, which means that every 3,323 years, a day
+should be removed from the calendar.  No attempt is made to correct for
+that.
+
+Among other things, these routines allow you to:
+
+1.  Enter a date and be able to choose any format conveniant
+
+2.  Compare two dates, entered in widely different formats to determine
+    which is earlier
+
+3.  Extract any information you want from ANY date using a format string
+    similar to the Unix date command
+
+4.  Determine the amount of time between two dates
+
+5.  Add a time offset to a date to get a second date (i.e. determine the
+    date 132 days ago or 2 years and 3 months after Jan 2, 1992)
+
+6.  Work with dates with dates using international formats (foreign month
+    names, 12-10-95 referring to October rather than December, etc.).
+
+Each of these tasks is trivial (one or two lines at most) with this package.
+
+Although the word date is used extensively here, it is actually somewhat
+misleading.  This package works with the full date AND time (year, month,
+day, hour, minute, second).
+
+In the documentation below, US formats are used, but in most cases, a
+non-English equivalent will work equally well.
+
+EXAMPLES:
+u
+1.  Parsing a date from any conveniant format
+
+  $date=&ParseDate("today");
+  $date=&ParseDate("1st thursday in June 1992");
+  $date=&ParseDate("05-10-93");
+  $date=&ParseDate("12:30 Dec 12th 1880");
+  $date=&ParseDate("8:00pm december tenth");
+  if (! $date) {
+    # Error in the date
+  }
+
+2.  Compare two dates
+
+  $date1=&ParseDate($string1);
+  $date2=&ParseDate($string2);
+  if ($date1 lt $date2) {
+    # date1 is earlier
+  } else {
+    # date2 is earlier (or the two dates are identical)
+  }
+
+3.  Extract information from a date.
+
+  print &UnixDate("today","The time is now %T on %b %f, %Y.");
+  =>  "The time is now 13:24:08 on Feb  3, 1996."
+
+4.  The amount of time between two dates.
+
+  $date1=&ParseDate($string1);
+  $date2=&ParseDate($string2);
+  $delta=&DateCalc($date1,$date2,\$err);
+  => 0:0:DD:HH:MM:SS   the days, hours, minutes, and seconds between the two
+  $delta=&DateCalc($date1,$date2,\$err,1);
+  => YY:MM:DD:HH:MM:SS  the years, months, etc. between the two
+
+  Read the documentation below for an explanation of the difference.
+
+5.  To determine a date a given offset from another.
+
+  $date=&DateCalc("today","+ 3hours 12minutes 6 seconds",\$err);
+  $date=&DateCalc("12 hours ago","12:30 6Jan90",\$err);
+
+6.  To work with dates in another language.
+
+  &Date_Init("French","non-US");
+  $date=&ParseDate("1er decembre 1990");
+
+For documentation on all of the date manipulation routines, read the
+man page.
+
+AUTHOR
+
+Sullivan Beck (beck@qtp.ufl.edu)
+

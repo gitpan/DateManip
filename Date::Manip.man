@@ -1,0 +1,756 @@
+.rn '' }`
+''' $RCSfile$$Revision$$Date$
+'''
+''' $Log$
+'''
+.de Sh
+.br
+.if t .Sp
+.ne 5
+.PP
+\fB\\$1\fR
+.PP
+..
+.de Sp
+.if t .sp .5v
+.if n .sp
+..
+.de Ip
+.br
+.ie \\n(.$>=3 .ne \\$3
+.el .ne 3
+.IP "\\$1" \\$2
+..
+.de Vb
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve
+.ft R
+
+.fi
+..
+'''
+'''
+'''     Set up \*(-- to give an unbreakable dash;
+'''     string Tr holds user defined translation string.
+'''     Bell System Logo is used as a dummy character.
+'''
+.tr \(*W-|\(bv\*(Tr
+.ie n \{\
+.ds -- \(*W-
+.ds PI pi
+.if (\n(.H=4u)&(1m=24u) .ds -- \(*W\h'-12u'\(*W\h'-12u'-\" diablo 10 pitch
+.if (\n(.H=4u)&(1m=20u) .ds -- \(*W\h'-12u'\(*W\h'-8u'-\" diablo 12 pitch
+.ds L" ""
+.ds R" ""
+.ds L' '
+.ds R' '
+'br\}
+.el\{\
+.ds -- \(em\|
+.tr \*(Tr
+.ds L" ``
+.ds R" ''
+.ds L' `
+.ds R' '
+.ds PI \(*p
+'br\}
+.\"	If the F register is turned on, we'll generate
+.\"	index entries out stderr for the following things:
+.\"		TH	Title 
+.\"		SH	Header
+.\"		Sh	Subsection 
+.\"		Ip	Item
+.\"		X<>	Xref  (embedded
+.\"	Of course, you have to process the output yourself
+.\"	in some meaninful fashion.
+.if \nF \{
+.de IX
+.tm Index:\\$1\t\\n%\t"\\$2"
+..
+.nr % 0
+.rr F
+.\}
+.TH MANIP 1 "perl 5.003 with" "18/Jul/96" "User Contributed Perl Documentation"
+.IX Title "MANIP 1"
+.UC
+.IX Name "Date::Manip - powerful date manipulation routines"
+.if n .hy 0
+.if n .na
+.ds C+ C\v'-.1v'\h'-1p'\s-2+\h'-1p'+\s0\v'.1v'\h'-1p'
+.de CQ          \" put $1 in typewriter font
+.ft CW
+'if n "\c
+'if t \\&\\$1\c
+'if n \\&\\$1\c
+'if n \&"
+\\&\\$2 \\$3 \\$4 \\$5 \\$6 \\$7
+'.ft R
+..
+.\" @(#)ms.acc 1.5 88/02/08 SMI; from UCB 4.2
+.	\" AM - accent mark definitions
+.bd B 3
+.	\" fudge factors for nroff and troff
+.if n \{\
+.	ds #H 0
+.	ds #V .8m
+.	ds #F .3m
+.	ds #[ \f1
+.	ds #] \fP
+.\}
+.if t \{\
+.	ds #H ((1u-(\\\\n(.fu%2u))*.13m)
+.	ds #V .6m
+.	ds #F 0
+.	ds #[ \&
+.	ds #] \&
+.\}
+.	\" simple accents for nroff and troff
+.if n \{\
+.	ds ' \&
+.	ds ` \&
+.	ds ^ \&
+.	ds , \&
+.	ds ~ ~
+.	ds ? ?
+.	ds ! !
+.	ds /
+.	ds q
+.\}
+.if t \{\
+.	ds ' \\k:\h'-(\\n(.wu*8/10-\*(#H)'\'\h"|\\n:u"
+.	ds ` \\k:\h'-(\\n(.wu*8/10-\*(#H)'\`\h'|\\n:u'
+.	ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'^\h'|\\n:u'
+.	ds , \\k:\h'-(\\n(.wu*8/10)',\h'|\\n:u'
+.	ds ~ \\k:\h'-(\\n(.wu-\*(#H-.1m)'~\h'|\\n:u'
+.	ds ? \s-2c\h'-\w'c'u*7/10'\u\h'\*(#H'\zi\d\s+2\h'\w'c'u*8/10'
+.	ds ! \s-2\(or\s+2\h'-\w'\(or'u'\v'-.8m'.\v'.8m'
+.	ds / \\k:\h'-(\\n(.wu*8/10-\*(#H)'\z\(sl\h'|\\n:u'
+.	ds q o\h'-\w'o'u*8/10'\s-4\v'.4m'\z\(*i\v'-.4m'\s+4\h'\w'o'u*8/10'
+.\}
+.	\" troff and (daisy-wheel) nroff accents
+.ds : \\k:\h'-(\\n(.wu*8/10-\*(#H+.1m+\*(#F)'\v'-\*(#V'\z.\h'.2m+\*(#F'.\h'|\\n:u'\v'\*(#V'
+.ds 8 \h'\*(#H'\(*b\h'-\*(#H'
+.ds v \\k:\h'-(\\n(.wu*9/10-\*(#H)'\v'-\*(#V'\*(#[\s-4v\s0\v'\*(#V'\h'|\\n:u'\*(#]
+.ds _ \\k:\h'-(\\n(.wu*9/10-\*(#H+(\*(#F*2/3))'\v'-.4m'\z\(hy\v'.4m'\h'|\\n:u'
+.ds . \\k:\h'-(\\n(.wu*8/10)'\v'\*(#V*4/10'\z.\v'-\*(#V*4/10'\h'|\\n:u'
+.ds 3 \*(#[\v'.2m'\s-2\&3\s0\v'-.2m'\*(#]
+.ds o \\k:\h'-(\\n(.wu+\w'\(de'u-\*(#H)/2u'\v'-.3n'\*(#[\z\(de\v'.3n'\h'|\\n:u'\*(#]
+.ds d- \h'\*(#H'\(pd\h'-\w'~'u'\v'-.25m'\f2\(hy\fP\v'.25m'\h'-\*(#H'
+.ds D- D\\k:\h'-\w'D'u'\v'-.11m'\z\(hy\v'.11m'\h'|\\n:u'
+.ds th \*(#[\v'.3m'\s+1I\s-1\v'-.3m'\h'-(\w'I'u*2/3)'\s-1o\s+1\*(#]
+.ds Th \*(#[\s+2I\s-2\h'-\w'I'u*3/5'\v'-.3m'o\v'.3m'\*(#]
+.ds ae a\h'-(\w'a'u*4/10)'e
+.ds Ae A\h'-(\w'A'u*4/10)'E
+.ds oe o\h'-(\w'o'u*4/10)'e
+.ds Oe O\h'-(\w'O'u*4/10)'E
+.	\" corrections for vroff
+.if v .ds ~ \\k:\h'-(\\n(.wu*9/10-\*(#H)'\s-2\u~\d\s+2\h'|\\n:u'
+.if v .ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'\v'-.4m'^\v'.4m'\h'|\\n:u'
+.	\" for low resolution devices (crt and lpr)
+.if \n(.H>23 .if \n(.V>19 \
+\{\
+.	ds : e
+.	ds 8 ss
+.	ds v \h'-1'\o'\(aa\(ga'
+.	ds _ \h'-1'^
+.	ds . \h'-1'.
+.	ds 3 3
+.	ds o a
+.	ds d- d\h'-1'\(ga
+.	ds D- D\h'-1'\(hy
+.	ds th \o'bp'
+.	ds Th \o'LP'
+.	ds ae ae
+.	ds Ae AE
+.	ds oe oe
+.	ds Oe OE
+.\}
+.rm #[ #] #H #V #F C
+.SH "NAME"
+.IX Header "NAME"
+Date::Manip \- powerful date manipulation routines
+.SH "SYNOPSIS"
+.IX Header "SYNOPSIS"
+.PP
+.Vb 1
+\& use DateManip;
+.Ve
+.Vb 3
+\& $date=&ParseDate(\e@args)
+\& $date=&ParseDate($string)
+\& $date=&ParseDate(\e$string)
+.Ve
+.Vb 2
+\& @date=&UnixDate($date,@format)
+\& $date=&UnixDate($date,@format)
+.Ve
+.Vb 3
+\& $delta=&ParseDateDelta(\e@args)
+\& $delta=&ParseDateDelta($string)
+\& $delta=&ParseDateDelta(\e$string)
+.Ve
+.Vb 1
+\& $d=&DateCalc($d1,$d2,$errref,$del)
+.Ve
+.Vb 2
+\& $date=&Date_SetTime($date,$hr,$min,$sec)
+\& $date=&Date_SetTime($date,$time)
+.Ve
+.Vb 2
+\& $date=&Date_GetPrev($date,$dow,$today,$hr,$min,$sec)
+\& $date=&Date_GetPrev($date,$dow,$today,$time)
+.Ve
+.Vb 2
+\& $date=&Date_GetNext($date,$dow,$today,$hr,$min,$sec)
+\& $date=&Date_GetNext($date,$dow,$today,$time)
+.Ve
+.Vb 1
+\& &Date_Init($lang,$format)
+.Ve
+.Vb 3
+\& The following routines are used by the above routines (though they can
+\& also be called directly).  Make sure that $y is entered as the full 4
+\& digit year... 2 digit years may give wrong results.
+.Ve
+.Vb 9
+\& $day=&Date_DayOfWeek($m,$d,$y)
+\& $secs=&Date_SecsSince1970($m,$d,$y,$h,$mn,$s)
+\& $days=&Date_DaysSince999($m,$d,$y)
+\& $day=&Date_DayOfYear($m,$d,$y)
+\& $days=&Date_DaysInYear($y)
+\& $wkno=&Date_WeekOfYear($m,$d,$y,$first)
+\& $flag=&Date_LeapYear($y)
+\& $day=&Date_DaySuffix($d)
+\& $tz=&Date_TimeZone()
+.Ve
+.SH "DESCRIPTION"
+.IX Header "DESCRIPTION"
+This is a set of routines to work with the Gregorian calendar (the one
+currently in use).  The Julian calendar defined leap years as every 4th
+year.  The Gregorian calendar improved this by making every 100th year
+NOT a leap year, unless it was also the 400th year.  The Gregorian
+calendar has been extrapolated back to the year 1000 AD and forward to
+the year 9999 AD.  Note that in historical context, the Julian calendar
+was in use until 1582 when the Gregorian calendar was adopted by the
+Catholic church.  Protestant countries did not accept it until later;
+Germany and Netherlands in 1698, British Empire in 1752, Russia in 1918.
+.PP
+Note that the Gregorian calendar is itself imperfect.  Each year is on
+average 26 seconds too long, which means that every 3,323 years, a day
+should be removed from the calendar.  No attempt is made to correct for
+that.
+.PP
+Among other things, these routines allow you to:
+.PP
+1.  Enter a date and be able to choose any format conveniant
+.PP
+2.  Compare two dates, entered in widely different formats to determine
+    which is earlier
+.PP
+3.  Extract any information you want from ANY date using a format string
+    similar to the Unix date command
+.PP
+4.  Determine the amount of time between two dates
+.PP
+5.  Add a time offset to a date to get a second date (i.e. determine the
+    date 132 days ago or 2 years and 3 months after Jan 2, 1992)
+.PP
+6.  Work with dates with dates using international formats (foreign month
+    names, 12-10-95 referring to October rather than December, etc.).
+.PP
+Each of these tasks is trivial (one or two lines at most) with this package.
+.PP
+Although the word date is used extensively here, it is actually somewhat
+misleading.  This package works with the full date AND time (year, month,
+day, hour, minute, second).
+.PP
+In the documentation below, US formats are used, but in most cases, a
+non-English equivalent will work equally well.
+.SH "EXAMPLES"
+.IX Header "EXAMPLES"
+1.  Parsing a date from any conveniant format
+.PP
+.Vb 8
+\&  $date=&ParseDate("today");
+\&  $date=&ParseDate("1st thursday in June 1992");
+\&  $date=&ParseDate("05-10-93");
+\&  $date=&ParseDate("12:30 Dec 12th 1880");
+\&  $date=&ParseDate("8:00pm december tenth");
+\&  if (! $date) {
+\&    # Error in the date
+\&  }
+.Ve
+2.  Compare two dates
+.PP
+.Vb 7
+\&  $date1=&ParseDate($string1);
+\&  $date2=&ParseDate($string2);
+\&  if ($date1 lt $date2) {
+\&    # date1 is earlier
+\&  } else {
+\&    # date2 is earlier (or the two dates are identical)
+\&  }
+.Ve
+3.  Extract information from a date.
+.PP
+.Vb 2
+\&  print &UnixDate("today","The time is now %T on %b %f, %Y.");
+\&  =>  "The time is now 13:24:08 on Feb  3, 1996."
+.Ve
+4.  The amount of time between two dates.
+.PP
+.Vb 6
+\&  $date1=&ParseDate($string1);
+\&  $date2=&ParseDate($string2);
+\&  $delta=&DateCalc($date1,$date2,\e$err);
+\&  => 0:0:DD:HH:MM:SS   the days, hours, minutes, and seconds between the two
+\&  $delta=&DateCalc($date1,$date2,\e$err,1);
+\&  => YY:MM:DD:HH:MM:SS  the years, months, etc. between the two
+.Ve
+.Vb 1
+\&  Read the documentation below for an explanation of the difference.
+.Ve
+5.  To determine a date a given offset from another.
+.PP
+.Vb 2
+\&  $date=&DateCalc("today","+ 3hours 12minutes 6 seconds",\e$err);
+\&  $date=&DateCalc("12 hours ago","12:30 6Jan90",\e$err);
+.Ve
+6.  To work with dates in another language.
+.PP
+.Vb 2
+\&  &Date_Init("French","non-US");
+\&  $date=&ParseDate("1er decembre 1990");
+.Ve
+.Ip "ParseDate" 2
+.IX Item "ParseDate"
+.Sp
+.Vb 3
+\& $date=&ParseDate(\e@args)
+\& $date=&ParseDate($string)
+\& $date=&ParseDate(\e$string)
+.Ve
+This takes an array or a string containing a date and parses it.  When the
+date is included as an array (for example, the arguments to a program) the
+array should contain a valid date in the first one or more elements
+(elements after a valid date are ignored).  Elements containing a valid
+date are shifted from the array.  The largest possible number of elements
+which can be correctly interpreted as a valid date are always used.  If a
+string is entered rather than an array, that string is tested for a valid
+date.  The string is unmodified, even if passed in by reference.
+.Sp
+When a part ofq the date is not given, defaults are used: year defaults to
+current year; hours, minutes, seconds to 00.
+.Sp
+Times may be written as:
+  1) \s-1HH:MN\s0
+     \s-1HH:MN:SS\s0
+     \s-1HH:MN\s0 am
+     \s-1HH:MN:SS\s0 am
+  2) hh:\s-1MN\s0
+     hh:\s-1MN:SS\s0
+     hh:\s-1MN\s0 am
+     hh:\s-1MN:SS\s0 am
+.Sp
+Valid formats for a full date and time (and examples of how Dec 10, 1965 at
+9:00 pm might appear) are:
+  DateTime
+     Date=\s-1YYMMDD\s0             1965121021:00:00  65121021:00
+     Time=format 1
+.Sp
+.Vb 5
+\&  Date Time
+\&  Date%Time
+\&    Date=mm%dd, mm%dd%YY     12/10/65 21:00    12 10 1965 9:00pm
+\&    Date=mmm%dd, mmm%dd%YY   December-10-65-9:00:00pm
+\&    Date=dd%mmm, dd%mmm%YY   10/December/65 9:00:00pm
+.Ve
+.Vb 5
+\&  Date Time
+\&    Date=mmmdd, mmmdd YY, mmmDDYY, mmm DDYY
+\&                             Dec10 65 9:00:00 pm    December 10 1965 9:00pm
+\&    Date=ddmmm, ddmmm YY, ddmmmYY, dd mmmYY
+\&                             10Dec65 9:00:00 pm     10 December 1965 9:00pm
+.Ve
+.Vb 6
+\&  TimeDate
+\&  Time Date
+\&  Time%Date
+\&    Date=mm%dd, mm%dd%YY     9:00pm 12.10.65      21:00 12/10/1965
+\&    Date=mmm%dd, mmm%dd%YY   9:00pm December/10/65
+\&    Date=dd%mmm, dd%mmm%YY   9:00pm 10-December-65  21:00/10/Dec/65
+.Ve
+.Vb 6
+\&  TimeDate
+\&  Time Date
+\&    Date=mmmdd, mmmdd YY, mmmDDYY
+\&                             21:00:00DeCeMbEr10
+\&    Date=ddmmm, ddmmm YY, ddmmmYY, dd mmmYY
+\&                             21:00 10Dec95
+.Ve
+.Vb 2
+\&  which dofw in mmm at time
+\&  which dofw in mmm YY at time  "first sunday in june 1996"
+.Ve
+In addition, the following strings are recognized:
+  today
+  now       (synonym for today)
+  yesterday (exactly 24 hours before now)
+  tomorrow  (exactly 24 hours from now)
+.Sp
+.Vb 16
+\& %       One of the valid date separators: - . / or whitespace (the same
+\&         character must be used for all occurences of a single date)
+\&         example: mm%dd%YY works for 1-1-95, 1 1 95, or 1/1/95
+\& YY      year in 2 or 4 digit format
+\& MM      two digit month (01 to 12)
+\& mm      one or two digit month (1 to 12 or 01 to 12)
+\& mmm     month name or 3 character abbreviation
+\& DD      two digit day (01 to 31)
+\& dd      one or two digit day (1 to 31 or 01 to 31)
+\& HH      two digit hour in 12 or 24 hour mode (00 to 23)
+\& hh      one or two digit hour in 12 or 24 hour mode (0 to 23 or 00 to 23)
+\& MN      two digit minutes (00 to 59)
+\& SS      two digit seconds (00 to 59)
+\& which   one of the strings (first-fifth, 1st-5th, or last)
+\& dofw    either the 3 character abbreviation or full name of a day of
+\&         the week
+.Ve
+In the above, the mm%dd formats can be switched to dd%mm by calling
+Date_Init and telling it to use a non-\s-1US\s0 date format.
+.Sp
+All \*(L"Date Time\*(R" and \*(L"DateTime\*(R" type formats allow the word \*(L"at\*(R" in them
+(i.e.  Jan 12 at 12:00) (and at can replace the space).  So the following
+are both acceptable: \*(L"Jan 12at12:00\*(R" and \*(L"Jan 12 at 12:00\*(R".  Also, the day
+of the week can be given practically anywhere in the date.  If it is given,
+it is checked to see if it is correct.  So, the string \*(L"Tue Jun 25 1996\*(R"
+works but \*(L"Mon Jun 25 1996\*(R" doesn't.  Note that depending on where the
+weekday comes, it may give unexpected results when used in array context.
+For example, the date ("Jun\*(R","25\*(R","Sun\*(R","1990") would return June 25 of the
+current year since only Jun 25, 1990 is not Sunday.
+.Sp
+Any time you have \s-1HH:MM\s0 or \s-1HH:MM:SS\s0, it can be followed by an am or pm to
+force have it in 12 hour mode (it defaults to 24 hour mode).
+.Sp
+The year may be entered as 2 or 4 digits.  If entered as 2 digits, it is
+taken to be the year in the range CurrYear-89 to CurrYear+10.  So, if the
+current year is 1996, the range is [1907 to 2006] so entering the year 00
+crefers to 2000, 05 to 2005, but 07 refers to 1907.
+.Sp
+When entered as a single element, the different parts of the date may be
+separated by any number of whitespaces including spaces and tabs.
+.Sp
+The date returned is \s-1YYYYMMDDHH:MM:SS\s0.  The advantage of this time
+format is that two times can be compared using simple string
+comparisons to find out which is later.
+.Sp
+Dates are checked to make sure they are valid.
+.Sp
+The elements containing a valid date are removed from the array!  If no
+valid date is found, the array is unmodified and nothing returned.
+.Sp
+In all of the formats, the day of week ("Friday") can be entered anywhere
+in the date and it will be checked for accuracy.  In other words,
+  \*(L"Tue Jul 16 1996 13:17:00\*(R"
+will work but
+  \*(L"Jul 16 1996 Wednesday 13:17:00\*(R"
+will not (because Jul 16, 1996 is Tuesday, not Wednesday).
+.Ip "UnixDate" 2
+.IX Item "UnixDate"
+.Sp
+.Vb 2
+\& @date=&UnixDate($date,@format)
+\& $date=&UnixDate($date,@format)
+.Ve
+This takes a date and a list of strings containing formats roughly
+identical to the format strings used by the \s-1UNIX\s0 \fIdate\fR\|(1) command.  Each
+format is parsed and an array of strings corresponding to each format is
+returned.
+.Sp
+$date must be of the form produced by &ParseDate.
+.Sp
+The format options are:
+.Sp
+.Vb 51
+\& Year
+\&     %y     year                     - 00 to 99
+\&     %Y     year                     - 0001 to 9999
+\& Month, Week
+\&     %m     month of year            - 01 to 12
+\&     %f     month of year            - " 1" to "12"
+\&     %b,%h  month abbreviation       - Jan to Dec
+\&     %B     month name               - January to December
+\&     %U     week of year, Sunday
+\&            as first day of week     - 00 to 53
+\&     %W     week of year, Monday
+\&            as first day of week     - 00 to 53
+\& Day
+\&     %j     day of the year          - 001 to 366
+\&     %d     day of month             - 01 to 31
+\&     %e     day of month             - " 1" to "31"
+\&     %v     weekday abbreviation     - " S"," M"," T"," W","Th"," F","Sa"
+\&     %a     weekday abbreviation     - Sun to Sat
+\&     %A     weekday name             - Sunday to Saturday
+\&     %w     day of week              - 0 (Sunday) to 6
+\&     %E     day of month with suffix - 1st, 2nd, 3rd...
+\& Hour
+\&     %H     hour                     - 00 to 23
+\&     %k     hour                     - " 0" to "23"
+\&     %i     hour                     - " 1" to "12"
+\&     %I     hour                     - 01 to 12
+\&     %p     AM or PM
+\& Minute, Second, Timezone
+\&     %M     minute                   - 00 to 59
+\&     %S     second                   - 00 to 59
+\&     %s     seconds from Jan 1, 1970 - negative if before 1/1/1970
+\&     %z,%Z  timezone (3 characters)  - "EDT"
+\& Date, Time
+\&     %c     %a %b %e %H:%M:%S %Y     - Fri Apr 28 17:23:15 1995
+\&     %C,%u  %a %b %e %H:%M:%S %z %Y  - Fri Apr 28 17:25:57 EDT 1995
+\&     %D,%x  %m/%d/%y                 - 04/28/95
+\&     %l     date in ls(1) format
+\&              %b %e $H:$M            - Apr 28 17:23  (if within 6 months)
+\&              %b %e  %Y              - Apr 28  1993  (otherwise)
+\&     %r     %I:%M:%S %p              - 05:39:55 PM
+\&     %R     %H:%M                    - 17:40
+\&     %T,%X  %H:%M:%S                 - 17:40:58
+\&     %V     %m%d%H%M%y               - 0428174095
+\&     %F     %A, %B %e, %Y            - Sunday, January  1, 1996
+\& Other formats
+\&     %n     insert a newline character
+\&     %t     insert a tab character
+\&     %%     insert a `%' character
+\&     %+     insert a `+' character
+\& All other formats insert the character following the %.  If a lone
+\& percent is the final character in a format, it is ignored.
+.Ve
+Note that the ls format applies to date within the past \s-1OR\s0 future 6 months!
+.Sp
+The following formats are currently unused but may be used in the future:
+  goq \s-1GJKLNOPQ\s0 1234567890 !@#$^&*()_|\-=\e`[];\*(R',./~{}:<>?
+.Sp
+This routine is loosely based on date.pl (version 3.2) by Terry McGonigal.
+No code was used, but most of his formats were.
+.Ip "ParseDateDelta" 2
+.IX Item "ParseDateDelta"
+.Sp
+.Vb 3
+\& $delta=&ParseDateDelta(\e@args)
+\& $delta=&ParseDateDelta($string)
+\& $delta=&ParseDateDelta(\e$string)
+.Ve
+This takes an array and shifts a valid delta date (an amount of time)
+from the array.  Recognized deltas are of the form:
+  +Yy +Mm +Dd +Hh +MNmn +Ss
+  +Y:+M:+D:+H:+\s-1MN:+S\s0
+.Sp
+A field in the format +Yy is a sign, a number, and a string specifying
+the type of field.  The sign is \*(L"+\*(R", \*(L"\-\*(R", or absent (defaults to the
+last sign given).  The valid strings specifying the field type
+are:
+   y:  y, yr, year, years
+   m:  m, mon, month, months
+   d:  d, day, days
+   h:  h, hr, hour, hours
+   mn: mn, min, minute, minutes
+   s:  s, sec, second, seconds
+.Sp
+Also, the \*(L"s\*(R" string may be omitted.  The sign, number, and string may
+all be separated from each other by any number of whitespaces.
+.Sp
+In the date, all fields must be given in the order: y m d h mn s.  Any
+number of them may be omitted provided the rest remain in the correct
+order.  In the 2nd (colon) format, from 2 to 6 of the fields may be given.
+For example +D:+H:+\s-1MN:+S\s0 may be given to specify only four of the fields.
+In any case, both the \s-1MN\s0 and S field may be present.  No spaces may be
+present in the colon format.
+.Sp
+Deltas may also be given as a combination of the two formats.  For example,
+the following is valid: +Yy +D:+H:+\s-1MN:+S\s0.  Again, all fields must be given
+in the correct order.
+.Sp
+The word in may be prepended to the delta ("in 5 years") and the word ago
+may be appended ("6 months ago").  The \*(L"in\*(R" is completely ignored.  The
+\*(L"ago\*(R" has the affect of reversing all signs that appear in front of the
+components of the delta.  I.e. \*(L"\-12 yr 6 mon ago\*(R" is identical to \*(L"+12yr
++6mon\*(R" (don't forget that there is an impled minus sign in front of the 6
+because when no sign is explicitely given, it carries the previously
+entered sign).
+.Ip "DateCalc" 2
+.IX Item "DateCalc"
+.Sp
+.Vb 1
+\& $d=&DateCalc($d1,$d2,\e$err,$del)
+.Ve
+This takes two dates, deltas, or one of each and performs the appropriate
+calculation with them.  Dates must be in the format given by &ParseDate and
+or must be a string which can be parsed as a date.  Deltas must be in the
+format returned by &ParseDateDelta or must be a string that can be parsed
+as a delta.  Two deltas add together to form a third delta.  A date and a
+delta returns a 2nd date.  Two dates return a delta (the difference between
+the two dates).
+.Sp
+Note that in many cases, it is somewhat ambiguous what the delta actually
+refers to.  Although it is \s-1ALWAYS\s0 known how many months in a year, hours in
+a day, etc., it is \s-1NOT\s0 known how many days form a month.  As a result, the
+part of the delta containing month/year and the part with sec/min/hr/day
+must be treated separately.  For example, \*(L"Mar 31, 12:00:00\*(R" plus a delta
+of 1month 2days would yield \*(L"May 2 12:00:00\*(R".  The year/month is first
+handled while keeping the same date.  Mar 31 plus one month is Apr 31 (but
+since Apr only has 30 days, it becomes Apr 30).  Apr 30 + 2 days is May 2.
+.Sp
+In the case where two dates are entered, the resulting delta can take on
+two different forms.  By default, an absolutely correct delta (ignoring
+daylight savings time) is returned in days, hours, minutes, and seconds.
+If \f(CW$del\fR is non-nil, a delta is returned using years and months as well.
+The year and month part is calculated first followed by the rest.  For
+example, the two dates \*(L"Mar 12 1995\*(R" and \*(L"Apr 10 1995\*(R" would have an
+absolutely correct delta of \*(L"29 days\*(R" but if \f(CW$del\fR is non-nil, it would be
+returned as \*(L"1 month \- 2 days\*(R".  Also, \*(L"Mar 31\*(R" and \*(L"Apr 30\*(R" would have
+deltas of \*(L"30 days\*(R" or \*(L"1 month\*(R" (since Apr 31 doesn't exist, it drops down
+to Apr 30).
+.Sp
+$err is set to:
+   1 is returned if \f(CW$d1\fR is not a delta or date
+   2 is returned if \f(CW$d2\fR is not a delta or date
+   3 is returned if the date is outside the years 1000 to 9999
+.Sp
+Nothing is returned if an error occurs.
+.Sp
+If \f(CW$del\fR is non-nil, both \f(CW$d1\fR and \f(CW$d2\fR must be dates.
+.Ip "Date_SetTime" 2
+.IX Item "Date_SetTime"
+.Sp
+.Vb 2
+\& $date=&Date_SetTime($date,$hr,$min,$sec)
+\& $date=&Date_SetTime($date,$time)
+.Ve
+This takes a date sets the time in that date.  For example, to get
+the time for 7:30 tomorrow, use the lines:
+.Sp
+.Vb 2
+\&   $date=&ParseDate("tomorrow")
+\&   $date=&Date_SetTime($date,"7:30")
+.Ve
+.Ip "Date_GetPrev" 2
+.IX Item "Date_GetPrev"
+.Sp
+.Vb 2
+\& $date=&Date_GetPrev($date,$dow,$today,$hr,$min,$sec)
+\& $date=&Date_GetPrev($date,$dow,$today,$time)
+.Ve
+This takes a date and returns the date of the previous \f(CW$day\fR.  For example,
+if \f(CW$day\fR is \*(L"Fri\*(R", it returns the date of the previous Friday.  If \f(CW$date\fR is
+Friday, it will return either \f(CW$date\fR (if \f(CW$today\fR is non-zero) or the Friday a
+week before (if \f(CW$today\fR is 0).  The time is also set according to the
+optional \f(CW$hr\fR,$min,$sec (or \f(CW$time\fR in the format \s-1HH:MM:SS\s0).
+.Ip "Date_GetNext" 2
+.IX Item "Date_GetNext"
+.Sp
+.Vb 2
+\& $date=&Date_GetNext($date,$dow,$today,$hr,$min,$sec)
+\& $date=&Date_GetNext($date,$dow,$today,$time)
+.Ve
+Similar to Date_GetPrev.
+.Ip "Date_DayOfWeek" 2
+.IX Item "Date_DayOfWeek"
+.Sp
+.Vb 1
+\& $day=&Date_DayOfWeek($m,$d,$y);
+.Ve
+Returns the day of the week (0 for Sunday, 6 for Saturday).  Dec 31, 0999
+was Tuesday.
+.Ip "Date_SecsSince1970" 2
+.IX Item "Date_SecsSince1970"
+.Sp
+.Vb 1
+\& $secs=&Date_SecsSince1970($m,$d,$y,$h,$mn,$s)
+.Ve
+Returns the number of seconds since Jan 1, 1970 00:00 (negative if date is
+earlier).
+.Ip "Date_DaysSince999" 2
+.IX Item "Date_DaysSince999"
+.Sp
+.Vb 1
+\& $days=&Date_DaysSince999($m,$d,$y)
+.Ve
+Returns the number of days since Dec 31, 0999.
+.Ip "Date_DayOfYear" 2
+.IX Item "Date_DayOfYear"
+.Sp
+.Vb 1
+\& $day=&Date_DayOfYear($m,$d,$y);
+.Ve
+Returns the day of the year (001 to 366)
+.Ip "Date_DaysInYear" 2
+.IX Item "Date_DaysInYear"
+.Sp
+.Vb 1
+\& $days=&Date_DaysInYear($y);
+.Ve
+Returns the number of days in the year (365 or 366)
+.Ip "Date_WeekOfYear" 2
+.IX Item "Date_WeekOfYear"
+.Sp
+.Vb 1
+\& $wkno=&Date_WeekOfYear($m,$d,$y,$first);
+.Ve
+Figure out week number.  \f(CW$first\fR is the first day of the week which is
+usually 0 (Sunday) or 1 (Monday), but could be any number between 0 and 6
+in practice.
+.Ip "Date_LeapYear" 2
+.IX Item "Date_LeapYear"
+.Sp
+.Vb 1
+\& $flag=&Date_LeapYear($y);
+.Ve
+Returns 1 if the argument is a leap year
+Written by David Muir Sharnoff <muir@idiom.com>
+.Ip "Date_DaySuffix" 2
+.IX Item "Date_DaySuffix"
+.Sp
+.Vb 1
+\& $day=&Date_DaySuffix($d);
+.Ve
+Add `st\*(R', `nd\*(R', `rd\*(R', `th\*(R' to a date (ie 1st, 22nd, 29th).  Works for
+international dates.
+.Ip "Date_TimeZone" 2
+.IX Item "Date_TimeZone"
+.Sp
+.Vb 1
+\& $tz=&Date_TimeZone
+.Ve
+This returns a timezone.  It looks in the following places for a
+timezone in the following order:
+   \s-1POSIX::\s0tzname
+   \f(CW$ENV\fR{\s-1TZ\s0}
+   \f(CW$main::TZ\fR
+   /etc/\s-1TIMEZONE\s0
+If it's not found in any of those places, \s-1GMT\s0 is returned.
+Obviously, this does not guarantee the correct timezone.
+.Ip "Date_Init" 2
+.IX Item "Date_Init"
+.Sp
+.Vb 2
+\& $flag=&Date_Init()
+\& $flag=&Date_Init($lang,$format)
+.Ve
+Normally, it is not necessary to explicitely call Date_Init.  The first
+time any of the other routines are called, Date_Init will be called to set
+everything up.  If for some reason you want to parse dates in multiple
+languages, you can pass in the language and format information and
+reinitialize everything for a different language.
+.Sp
+Recognized values of \f(CW$lang\fR are \*(L"English\*(R" and \*(L"French\*(R".  Others will be
+added in the future.  \f(CW$format\fR should be \*(L"\s-1US\s0\*(R" or any other string.  Most \s-1US\s0
+people look at the date 12/10/96 as \s-1MM/DD/YY\s0 or Dec 10, 1996.  Many
+countries would regard this as Oct 12, 1996 instead.  Setting the \f(CW$form\fR
+variable to \*(L"\s-1US\s0\*(R" forces the first one.  Anything else forces the 2nd.
+.SH "AUTHOR"
+.IX Header "AUTHOR"
+Sullivan Beck (beck@qtp.ufl.edu)
+
+.rn }` ''

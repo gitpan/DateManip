@@ -1,0 +1,8 @@
+To install, just type
+  perl Makefile.PL
+  make
+  make install
+
+If you want to skip the makefile, just copy Date/Manip.pm to somewhere in
+your perl include path.
+
