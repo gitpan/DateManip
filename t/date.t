@@ -10,7 +10,7 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
-$ntest=213;
+$ntest=219;
 
 print "1..$ntest\n"  if (! $runtests);
 &Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST",
@@ -525,6 +525,9 @@ DeC first 1965
 5:30:02
     $todaydate 05:30:02
 
+15:30:00
+    $todaydate 15:30:00
+
 # Tests TimeDate
 #       Time%Date
 5:30 pm 12/10/65
@@ -695,9 +698,25 @@ Feb 02 1997 01:00+01
 Feb 02 1997 01:00+01:00
     1997020119:00:00
 
+19970202010000+0100
+    1997020119:00:00
+
 # More tests...
 last day in October 1997
     1997103100:00:00
+
+epoch 400000
+    1970010510:06:40
+
+19980102030405 EST
+    1998010203:04:05
+
+19980102030405E
+    1998010203:04:05
+
+Mon, 19 Jan 1998 08:11:34 +1030
+    1998011816:41:34
+
 ";
 
 print "Date...\n";

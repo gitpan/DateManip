@@ -37,7 +37,7 @@ Make sure that in your perl script you have the line:
 
 
 You can also create the man page using the command:
-        pod2man Manip.pm > Date::Manip.3
+        pod2man Manip.pod > Date::Manip.3
 and install it somewhere in your MANPATH.  I have it in:
         /usr/local/man/man3/Date::Manip.3
 
@@ -61,7 +61,3 @@ Date::Manip's value with, I just add 1 to todays date (which returns Jan 32
 instead of Feb 1, for example).  So, the "tomorrow" tests fail on the last
 day of the month and the "yesterday" tests fail on the first day of the
 month.
-
-The tests may now be run regardless of the local timezone and regardless
-of whether the config variables at the top of the Manip.pm file have been
-modified.

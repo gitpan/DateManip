@@ -18,7 +18,7 @@ Date::Manip to a newsgroup or emailing me.  If you've done this, I'll be
 glad to answer any questions not covered in the man page.
 
 
-** IMPORTANT NOTE **
+** IMPORTANT NOTE (5.30) **
 The internal format of a delta has changed (a week field has been added).
 I realize that this is going to cause some problems, but I am adding two
 other types of data (granularity and recurrence) to Date::Manip.  Both
@@ -32,6 +32,14 @@ I also plan on changing the internal format for a date to include
 the timezone ( YYYYMMDDHH:MN:SS+HHMN ).  Using UnixDate to extract information
 from a date is recommended.
 
+
+Notes for version 5.31:
+  Mainly a bug fix release.
+  Aplit Manip.pm so it's not all in one file.
+  Allowed non-ISO-8601 timezones with ISO-8601 dates.
+  Added "epoch 52352352352" to ParseDate to parse seconds since the epoch.
+  Added German date support.
+  Date_NthDayOfYear enhanced.
 
 Notes for version 5.30:
   *** Deltas now have a week field: Y:M:W:D:H:Mn:S
@@ -100,7 +108,7 @@ Backwards incompatibilities:
 
   The newest version (which should be considered a beta version) is available
   through my home page:
-    http://www.qtp.ufl.edu/~beck
+    http://www.cise.ufl.edu/~sbeck/
   Feel free to try it out.
 
   The current (non-beta) version of this module is available from you nearest
@@ -112,13 +120,20 @@ Backwards incompatibilities:
 This is a set of routines designed to make any common date/time
 manipulation easy to do.  Operations such as comparing two times,
 calculating a time a given amount of time from another, or parsing
-international times are all easily done.
+international times are all easily done.  From the very beginning, the main
+focus of Date::Manip has been to be able to do ANY desired date/time
+operation easily, not necessarily quickly.  There are other modules that
+can do a small subset of the operations available in Date::Manip much
+quicker than those presented here, so if speed is a primary issue, you
+should look elsewhere.  Check out the CPAN listing of Time and Date
+modules.  But for sheer flexibility, I believe that Date::Manip is your
+best bet.
 
-Date::Manip deals only with the Gregorian calendar (the one currently in
-use).  The Julian calendar defined leap years as every 4th year.  The
-Gregorian calendar improved this by making every 100th year NOT a leap
-year, unless it was also the 400th year.  The Gregorian calendar has been
-extrapolated back to the year 1000 AD and forward to the year 9999 AD.
+Date::Manip deals with time as it is presented the Gregorian calendar (the
+one currently in use).  The Julian calendar defined leap years as every 4th
+year.  The Gregorian calendar improved this by making every 100th year NOT
+a leap year, unless it was also the 400th year.  The Gregorian calendar has
+been extrapolated back to the year 1000 AD and forward to the year 9999 AD.
 Note that in historical context, the Julian calendar was in use until 1582
 when the Gregorian calendar was adopted by the Catholic church.  Protestant
 countries did not accept it until later; Germany and Netherlands in 1698,
@@ -127,11 +142,48 @@ is itself imperfect.  Each year is on average 26 seconds too long, which
 means that every 3,323 years, a day should be removed from the calendar.
 No attempt is made to correct for that.
 
-Date::Manip is therefore not equipped to truly deal with historacle dates,
+Date::Manip is therefore not equipped to truly deal with historical dates,
 but should be able to perform (virtually) any operation dealing with a
 modern time and date.
 
-Among other things, Date::Manip allow you to:
+Date::Manip has (or will have) functionality to work with several fundamental
+types of data.
+
+DATE
+
+Although the word date is used extensively here, it is actually somewhat
+misleading.  Date::Manip works with the full date AND time (year, month,
+day, hour, minute, second).  It doesn't work with fractional seconds.
+Timezones are also supported.
+
+NOTE:  Much better support for timezones (including Daylight Savings Time)
+is planned for the future.
+
+DELTA
+
+This refers to a duration or elapsed time.  One thing to note is that, as
+used in this module, a delta refers only to the amount of time elapsed.  It
+includes no information about a starting or ending time.
+
+RECURRENCE
+
+A recurrence is simply a notation for defining when a recurring event
+occurs.  For example, if an event occurs every other Friday or every
+4 hours, this can be defined as a recurrence.  With a recurrence and a
+starting and ending date, you can get a list of dates in that period when
+a recurring event occurs.
+
+GRAIN
+
+The granularity of a time basically refers to how accurate you wish to
+treat a date.  For example, if you want to compare two dates to see if
+they are identical at a granularity of days, then they only have to occur
+on the same day.  At a granularity of an hour, they have to occur within
+an hour of each other, etc.
+
+NOTE:  Support for this will be added soon.
+
+mong other things, Date::Manip allow you to:
 
 1.  Enter a date and be able to choose any format conveniant
 
@@ -152,13 +204,6 @@ Among other things, Date::Manip allow you to:
 7.  To find a list of dates where a recurring event happens.
 
 Each of these tasks is trivial (one or two lines at most) with this package.
-
-Although the word date is used extensively here, it is actually somewhat
-misleading.  Date::Manip works with the full date AND time (year, month,
-day, hour, minute, second, and will ignore fractional seconds).
-
-In the documentation below, US formats are used, but in most (if not all)
-cases, a non-English equivalent will work equally well.
 
 EXAMPLES:
 
