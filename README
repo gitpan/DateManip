@@ -1,4 +1,4 @@
-Copyright (c) 1995-2001 Sullivan Beck. All rights reserved.
+Copyright (c) 1995-2003 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
@@ -16,7 +16,6 @@ given below.  PLEASE read the man page thoroughly before posting any questions
 about Date::Manip to a newsgroup or emailing me.  If you've done this, I'll be
 glad to answer any questions not covered or unclear in the man page.
 
-
 ** IMPORTANT NOTE (5.35) **
 
 I am considering going OO... so everyone should use the appropriate
@@ -27,9 +26,12 @@ don't, the internal format for both will change, so the above routines
 should be used.
 
 
-Notes for version 5.40:
-   Bug fix release.  No significant new functionality.
-
+Notes for version 5.42:
+   Mainly a bug fix release.
+   Added Russian, Dutch, Turkish translations.
+   Modified Delta_Format to treat the entire delta as exact if no month
+      component is present.
+   ***Fixed the problem of malformed UTF-8 character warnings.
 
   ############################################################################
   If you would like to stay informed about future versions of this module,

@@ -552,7 +552,7 @@ Version 5.35  1999-07-06
       *** Added support for recurrences and one-year-only holidays (the latter
          requested first by Vishal Bhatia <vishalb@hotmail.com>)
       Cleaned up holiday variables and redid holiday routines.
-      Fixed Veteren's day, added Good Friday (off by default).  Peter Chen
+      Fixed Veteran's day, added Good Friday (off by default).  Peter Chen
          <petechen@lehman.com>
    Fixed a serious typo in the DaysSince1BC routine.  Qian Miao <qmiao@ml.com>
    Added Date_IsHoliday routine.  Joe Pepin <joepepin@att.com>
@@ -649,18 +649,80 @@ Version 5.40  2001-06-07
       back in to Date_Init.  James Elson <James@citria.com>
    Fixed a typo in the docs.  Zhen Liu <zhen_hua_liu2@yahoo.com>
 
+Version 5.41  2003-06-30
+   Added runtests.bat contributed by Lon Amick <lon.g.amick@mail.sprint.com>
+   Added JAVT timezone.  David Coppit <david@coppit.org>
+   Fixed bug where -HH:MM and +HH:MM were not being accepted as valid
+      timezones.  Hank Barta <hbarta@htc.com>
+   Small patch for OpenVMS.  Martin P.J. Zinser <zinser@decus.de>
+   Minor doc fix.  Jeremy Tietsort <jrtietsort@micron.com>
+   Added BRST timezone.  Daniel Serodio <dserodio@email.com>
+   Added Russian translation.  Dapi <dapi@mail.ru>
+   Made the UnixDate %Z format work with numeric timezones.  Michael Isard
+      <michael.isard@compaq.com>
+   Minor bug fix where /etc/timezone not correctly read.  Jacek Nowacki
+      <jacekn@polcard.com.pl>
+   Added ART timezone.  Fabian Mandelbaum <fabman@mandrakesoft.com>
+   Minor enhancement to ParseRecur.  Randy Harmon <rjh@fortheweb.com
+   Fixed spelling of Veteran's day.  Dirk Eddelbuettel <edd@debian.org>
+   Documentation improvements.  James Olsen <jolsen@multiad.com>
+   Added Brazilian timezones.  Raul Dias <raul@dias.com.br>
+   Fixed WEST timezone.  Pedro Melo CUNHA <melo@isp.novis.pt>
+   Added NOVST timezone.  Roman Y Malakhov <roman@intis.tomsk.ru>
+   Additions to Dutch translation.  Willem <itsme@xs4all.nl>
+   Fixed a bug where timezones -HH:MM weren't handled in ISO 8601 dates.
+      Ed Avis <ed@membled.com>
+   Fixed a bug involving business deltas with negative hours.  Ludovic
+      Dubost <ludovic@pobox.com>
+   Modified Delta_Format to treat the entire delta as exact if no month
+      component is present.  Due to discussion with Tim Turner
+      <torrid@mindspring.com>
+   Added EAT timezone.  David Whiting <dave@pluto.ammp>
+   Added BOT timezone.  Khaled Mostaguir <Khaled.Mostaguir@isb-sib.ch>
+   Added several Australian timezones.  Jason King
+      <Jason.King1@team.telstra.com>
+   Added some support for NetWare.  Chris Shields <cshields@waubonsee.edu>
+   Added some help for VMS timezones.  Don Slutz <DSlutz@arrayinc.com>
+   Applied some robustness patches.  Ed Avis <ed@membled.com>
+   Fixed a bug with years <1000.  Jonathan Callahan
+      <Jonathan.S.Callahan@noaa.gov>
+   Patch to make Manip.pm -Mstrict clean and better VMS support.
+      Peter Prymmer <PPrymmer@factset.com>
+   Patch to French support.  Patrick Turmel <patrick@espacecourbe.com>
+   Added Tues/Thur abbreviations.  <mthurn@cise.ufl.edu>
+   Fixed a bug in "1st saturday of 2005" format.  Maurice Aubrey
+      <maurice@redweek.com>
+   Taint check insecure $ENV{PATH} fix.  Ed Avis <ed@membled.com>
+   Patch to allow deltas of the form "+ -1 day" to work.  Ed Avis
+      <ed@membled.com>
+   Added Turkish.  <giray@pultar.org>
+   Added Danish.  Jesper Dalberg <dalberg@cybercity.dk>
+   Added some checking to the timezone determination.  Ed Avis
+      <ed@membled.com>
+   ***Replaced all non-ASCII characters with hex representations to avoid
+      the malformed UTF-8 character warnings. Ed Avis <ed@membled.com>
+   Removed ampersands from function calls in documentation to fit new
+      perl coding standards.  Bill Pollock <billp@statenet.com>
+   Fixed a bug where spaces in a date caused problems in German (due
+      to the number 1st, 2nd, etc. being 1., 2., etc.).  Erik Roderwald
+      <erik@roderwald.de>
+
+Version 5.42  2003-07-02
+   Number changed to distinguish between the development release (5.41)
+      and official release since.
+
 #########################################################################
 # Backwards incompatibilities
 #########################################################################
 
-In 5.07
+Version 5.07
   %s UnixDate format changed
   By default, the signs of a diff are stored in a different format (only
     minimum number of signs stored).  Backwards compatible if you set
     DeltaSigns=1.
   Date_Init arguments changed (old method supported but depreciated)
 
-In 5.20
+Version 5.20
   ISO 8601 dates added, several old formats are no longer available
     MM-DD-YY  (conflicts with YY-MM-DD)
     YYMMDD    (conflicts with YYYYMM)
@@ -669,18 +731,18 @@ In 5.20
   Also for ISO 8601, the week starts with Monday by default.
   By default, the first week of the year contains Jan 4 (ISO 8601).
 
-In 5.21
+Version 5.21
   Long running process timezone may slip.  See UpdateCurrTZ variable.
   UnixDate formats %W,%U no longer return week 00.  %J is now correct.
 
-In 5.30
+Version 5.30
   Delta now contains a week field.
 
-In 5.32
+Version 5.32
   Old style Date_Init arguments no longer supported.
   The DateManip.cnf file's name has changed for ALL non-Unix platforms.
 
-In 5.34
+Version 5.34
   A business week is now interpreted the same as an exact week.
   *** All Date::Manip variables are declared with my(VAR), so no
     more access to internals.
@@ -692,12 +754,16 @@ In 5.34
   *** Date_Cmp added in preparation for the change in internal format to
     include the timezone.
 
-In 5.35
+Version 5.35
   Deprecated the function Date_DaysSince999.  It's been replaced by
     Date_DaysSince1BC.  It will disappear in the next version.
   *** Added the PathSep variable which may cause problems on WinXX platforms
     with old config files where a colon is assumed.
 
-In 5.38
+Version 5.38
    Removed Date_DaysSince999.
 
+Version 5.41
+   For VMS, changed the path separator to "\n" since ":" is a part of some
+     paths.
+   Changed the behavior of Delta_Format slightly.

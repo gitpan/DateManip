@@ -1,13 +1,12 @@
 package Date::Manip;
-
-# Copyright (c) 1995-2001 Sullivan Beck.  All rights reserved.
+# Copyright (c) 1995-2003 Sullivan Beck.  All rights reserved.
 # This program is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
 ###########################################################################
 ###########################################################################
 
-use vars qw($OS %Lang %Holiday %Events %Curr %Cnf %Zone);
+use vars qw($OS %Lang %Holiday %Events %Curr %Cnf %Zone $VERSION @ISA @EXPORT);
 
 # Determine the type of OS...
 $OS="Unix";
@@ -19,6 +18,8 @@ $OS="Windows"  if ((defined $^O and
                     $ENV{OS} =~ /MSWin32/i ||
                     $ENV{OS} =~ /Windows_95/i ||
                     $ENV{OS} =~ /Windows_NT/i));
+$OS="Netware"  if (defined $^O and
+                   $^O =~ /NetWare/i);
 $OS="Mac"      if ((defined $^O and
                     $^O =~ /MacOS/i) ||
                    (defined $ENV{OS} and
@@ -31,7 +32,7 @@ $OS="VMS"      if (defined $^O and
                    $^O =~ /VMS/i);
 
 # Determine if we're doing taint checking
-$NoTaint = eval { local $^W; unlink "$^X$^T"; 1 };
+$Date::Manip::NoTaint = eval { local $^W; unlink "$^X$^T"; 1 };
 
 ###########################################################################
 # CUSTOMIZATION
@@ -50,8 +51,13 @@ $Cnf{"IgnoreGlobalCnf"}="";
 # expansions are allowed.  This should be set in Date_Init arguments or in
 # the global config file.
 
-@DatePath=();
+@Date::Manip::DatePath=();
 if ($OS eq "Windows") {
+  $Cnf{"PathSep"}         = ";";
+  $Cnf{"PersonalCnf"}     = "Manip.cnf";
+  $Cnf{"PersonalCnfPath"} = ".";
+
+} elsif ($OS eq "Netware") {
   $Cnf{"PathSep"}         = ";";
   $Cnf{"PersonalCnf"}     = "Manip.cnf";
   $Cnf{"PersonalCnfPath"} = ".";
@@ -73,16 +79,16 @@ if ($OS eq "Windows") {
 
 } elsif ($OS eq "VMS") {
   # VMS doesn't like files starting with "."
-  $Cnf{"PathSep"}         = ":";
+  $Cnf{"PathSep"}         = "\n";
   $Cnf{"PersonalCnf"}     = "Manip.cnf";
-  $Cnf{"PersonalCnfPath"} = ".:~";
+  $Cnf{"PersonalCnfPath"} = ".\n~";
 
 } else {
   # Unix
   $Cnf{"PathSep"}         = ":";
   $Cnf{"PersonalCnf"}     = ".DateManip.cnf";
   $Cnf{"PersonalCnfPath"} = ".:~";
-  @DatePath=qw(/bin /usr/bin /usr/local/bin);
+  @Date::Manip::DatePath=qw(/bin /usr/bin /usr/local/bin);
 }
 
 ### Date::Manip variables set in the global or personal config file
@@ -198,8 +204,7 @@ use Carp;
 
 use IO::File;
 
-use vars qw($VERSION);
-$VERSION="5.40";
+$VERSION="5.42";
 
 ########################################################################
 ########################################################################
@@ -362,6 +367,15 @@ sub Date_Init {
 
     } elsif ($L eq "Italian") {
       &Date_Init_Italian(\%lang);
+
+    } elsif ($L eq "Russian") {
+      &Date_Init_Russian(\%lang);
+
+    } elsif ($L eq "Turkish") {
+      &Date_Init_Turkish(\%lang);
+
+    } elsif ($L eq "Danish") {
+      &Date_Init_Danish(\%lang);
 
     } else {
       confess "ERROR: Unknown language in Date::Manip.\n";
@@ -538,22 +552,32 @@ sub Date_Init {
       "cst    -0600 ".  # Central Standard
       "cdt    -0500 ".  # Central Daylight
       "est    -0500 ".  # Eastern Standard
+      "act    -0500 ".  # Brazil, Acre
       "sat    -0400 ".  # Chile
+      "bot    -0400 ".  # Bolivia
+      "amt    -0400 ".  # Brazil, Amazon
+      "acst   -0400 ".  # Brazil, Acre Daylight
       "edt    -0400 ".  # Eastern Daylight
       "ast    -0400 ".  # Atlantic Standard
       #"nst   -0330 ".  # Newfoundland Standard      nst=North Sumatra    +0630
       "nft    -0330 ".  # Newfoundland
       #"gst   -0300 ".  # Greenland Standard         gst=Guam Standard    +1000
       #"bst   -0300 ".  # Brazil Standard            bst=British Summer   +0100
+      "brt    -0300 ".  # Brazil Standard (official time)
+      "brst   -0300 ".  # Brazil Standard
       "adt    -0300 ".  # Atlantic Daylight
+      "art    -0300 ".  # Argentina
+      "amst   -0300 ".  # Brazil, Amazon Daylight
       "ndt    -0230 ".  # Newfoundland Daylight
+      "brst   -0200 ".  # Brazil Daylight (official time)
+      "fnt    -0200 ".  # Brazil, Fernando de Noronha
       "at     -0200 ".  # Azores
       "wat    -0100 ".  # West Africa
+      "fnst   -0100 ".  # Brazil, Fernando de Noronha Daylight
       "gmt    +0000 ".  # Greenwich Mean
       "ut     +0000 ".  # Universal
       "utc    +0000 ".  # Universal (Coordinated)
       "wet    +0000 ".  # Western European
-      "west   +0000 ".  # Alias for Western European
       "cet    +0100 ".  # Central European
       "fwt    +0100 ".  # French Winter
       "met    +0100 ".  # Middle European
@@ -562,6 +586,7 @@ sub Date_Init {
       "swt    +0100 ".  # Swedish Winter
       "bst    +0100 ".  # British Summer             bst=Brazil standard  -0300
       "gb     +0100 ".  # GMT with daylight savings
+      "west   +0000 ".  # Western European Daylight
       "eet    +0200 ".  # Eastern Europe, USSR Zone 1
       "cest   +0200 ".  # Central European Summer
       "fst    +0200 ".  # French Summer
@@ -576,27 +601,34 @@ sub Date_Init {
       "eetedt +0300 ".  # Eastern Europe, USSR Zone 1
       "idt    +0300 ".  # Israel Daylight
       "msk    +0300 ".  # Moscow
+      "eat    +0300 ".  # East Africa
       "it     +0330 ".  # Iran
       "zp4    +0400 ".  # USSR Zone 3
       "msd    +0400 ".  # Moscow Daylight
       "zp5    +0500 ".  # USSR Zone 4
       "ist    +0530 ".  # Indian Standard
       "zp6    +0600 ".  # USSR Zone 5
+      "novst  +0600 ".  # Novosibirsk time zone, Russia
       "nst    +0630 ".  # North Sumatra              nst=Newfoundland Std -0330
       #"sst   +0700 ".  # South Sumatra, USSR Zone 6 sst=Swedish Summer   +0200
+      "javt   +0700 ".  # Java
       "hkt    +0800 ".  # Hong Kong
       "sgt    +0800 ".  # Singapore
       "cct    +0800 ".  # China Coast, USSR Zone 7
-      "awst   +0800 ".  # West Australian Standard
+      "awst   +0800 ".  # Australian Western Standard
       "wst    +0800 ".  # West Australian Standard
       "pht    +0800 ".  # Asia Manila
       "kst    +0900 ".  # Republic of Korea
       "jst    +0900 ".  # Japan Standard, USSR Zone 8
       "rok    +0900 ".  # Republic of Korea
+      "acst   +0930 ".  # Australian Central Standard
       "cast   +0930 ".  # Central Australian Standard
+      "aest   +1000 ".  # Australian Eastern Standard
       "east   +1000 ".  # Eastern Australian Standard
       "gst    +1000 ".  # Guam Standard, USSR Zone 9 gst=Greenland Std    -0300
+      "acdt   +1030 ".  # Australian Central Daylight
       "cadt   +1030 ".  # Central Australian Daylight
+      "aedt   +1100 ".  # Australian Eastern Daylight
       "eadt   +1100 ".  # Eastern Australian Daylight
       "idle   +1200 ".  # International Date Line East
       "nzst   +1200 ".  # New Zealand Standard
@@ -881,18 +913,18 @@ sub ParseDateString {
       $tmp=0;
       $tmp=1  if (/$mnsec$zone2?\s*$/i);  # or /$mnsec$zone/ ??
       $tmp=0  if (/$ampmexp/i);
-      if (s/$apachetime$zone()/$1 /i  ||
-          s/$apachetime$zone2?/$1 /i  ||
-          s/(^|[^a-z])$at\s*$D$mnsec$zone()/$1 /i  ||
-          s/(^|[^a-z])$at\s*$D$mnsec$zone2?/$1 /i  ||
-          s/(^|[^0-9])(\d)$mnsec$zone()/$1 /i ||
-          s/(^|[^0-9])(\d)$mnsec$zone2?/$1 /i ||
+      if (s/$apachetime$zone()/$1 /i                            ||
+          s/$apachetime$zone2?/$1 /i                            ||
+          s/(^|[^a-z])$at\s*$D$mnsec$zone()/$1 /i               ||
+          s/(^|[^a-z])$at\s*$D$mnsec$zone2?/$1 /i               ||
+          s/(^|[^0-9])(\d)$mnsec$zone()/$1 /i                   ||
+          s/(^|[^0-9])(\d)$mnsec$zone2?/$1 /i                   ||
           (s/(t)$D$mnsec$zone()/$1 /i and (($iso=-$tmp) || 1))  ||
           (s/(t)$D$mnsec$zone2?/$1 /i and (($iso=-$tmp) || 1))  ||
-          (s/()$DD$mnsec$zone()/ /i and (($iso=$tmp) || 1)) ||
-          (s/()$DD$mnsec$zone2?/ /i and (($iso=$tmp) || 1))  ||
-          s/(^|$at\s*|\s+)$D()()\s*$ampmexp$zone()/ /i  ||
-          s/(^|$at\s*|\s+)$D()()\s*$ampmexp$zone2?/ /i  ||
+          (s/()$DD$mnsec$zone()/ /i and (($iso=$tmp) || 1))     ||
+          (s/()$DD$mnsec$zone2?/ /i and (($iso=$tmp) || 1))     ||
+          s/(^|$at\s*|\s+)$D()()\s*$ampmexp$zone()/ /i          ||
+          s/(^|$at\s*|\s+)$D()()\s*$ampmexp$zone2?/ /i          ||
           0
          ) {
         ($h,$mn,$s,$ampm,$z,$z2)=($2,$3,$4,$5,$6,$7);
@@ -923,43 +955,40 @@ sub ParseDateString {
     # dateTtime ISO 8601 formats
     my($orig)=$_;
     s/t$//i  if ($iso<0);
-        
+
     # Parse ISO 8601 dates now (which may still have a zone stuck to it).
-    if ( ($iso && /^[0-9-]+(W[0-9-]+)?$zone?$/i)  ||
-         ($iso && /^[0-9-]+(W[0-9-]+)?$zone2?$/i)  ||
-         ($iso && /^[0-9-]+(T[0-9-]+)?$zone?$/i)  ||
-         ($iso && /^[0-9-]+(T[0-9-]+)?$zone2?$/i)  ||
+    if ( ($iso && /^([0-9-]+(?:W[0-9-]+)?)$zone?$/i)   ||
+         ($iso && /^([0-9-]+(?:W[0-9-]+)?)$zone2?$/i)  ||
+         ($iso && /^([0-9-]+(?:T[0-9-]+)?)$zone?$/i)   ||
+         ($iso && /^([0-9-]+(?:T[0-9-]+)?)$zone2?$/i)  ||
          0) {
 
       # ISO 8601 dates
+      ($_,$z,$z2) = ($1,$2);
       s,-, ,g;            # Change all ISO8601 seps to spaces
       s/^\s+//;
       s/\s+$//;
 
-      if (/^$D4\s*$DD\s*$DD\s*t?$DD(?:$DD(?:$DD\d*)?)?$zone2?$/i  ||
-          /^$D4\s*$DD\s*$DD\s*t?$DD(?:$DD(?:$DD\d*)?)?$zone?()$/i ||
-          /^$DD\s+$DD\s*$DD\s*t?$DD(?:$DD(?:$DD\d*)?)?$zone2?$/i  ||
-          /^$DD\s+$DD\s*$DD\s*t?$DD(?:$DD(?:$DD\d*)?)?$zone?()$/i ||
+      if (/^$D4\s*$DD\s*$DD\s*t?$DD(?:$DD(?:$DD(\d*))?)?$/i ||
+          /^$DD\s+$DD\s*$DD\s*t?$DD(?:$DD(?:$DD(\d*))?)?$/i ||
           0
          ) {
         # ISO 8601 Dates with times
-        #    YYYYMMDDHHMNSSFFFF
+        #    YYYYMMDDHHMNSSFFFF...
         #    YYYYMMDDHHMNSS
         #    YYYYMMDDHHMN
         #    YYYYMMDDHH
-        #    YY MMDDHHMNSSFFFF
+        #    YY MMDDHHMNSSFFFF...
         #    YY MMDDHHMNSS
         #    YY MMDDHHMN
         #    YY MMDDHH
-        ($y,$m,$d,$h,$mn,$s,$tmp,$z2)=($1,$2,$3,$4,$5,$6,$7,$8);
+        ($y,$m,$d,$h,$mn,$s,$tmp)=($1,$2,$3,$4,$5,$6,$7);
         if ($h==24 && (! defined $mn || $mn==0) && (! defined $s || $s==0)) {
           $h=0;
           $midnight=1;
         }
-        $z=""    if (! $h);
-        return ""  if ($tmp  and  $z);
-        $z=$tmp    if ($tmp  and  $tmp);
-        return ""  if ($time);
+        $z = ""    if (! defined $h);
+        return ""  if ($time  &&  defined $h);
         last PARSE;
 
       } elsif (/^$D4(?:\s*$DD(?:\s*$DD)?)?$/  ||
@@ -1220,9 +1249,9 @@ sub ParseDateString {
         $m=$Curr{"M"};
         last PARSE;
       }
-      $tmp=lc($2);
-      $tmp=$dom{"$tmp"};
-      s/(^|[^a-z])$dom($|[^a-z])/$1 $tmp $3/i;
+      my $from = $2;
+      my $to   = $dom{ lc($from) };
+      s/(^|[^a-z])$from($|[^a-z])/$1 $to $2/i;
       s/^\s+//;
       s/\s+$//;
     }
@@ -1232,11 +1261,12 @@ sub ParseDateString {
       # 22nd sunday in 1996
       ($which,$dofw,$y)=($1,$2,$3);
       $y=$Curr{"Y"}  if (! $y);
-      $tmp=&Date_GetNext("$y-01-01",$dofw,0);
+      $y--; # previous year
+      $tmp=&Date_GetNext("$y-12-31",$dofw,0);
       if ($which>1) {
         $tmp=&DateCalc_DateDelta($tmp,"+0:0:".($which-1).":0:0:0:0",\$err,0);
       }
-      ($y,$m,$d)=(&Date_Split($tmp))[0..2];
+      ($y,$m,$d)=(&Date_Split($tmp, 1))[0..2];
       last PARSE;
     } elsif (/^$week$wkabb\s*$D(?:$of?\s*$YY)?$/i  ||
              /^$week\s*$D$wkabb(?:$of?\s*$YY)?$/i) {
@@ -1527,7 +1557,9 @@ sub ParseDateDelta {
   my($workweek)=$Cnf{"WorkWeekEnd"}-$Cnf{"WorkWeekBeg"}+1;
 
   &Date_Init()  if (! $Curr{"InitDone"});
-  my($signexp)='([+-]?)';
+  # A sign can be a sequence of zero or more + and - signs, this
+  # allows for deltas like '+ -2 days'.
+  my($signexp)='((?:[+-]\s*)*)';
   my($numexp)='(\d+)';
   my($exp1)="(?: \\s* $signexp \\s* $numexp \\s*)";
   my($yexp,$mexp,$wexp,$dexp,$hexp,$mnexp,$sexp,$i)=();
@@ -1638,6 +1670,16 @@ sub ParseDateDelta {
         $val=$2   if ($2);
         $sign=$1  if ($1);
       }
+
+      # Collapse a sign like '+ -' into a single character like '-',
+      # by counting the occurrences of '-'.
+      #
+      $sign =~ s/\s+//g;
+      $sign =~ tr/+//d;
+      my $count = ($sign =~ tr/-//d);
+      die "bad characters in sign: $sign" if length $sign;
+      $sign = $count % 2 ? '-' : '+';
+
       push(@delta,"$sign$val");
     }
     if (! /^\s*$/) {
@@ -1684,7 +1726,7 @@ sub UnixDate {
   return  if (! $date);
 
   my($y,$m,$d,$h,$mn,$s)=($f{"Y"},$f{"m"},$f{"d"},$f{"H"},$f{"M"},$f{"S"})=
-    &Date_Split($date);
+    &Date_Split($date, 1);
   $f{"y"}=substr $f{"Y"},2;
   &Date_Init()  if (! $Curr{"InitDone"});
 
@@ -1779,7 +1821,7 @@ sub UnixDate {
   $f{"s"}=&Date_SecsSince1970GMT($m,$d,$y,$h,$mn,$s);
   $f{"Z"}=($Cnf{"ConvTZ"} eq "IGNORE" or $Cnf{"ConvTZ"} eq "") ?
            $Cnf{"TZ"} : $Cnf{"ConvTZ"};
-  $f{"z"}=($Zone{"n2o"}{lc $f{"Z"}} || "");
+  $f{"z"}=($f{"Z"}=~/^[+-]\d{4}/) ? $f{"Z"} : ($Zone{"n2o"}{lc $f{"Z"}} || "");
 
   # date, time
   $f{"c"}=qq|$f{"a"} $f{"b"} $f{"e"} $h:$mn:$s $y|;
@@ -1876,17 +1918,23 @@ sub Delta_Format {
   }
 
   # Length of each unit in seconds
-  my($sl,$ml,$hl,$dl,$wl)=();
+  my($sl,$ml,$hl,$dl,$wl,$yl)=();
   $sl = 1;
   $ml = $sl*60;
   $hl = $ml*60;
   $dl = $hl*24;
   $wl = $dl*7;
+  $yl = $dl*365.25;
 
   # The decimal amount of each unit contained in all smaller units
   my($yd,$Md,$sd,$md,$hd,$dd,$wd)=();
-  $yd = $M/12;
-  $Md = 0;
+  if ($M) {
+    $yd = $M/12;
+    $Md = 0;
+  } else {
+    $yd = ($w*$wl + $d*$dl + $h*$hl + $m*$ml + $s*$sl)/$yl;
+    $Md = 0;
+  }
 
   $wd = ($d*$dl + $h*$hl + $m*$ml + $s*$sl)/$wl;
   $dd =          ($h*$hl + $m*$ml + $s*$sl)/$dl;
@@ -1897,10 +1945,17 @@ sub Delta_Format {
   # The amount of each unit contained in higher units.
   my($yh,$Mh,$sh,$mh,$hh,$dh,$wh)=();
   $yh = 0;
-  $Mh = ($yh+$y)*12;
 
-  $wh = 0;
-  $dh = ($wh+$w)*7;
+  if ($M) {
+    $Mh = ($yh+$y)*12;
+    $wh = 0;
+    $dh = ($wh+$w)*7;
+  } else {
+    $Mh = 0;
+    $wh = ($yh+$y)*365.25/7;
+    $dh = ($yh+$y)*365.25 + $w*7;
+  }
+
   $hh = ($dh+$d)*24;
   $mh = ($hh+$h)*60;
   $sh = ($mh+$m)*60;
@@ -2145,8 +2200,9 @@ sub ParseRecur {
         @recur0=(0,1);
         @recur1=($num,$d,0,0,0);
 
-      } elsif (/^$D$wkexp(?:$of$mmm?$Y)?$/i ||
-               /^$D$wkexp(?:$of$mmm())?$/i) {
+      } elsif (/^$D?$wkexp(?:$of$mmm?$Y)?$/i ||
+               /^$D?$wkexp(?:$of$mmm())?$/i) {
+        # every tuesday in june 1997
         # every 2nd tuesday in june 1997
         ($num,$d,$m,$y)=($1,$2,$3,$4);
         $y=$Curr{"Y"}  if (! $y);
@@ -2421,9 +2477,9 @@ sub ParseRecur {
         @d=sort { $a<=>$b } (@d);
 
         # We need to find years that are a multiple of $n from $y(base)
-        ($y0)=( &Date_Split($date0) )[0];
-        ($y1)=( &Date_Split($date1) )[0];
-        ($yb)=( &Date_Split($dateb) )[0];
+        ($y0)=( &Date_Split($date0, 1) )[0];
+        ($y1)=( &Date_Split($date1, 1) )[0];
+        ($yb)=( &Date_Split($dateb, 1) )[0];
         @date=();
         for ($yy=$y0; $yy<=$y1; $yy++) {
           if (($yy-$yb)%$n == 0) {
@@ -2449,9 +2505,9 @@ sub ParseRecur {
           @d=&ReturnList($d);
         }
 
-        ($y0)=( &Date_Split($date0) )[0];
-        ($y1)=( &Date_Split($date1) )[0];
-        ($yb)=( &Date_Split($dateb) )[0];
+        ($y0)=( &Date_Split($date0, 1) )[0];
+        ($y1)=( &Date_Split($date1, 1) )[0];
+        ($yb)=( &Date_Split($dateb, 1) )[0];
         @y=();
         for ($yy=$y0; $yy<=$y1; $yy++) {
           if (($yy-$yb)%$n == 0) {
@@ -2497,9 +2553,9 @@ sub ParseRecur {
         }
 
         # We need to find years that are a multiple of $n from $y(base)
-        ($y0)=( &Date_Split($date0) )[0];
-        ($y1)=( &Date_Split($date1) )[0];
-        ($yb)=( &Date_Split($dateb) )[0];
+        ($y0)=( &Date_Split($date0, 1) )[0];
+        ($y1)=( &Date_Split($date1, 1) )[0];
+        ($yb)=( &Date_Split($dateb, 1) )[0];
         @date=();
         for ($yy=$y0; $yy<=$y1; $yy++) {
           if (($yy-$yb)%$n == 0) {
@@ -2561,9 +2617,9 @@ sub ParseRecur {
         @d=sort { $a<=>$b } (@d);
 
         # We need to find years that are a multiple of $n from $y(base)
-        ($y0)=( &Date_Split($date0) )[0];
-        ($y1)=( &Date_Split($date1) )[0];
-        ($yb)=( &Date_Split($dateb) )[0];
+        ($y0)=( &Date_Split($date0, 1) )[0];
+        ($y1)=( &Date_Split($date1, 1) )[0];
+        ($yb)=( &Date_Split($dateb, 1) )[0];
         @date=();
         for ($yy=$y0; $yy<=$y1; $yy++) {
           if (($yy-$yb)%$n == 0) {
@@ -2589,7 +2645,7 @@ sub ParseRecur {
         }
 
         # Find out what DofW the basedate is.
-        @tmp2=&Date_Split($dateb);
+        @tmp2=&Date_Split($dateb, 1);
         $tmp=&Date_DayOfWeek($tmp2[1],$tmp2[2],$tmp2[0]);
 
         @date=();
@@ -2627,7 +2683,7 @@ sub ParseRecur {
         @tmp2=&Date_Recur($date0,$date1,$dateb,$delta);
         @date=();
         foreach $date (@tmp2) {
-          ($y,$m)=( &Date_Split($date) )[0..1];
+          ($y,$m)=( &Date_Split($date, 1) )[0..1];
           $tmp2=&Date_DaysInMonth($m,$y);
           foreach $d (@d) {
             $d2=$d;
@@ -2754,7 +2810,7 @@ sub ParseRecur {
       if ($f eq "EASTER") {
         @tmp=();
         foreach $date (@date) {
-          ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
+          ($y,$m,$d,$h,$mn,$s)=&Date_Split($date, 1);
           ($m,$d)=&Date_Easter($y);
           $date=&Date_Join($y,$m,$d,$h,$mn,$s);
           next  if (&Date_Cmp($date,$date0)<0  ||
@@ -2784,7 +2840,7 @@ sub Date_GetPrev {
     return ""  if (! $date);
   }
   $curr=$date;
-  ($y,$m,$d)=( &Date_Split($date) )[0..2];
+  ($y,$m,$d)=( &Date_Split($date, 1) )[0..2];
 
   if ($dow) {
     $curr_dow=&Date_DayOfWeek($m,$d,$y);
@@ -2808,7 +2864,7 @@ sub Date_GetPrev {
       if ($adjust  &&  &Date_Cmp($date,$curr)>0);
 
   } else {
-    ($h,$mn,$s)=( &Date_Split($date) )[3..5];
+    ($h,$mn,$s)=( &Date_Split($date, 1) )[3..5];
     ($th,$tm,$ts)=&Date_ParseTime($hr,$min,$sec);
     if ($hr) {
       ($hr,$min,$sec)=($th,$tm,$ts);
@@ -2849,7 +2905,7 @@ sub Date_GetNext {
     return ""  if (! $date);
   }
   $curr=$date;
-  ($y,$m,$d)=( &Date_Split($date) )[0..2];
+  ($y,$m,$d)=( &Date_Split($date, 1) )[0..2];
 
   if ($dow) {
     $curr_dow=&Date_DayOfWeek($m,$d,$y);
@@ -2873,7 +2929,7 @@ sub Date_GetNext {
       if ($adjust  &&  &Date_Cmp($date,$curr)<0);
 
   } else {
-    ($h,$mn,$s)=( &Date_Split($date) )[3..5];
+    ($h,$mn,$s)=( &Date_Split($date, 1) )[3..5];
     ($th,$tm,$ts)=&Date_ParseTime($hr,$min,$sec);
     if ($hr) {
       ($hr,$min,$sec)=($th,$tm,$ts);
@@ -2907,7 +2963,7 @@ sub Date_IsHoliday {
   $date=&ParseDateString($date);
   return undef  if (! $date);
   $date=&Date_SetTime($date,0,0,0);
-  my($y)=(&Date_Split($date))[0];
+  my($y)=(&Date_Split($date, 1))[0];
   &Date_UpdateHolidays($y)  if (! exists $Holiday{"dates"}{$y});
   return undef  if (! exists $Holiday{"dates"}{$y}{$date});
   my($name)=$Holiday{"dates"}{$y}{$date};
@@ -2941,7 +2997,7 @@ sub Events_List {
     $date0=&Date_SetTime($date0,"00:00:00");
     $date1=&DateCalc_DateDelta($date0,"+0:0:0:1:0:0:0");
   }
-    
+
   $tmp=&Events_Calc($date0,$date1);
 
   $flag=$args[2];
@@ -2965,7 +3021,7 @@ sub Events_List {
       }
     }
     return \%ret;
-    
+
   } elsif ($flag==2) {
     while ($#tmp>0) {
       ($date0,$tmp)=splice(@tmp,0,2);
@@ -3001,7 +3057,7 @@ sub Date_SetTime {
     return ""  if (! $date);
   }
 
-  ($y,$m,$d)=( &Date_Split($date) )[0..2];
+  ($y,$m,$d)=( &Date_Split($date, 1) )[0..2];
   ($h,$mn,$s)=&Date_ParseTime($h,$mn,$s);
 
   my($ampm,$wk);
@@ -3020,7 +3076,7 @@ sub Date_SetDateField {
   if (! $y) {
     $date=&ParseDateString($date);
     return "" if (! $date);
-    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
+    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date, 1);
   }
 
   if      (lc($field) eq "y") {
@@ -3207,6 +3263,10 @@ sub Date_DaySuffix {
 sub Date_ConvTZ {
   print "DEBUG: Date_ConvTZ\n"  if ($Curr{"Debug"} =~ /trace/);
   my($date,$from,$to)=@_;
+  if (not Date_Split($date)) {
+      croak "date passed in ('$date') is not a Date::Manip object";
+  }
+
   &Date_Init()  if (! $Curr{"InitDone"});
   my($gmt)=();
 
@@ -3248,7 +3308,7 @@ sub Date_ConvTZ {
 
   my($s1,$h1,$m1,$s2,$h2,$m2,$d,$h,$m,$sign,$delta,$err,$yr,$mon,$sec)=();
   # We're going to try to do the calculation without calling DateCalc.
-  ($yr,$mon,$d,$h,$m,$sec)=&Date_Split($date);
+  ($yr,$mon,$d,$h,$m,$sec)=&Date_Split($date, 1);
 
   # Convert $date from $from to GMT
   $from=~/([+-])(\d{2})(\d{2})/;
@@ -3306,7 +3366,15 @@ sub Date_TimeZone {
   # Get timezones from all of the relevant places
 
   push(@tz,$Cnf{"TZ"})  if (defined $Cnf{"TZ"});  # TZ config var
-  push(@tz,$ENV{"TZ"})  if (exists $ENV{"TZ"});   # TZ environ var
+  push(@tz,$ENV{"TZ"})  if (defined $ENV{"TZ"});  # TZ environ var
+  push(@tz,$ENV{'SYS$TIMEZONE_RULE'})
+    if defined $ENV{'SYS$TIMEZONE_RULE'};         # VMS TZ environ var
+  push(@tz,$ENV{'SYS$TIMEZONE_NAME'})
+    if defined $ENV{'SYS$TIMEZONE_NAME'};         # VMS TZ name environ var
+  push(@tz,$ENV{'UCX$TZ'})
+    if defined $ENV{'UCX$TZ'};                    # VMS TZ environ var
+  push(@tz,$ENV{'TCPIP$TZ'})
+    if defined $ENV{'TCPIP$TZ'};                  # VMS TZ environ var
 
   # The `date` command... if we're doing taint checking, we need to
   # always call it with a full path... otherwise, use the user's path.
@@ -3319,28 +3387,42 @@ sub Date_TimeZone {
   # Thu Aug 31 14:57:46 EDT 2000
 
   unless (($^X =~ /perl\.exe$/i) or
-          $OS eq "Windows") {
+          ($OS eq "Windows") or
+          ($OS eq "Netware") or
+          ($OS eq "VMS")) {
     if ($Date::Manip::NoTaint) {
-      $tz=`date +%Z 2> /dev/null`;
-      chomp($tz);
-      if (! $tz) {
-         $tz=`date 2> /dev/null`;
-         chomp($tz);
-         $tz=(split(/\s+/,$tz))[4];
+      if ($OS eq "VMS") {
+        $tz=$ENV{'SYS$TIMEZONE_NAME'};
+        if (! $tz) {
+          $tz=$ENV{'MULTINET_TIMEZONE'};
+          if (! $tz) {
+            $tz=$ENV{'SYS$TIMEZONE_DIFFERENTIAL'}/3600.; # e.g. '-4' for EDT
+          }
+        }
+      } else {
+        $tz=`date +%Z 2> /dev/null`;
+        chomp($tz);
+        if (! $tz) {
+          $tz=`date 2> /dev/null`;
+          chomp($tz);
+          $tz=(split(/\s+/,$tz))[4];
+        }
       }
       push(@tz,$tz);
     } else {
-      foreach my $dir (@Date::Manip::DatePath) {
-        next  if (! -x "$dir/date");
-        $tz=`$dir/date +%Z 2> /dev/null`;
-        chomp($tz);
-        if (! $tz) {
-           $tz=`$dir/date 2> /dev/null`;
-           chomp($tz);
-           $tz=(split(/\s+/,$tz))[4];
-        }
-        push(@tz,$tz);
+      # We need to satisfy taint checking, but also look in all the
+      # directories in @DatePath.
+      #
+      local $ENV{PATH} = join(':', @Date::Manip::DatePath);
+      local $ENV{BASH_ENV} = '';
+      $tz=`date +%Z 2> /dev/null`;
+      chomp($tz);
+      if (! $tz) {
+	$tz=`date 2> /dev/null`;
+	chomp($tz);
+	$tz=(split(/\s+/,$tz))[4];
       }
+      push(@tz,$tz);
     }
   }
 
@@ -3366,7 +3448,7 @@ sub Date_TimeZone {
       $tmp=<$in>;
       next  if ($tmp =~ /^\s*\043/);
       chomp($tmp);
-      if ($tz =~ /^\s*(.*?)\s*$/) {
+      if ($tmp =~ /^\s*(.*?)\s*$/) {
         push(@tz,$1);
         last;
       }
@@ -3376,8 +3458,20 @@ sub Date_TimeZone {
 
   # Now parse each one to find the first valid one.
   foreach $tz (@tz) {
+    $tz =~ s/\s*$//;
+    $tz =~ s/^\s*//;
+    next  if (! $tz);
+
     return uc($tz)
-      if (defined $Zone{"n2o"}{lc($tz)} or $tz=~/^[+-]\d{4}/);
+      if (defined $Zone{"n2o"}{lc($tz)});
+
+    if ($tz =~ /^[+-]\d{4}$/) {
+      return $tz;
+    } elsif ($tz =~ /^([+-]\d{2})(?::(\d{2}))?$/) {
+      my($h,$m)=($1,$2);
+      $m="00"  if (! $m);
+      return "$h$m";
+    }
 
     # Handle US/Eastern format
     if ($tz =~ /^$Zone{"tzones"}$/i) {
@@ -3414,7 +3508,7 @@ sub Date_IsWorkDay {
   $d=&Date_SetTime($date,$Cnf{"WorkDayBeg"})  if (! $time);
 
   my($y,$mon,$day,$tmp,$h,$m,$dow)=();
-  ($y,$mon,$day,$h,$m,$tmp)=&Date_Split($d);
+  ($y,$mon,$day,$h,$m,$tmp)=&Date_Split($d, 1);
   $dow=&Date_DayOfWeek($mon,$day,$y);
 
   return 0  if ($dow<$Cnf{"WorkWeekBeg"} or
@@ -4075,6 +4169,9 @@ sub Date_ParseTime {
 # No check as to validity is made.
 sub Date_Join {
   print "DEBUG: Date_Join\n"  if ($Curr{"Debug"} =~ /trace/);
+  foreach (0 .. $#_) {
+      croak "undefined arg $_ to Date_Join()" if not defined $_[$_];
+  }
   my($y,$m,$d,$h,$mn,$s)=@_;
   my($ym,$md,$dh,$hmn,$mns)=();
 
@@ -4158,9 +4255,15 @@ sub Recur_Split {
 
 # This checks a date.  If it is valid, it splits it and returns the elements.
 # If no date is passed in, it returns a regular expression for the date.
+#
+# The optional second argument says 'I really expect this to be a
+# valid Date::Manip object, please throw an exception if it is
+# not'.  Otherwise, errors are signalled by returning ().
+#
 sub Date_Split {
   print "DEBUG: Date_Split\n"  if ($Curr{"Debug"} =~ /trace/);
-  my($date)=@_;
+  my($date, $definitely_valid)=@_;
+  $definitely_valid = 0 if not defined $definitely_valid;
   my($ym,$md,$dh,$hmn,$mns)=();
   my($y)='(\d{4})';
   my($m)='(0[1-9]|1[0-2])';
@@ -4186,14 +4289,34 @@ sub Date_Split {
   }
 
   my($t)="^$y$ym$m$md$d$dh$h$hmn$mn$mns$s\$";
-  return $t  if ($date eq "");
+
+  if (not defined $date or $date eq '') {
+      if ($definitely_valid) {
+	  die "bad date '$date'";
+      } else {
+	  return $t;
+      }
+  }
 
   if ($date =~ /$t/) {
     ($y,$m,$d,$h,$mn,$s)=($1,$2,$3,$4,$5,$6);
     my(@d_in_m)=(0,31,28,31,30,31,30,31,31,30,31,30,31);
     $d_in_m[2]=29  if (&Date_LeapYear($y));
-    return ()  if ($d>$d_in_m[$m]);
+    if ($d>$d_in_m[$m]) {
+	my $msg = "invalid date $date: day $d of month $m, but only $d_in_m[$m] days in that month";
+	if ($definitely_valid) {
+	    die $msg;
+	}
+	else {
+	    warn $msg;
+	    return ();
+	}
+    }
     return ($y,$m,$d,$h,$mn,$s);
+  }
+
+  if ($definitely_valid) {
+      die "invalid date $date: doesn't match regexp $t";
   }
   return ();
 }
@@ -4460,8 +4583,8 @@ sub DateCalc_DateDate {
 
   # Exact mode
   if ($mode==0) {
-    my($y1,$m1,$d1,$h1,$mn1,$s1)=&Date_Split($D1);
-    my($y2,$m2,$d2,$h2,$mn2,$s2)=&Date_Split($D2);
+    my($y1,$m1,$d1,$h1,$mn1,$s1)=&Date_Split($D1, 1);
+    my($y2,$m2,$d2,$h2,$mn2,$s2)=&Date_Split($D2, 1);
     my($i,@delta,$d,$delta,$y)=();
 
     # form the delta for hour/min/sec
@@ -4523,8 +4646,8 @@ sub DateCalc_DateDate {
     return "+0:0:0:0:0:0:0";
   }
 
-  my($y1,$m1,$d1,$h1,$mn1,$s1)=&Date_Split($date1);
-  my($y2,$m2,$d2,$h2,$mn2,$s2)=&Date_Split($date2);
+  my($y1,$m1,$d1,$h1,$mn1,$s1)=&Date_Split($date1, 1);
+  my($y2,$m2,$d2,$h2,$mn2,$s2)=&Date_Split($date2, 1);
   my($dy,$dm,$dw,$dd,$dh,$dmn,$ds,$ddd)=(0,0,0,0,0,0,0,0);
 
   if ($mode != 3) {
@@ -4580,7 +4703,7 @@ sub DateCalc_DateDate {
     }
 
   } else {
-    ($y1,$m1,$d1)=( &Date_Split($date1) )[0..2];
+    ($y1,$m1,$d1)=( &Date_Split($date1, 1) )[0..2];
     $dd=0;
     # If we're jumping across months, set $d1 to the first of the next month
     # (or possibly the 0th of next month which is equivalent to the last day
@@ -4613,7 +4736,7 @@ sub DateCalc_DateDate {
 
   # in business mode, make sure h1 comes before h2 (if not find delta between
   # now and end of day and move to start of next business day)
-  $d1=( &Date_Split($date1) )[2];
+  $d1=( &Date_Split($date1, 1) )[2];
   $dh=$dmn=$ds=0;
   if ($mode==2 || $mode==3  and  $d1 != $d2) {
     $tmp=&Date_SetTime($date1,$Cnf{"WorkDayEnd"});
@@ -4623,7 +4746,7 @@ sub DateCalc_DateDate {
     ($tmp,$tmp,$tmp,$tmp,$dh,$dmn,$ds)=&Delta_Split($tmp);
     $date1=&Date_NextWorkDay($date1,1,0);
     $date1=&Date_SetTime($date1,$Cnf{"WorkDayBeg"});
-    $d1=( &Date_Split($date1) )[2];
+    $d1=( &Date_Split($date1, 1) )[2];
     confess "ERROR: DateCalc DateDate Business.\n"  if ($d1 != $d2);
   }
 
@@ -4678,11 +4801,14 @@ sub DateCalc_DateDelta {
   }
 
   # Date, delta
-  my($y,$m,$d,$h,$mn,$s)=&Date_Split($D1);
+  my($y,$m,$d,$h,$mn,$s)=&Date_Split($D1, 1);
   my($dy,$dm,$dw,$dd,$dh,$dmn,$ds)=&Delta_Split($D2);
 
   # do the month/year part
   $y+=$dy;
+  while (length($y)<4) {
+    $y = "0$y";
+  }
   &ModuloAddition(-12,$dm,\$m,\$y);   # -12 means 1-12 instead of 0-11
   $d_in_m[2]=29  if (&Date_LeapYear($y));
 
@@ -4698,7 +4824,7 @@ sub DateCalc_DateDelta {
   } else {
     $date=&DateCalc_DateDelta(&Date_Join($y,$m,$d,$h,$mn,$s),
                               "+0:0:$dw:0:0:0:0",0);
-    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
+    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date, 1);
   }
 
   # in business mode, set the day to a work day at this point so the h/mn/s
@@ -4706,7 +4832,7 @@ sub DateCalc_DateDelta {
   if ($mode==2 || $mode==3) {
     $d=$d_in_m[$m] if ($d>$d_in_m[$m]);
     $date=&Date_NextWorkDay(&Date_Join($y,$m,$d,$h,$mn,$s),0,1);
-    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
+    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date, 1);
   }
 
   # seconds, minutes, hours
@@ -4724,7 +4850,7 @@ sub DateCalc_DateDelta {
         $dd++;
 
       } elsif ($h<$h1  or  $h==$h1 && $mn<$m1) {
-        $dh=$h1-$h;
+        $dh=$h-$h1;
         $dmn=$m1-$mn;
         $h=$h2;
         $mn=$m2;
@@ -4759,7 +4885,7 @@ sub DateCalc_DateDelta {
     } else {
       $date=&Date_PrevWorkDay(&Date_Join($y,$m,$d,$h,$mn,$s),-$dd,1);
     }
-    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date);
+    ($y,$m,$d,$h,$mn,$s)=&Date_Split($date, 1);
 
   } else {
     $d_in_m[2]=29  if (&Date_LeapYear($y));
@@ -5345,7 +5471,7 @@ sub Date_NthWeekOfYear {
   $date=&Date_GetNext($date,$dow,1)  if ($dow ne "");
 
   if ($flag) {
-    ($tmp)=&Date_Split($date);
+    ($tmp)=&Date_Split($date, 1);
     $n++  if ($tmp != $y);
   }
 
@@ -5354,7 +5480,7 @@ sub Date_NthWeekOfYear {
   } elsif ($n==0) {
     $date=&DateCalc_DateDelta($date,"-0:0:1:0:0:0:0",\$err,0);
   }
-  ($y,$m,$d)=&Date_Split($date);
+  ($y,$m,$d)=&Date_Split($date, 1);
   ($y,$m,$d);
 }
 
@@ -5375,16 +5501,17 @@ sub Char_8Bit {
   #     U`    00d9     u`    00f9
   #     W`    1e80     w`    1e81
   #     Y`    1ef2     y`    1ef3
-  $$hash{"A`"} = "\xc0";   #   Å¿
-  $$hash{"E`"} = "\xc8";   #   Å»
-  $$hash{"I`"} = "\xcc";   #   ÅÃ
-  $$hash{"O`"} = "\xd2";   #   Å“
-  $$hash{"U`"} = "\xd9";   #   ÅŸ
-  $$hash{"a`"} = "\xe0";   #   Å‡
-  $$hash{"e`"} = "\xe8";   #   ÅË
-  $$hash{"i`"} = "\xec";   #   ÅÏ
-  $$hash{"o`"} = "\xf2";   #   ÅÚ
-  $$hash{"u`"} = "\xf9";   #   Å˘
+
+  $$hash{"A`"} = "\xc0";   #   LATIN CAPITAL LETTER A WITH GRAVE
+  $$hash{"E`"} = "\xc8";   #   LATIN CAPITAL LETTER E WITH GRAVE
+  $$hash{"I`"} = "\xcc";   #   LATIN CAPITAL LETTER I WITH GRAVE
+  $$hash{"O`"} = "\xd2";   #   LATIN CAPITAL LETTER O WITH GRAVE
+  $$hash{"U`"} = "\xd9";   #   LATIN CAPITAL LETTER U WITH GRAVE
+  $$hash{"a`"} = "\xe0";   #   LATIN SMALL LETTER A WITH GRAVE
+  $$hash{"e`"} = "\xe8";   #   LATIN SMALL LETTER E WITH GRAVE
+  $$hash{"i`"} = "\xec";   #   LATIN SMALL LETTER I WITH GRAVE
+  $$hash{"o`"} = "\xf2";   #   LATIN SMALL LETTER O WITH GRAVE
+  $$hash{"u`"} = "\xf9";   #   LATIN SMALL LETTER U WITH GRAVE
 
   #   acute '
   #     A'    00c1     a'    00e1
@@ -5401,18 +5528,18 @@ sub Char_8Bit {
   #     Y'    00dd     y'    00fd
   #     Z'    0179     z'    017a
 
-  $$hash{"A'"} = "\xc1";   #   Å¡
-  $$hash{"E'"} = "\xc9";   #   Å…
-  $$hash{"I'"} = "\xcd";   #   ÅÕ
-  $$hash{"O'"} = "\xd3";   #   Å”
-  $$hash{"U'"} = "\xda";   #   Å⁄
-  $$hash{"Y'"} = "\xdd";   #   Å›
-  $$hash{"a'"} = "\xe1";   #   Å·
-  $$hash{"e'"} = "\xe9";   #   ÅÈ
-  $$hash{"i'"} = "\xed";   #   ÅÌ
-  $$hash{"o'"} = "\xf3";   #   ÅÛ
-  $$hash{"u'"} = "\xfa";   #   Å˙
-  $$hash{"y'"} = "\xfd";   #   Å˝
+  $$hash{"A'"} = "\xc1";   #   LATIN CAPITAL LETTER A WITH ACUTE
+  $$hash{"E'"} = "\xc9";   #   LATIN CAPITAL LETTER E WITH ACUTE
+  $$hash{"I'"} = "\xcd";   #   LATIN CAPITAL LETTER I WITH ACUTE
+  $$hash{"O'"} = "\xd3";   #   LATIN CAPITAL LETTER O WITH ACUTE
+  $$hash{"U'"} = "\xda";   #   LATIN CAPITAL LETTER U WITH ACUTE
+  $$hash{"Y'"} = "\xdd";   #   LATIN CAPITAL LETTER Y WITH ACUTE
+  $$hash{"a'"} = "\xe1";   #   LATIN SMALL LETTER A WITH ACUTE
+  $$hash{"e'"} = "\xe9";   #   LATIN SMALL LETTER E WITH ACUTE
+  $$hash{"i'"} = "\xed";   #   LATIN SMALL LETTER I WITH ACUTE
+  $$hash{"o'"} = "\xf3";   #   LATIN SMALL LETTER O WITH ACUTE
+  $$hash{"u'"} = "\xfa";   #   LATIN SMALL LETTER U WITH ACUTE
+  $$hash{"y'"} = "\xfd";   #   LATIN SMALL LETTER Y WITH ACUTE
 
   #   double acute "         "
   #     O"    0150     o"    0151
@@ -5432,16 +5559,16 @@ sub Char_8Bit {
   #     W^    0174     w^    0175
   #     Y^    0176     y^    0177
 
-  $$hash{"A^"} = "\xc2";   #   Å¬
-  $$hash{"E^"} = "\xca";   #   Å 
-  $$hash{"I^"} = "\xce";   #   ÅŒ
-  $$hash{"O^"} = "\xd4";   #   Å‘
-  $$hash{"U^"} = "\xdb";   #   Å€
-  $$hash{"a^"} = "\xe2";   #   Å‚
-  $$hash{"e^"} = "\xea";   #   ÅÍ
-  $$hash{"i^"} = "\xee";   #   ÅÓ
-  $$hash{"o^"} = "\xf4";   #   ÅÙ
-  $$hash{"u^"} = "\xfb";   #   Å˚
+  $$hash{"A^"} = "\xc2";   #   LATIN CAPITAL LETTER A WITH CIRCUMFLEX
+  $$hash{"E^"} = "\xca";   #   LATIN CAPITAL LETTER E WITH CIRCUMFLEX
+  $$hash{"I^"} = "\xce";   #   LATIN CAPITAL LETTER I WITH CIRCUMFLEX
+  $$hash{"O^"} = "\xd4";   #   LATIN CAPITAL LETTER O WITH CIRCUMFLEX
+  $$hash{"U^"} = "\xdb";   #   LATIN CAPITAL LETTER U WITH CIRCUMFLEX
+  $$hash{"a^"} = "\xe2";   #   LATIN SMALL LETTER A WITH CIRCUMFLEX
+  $$hash{"e^"} = "\xea";   #   LATIN SMALL LETTER E WITH CIRCUMFLEX
+  $$hash{"i^"} = "\xee";   #   LATIN SMALL LETTER I WITH CIRCUMFLEX
+  $$hash{"o^"} = "\xf4";   #   LATIN SMALL LETTER O WITH CIRCUMFLEX
+  $$hash{"u^"} = "\xfb";   #   LATIN SMALL LETTER U WITH CIRCUMFLEX
 
   #   tilde ~
   #     A~    00c3    a~    00e3
@@ -5450,12 +5577,12 @@ sub Char_8Bit {
   #     O~    00d5    o~    00f5
   #     U~    0168    u~    0169
 
-  $$hash{"A~"} = "\xc3";   #   Å√
-  $$hash{"N~"} = "\xd1";   #   Å—
-  $$hash{"O~"} = "\xd5";   #   Å’
-  $$hash{"a~"} = "\xe3";   #   Å„
-  $$hash{"n~"} = "\xf1";   #   ÅÒ
-  $$hash{"o~"} = "\xf5";   #   Åı
+  $$hash{"A~"} = "\xc3";   #   LATIN CAPITAL LETTER A WITH TILDE
+  $$hash{"N~"} = "\xd1";   #   LATIN CAPITAL LETTER N WITH TILDE
+  $$hash{"O~"} = "\xd5";   #   LATIN CAPITAL LETTER O WITH TILDE
+  $$hash{"a~"} = "\xe3";   #   LATIN SMALL LETTER A WITH TILDE
+  $$hash{"n~"} = "\xf1";   #   LATIN SMALL LETTER N WITH TILDE
+  $$hash{"o~"} = "\xf5";   #   LATIN SMALL LETTER O WITH TILDE
 
   #   macron -
   #     A-    0100    a-    0101
@@ -5485,17 +5612,17 @@ sub Char_8Bit {
   #     W:    1e84    w:    1e85
   #     Y:    0178    y:    00ff
 
-  $$hash{"A:"} = "\xc4";   #   Åƒ
-  $$hash{"E:"} = "\xcb";   #   ÅÀ
-  $$hash{"I:"} = "\xcf";   #   Åœ
-  $$hash{"O:"} = "\xd6";   #   Å÷
-  $$hash{"U:"} = "\xdc";   #   Å‹
-  $$hash{"a:"} = "\xe4";   #   Å‰
-  $$hash{"e:"} = "\xeb";   #   ÅÎ
-  $$hash{"i:"} = "\xef";   #   ÅÔ
-  $$hash{"o:"} = "\xf6";   #   Åˆ
-  $$hash{"u:"} = "\xfc";   #   Å¸
-  $$hash{"y:"} = "\xff";   #   Å~
+  $$hash{"A:"} = "\xc4";   #   LATIN CAPITAL LETTER A WITH DIAERESIS
+  $$hash{"E:"} = "\xcb";   #   LATIN CAPITAL LETTER E WITH DIAERESIS
+  $$hash{"I:"} = "\xcf";   #   LATIN CAPITAL LETTER I WITH DIAERESIS
+  $$hash{"O:"} = "\xd6";   #   LATIN CAPITAL LETTER O WITH DIAERESIS
+  $$hash{"U:"} = "\xdc";   #   LATIN CAPITAL LETTER U WITH DIAERESIS
+  $$hash{"a:"} = "\xe4";   #   LATIN SMALL LETTER A WITH DIAERESIS
+  $$hash{"e:"} = "\xeb";   #   LATIN SMALL LETTER E WITH DIAERESIS
+  $$hash{"i:"} = "\xef";   #   LATIN SMALL LETTER I WITH DIAERESIS
+  $$hash{"o:"} = "\xf6";   #   LATIN SMALL LETTER O WITH DIAERESIS
+  $$hash{"u:"} = "\xfc";   #   LATIN SMALL LETTER U WITH DIAERESIS
+  $$hash{"y:"} = "\xff";   #   LATIN SMALL LETTER Y WITH DIAERESIS
 
   #   ring o
   #     U0    016e    u0    016f
@@ -5510,8 +5637,8 @@ sub Char_8Bit {
   #     ,S    015e    ,s    015f
   #     ,T    0162    ,t    0163
 
-  $$hash{",C"} = "\xc7";   #   Å«
-  $$hash{",c"} = "\xe7";   #   ÅÁ
+  $$hash{",C"} = "\xc7";   #   LATIN CAPITAL LETTER C WITH CEDILLA
+  $$hash{",c"} = "\xe7";   #   LATIN SMALL LETTER C WITH CEDILLA
 
   #   ogonek ;  [squiggle down and right below the letter]
   #     A;    0104    a;    0105
@@ -5534,61 +5661,60 @@ sub Char_8Bit {
 
   # Other characters
 
-
   # First character is below, 2nd character is above
-  $$hash{"||"} = "\xa6";   #   Å¶
-  $$hash{" :"} = "\xa8";   #   Å®
-  $$hash{"-a"} = "\xaa";   #   Å™
-  #$$hash{" -"}= "\xaf";   #   ÅØ   (narrow bar)
-  $$hash{" -"} = "\xad";   #   Å≠   (wide bar)
-  $$hash{" o"} = "\xb0";   #   Å∞
-  $$hash{"-+"} = "\xb1";   #   Å±
-  $$hash{" 1"} = "\xb9";   #   Åπ
-  $$hash{" 2"} = "\xb2";   #   Å≤
-  $$hash{" 3"} = "\xb3";   #   Å≥
-  $$hash{" '"} = "\xb4";   #   Å¥
-  $$hash{"-o"} = "\xba";   #   Å∫
-  $$hash{" ."} = "\xb7";   #   Å∑
-  $$hash{", "} = "\xb8";   #   Å∏
-  $$hash{"Ao"} = "\xc5";   #   Å≈
-  $$hash{"ao"} = "\xe5";   #   ÅÂ
-  $$hash{"ox"} = "\xf0";   #   Å
+  $$hash{"||"} = "\xa6";   #   BROKEN BAR
+  $$hash{" :"} = "\xa8";   #   DIAERESIS
+  $$hash{"-a"} = "\xaa";   #   FEMININE ORDINAL INDICATOR
+  #$$hash{" -"}= "\xaf";   #   MACRON   (narrow bar)
+  $$hash{" -"} = "\xad";   #   HYPHEN   (wide bar)
+  $$hash{" o"} = "\xb0";   #   DEGREE SIGN
+  $$hash{"-+"} = "\xb1";   #   PLUS\342\200\220MINUS SIGN
+  $$hash{" 1"} = "\xb9";   #   SUPERSCRIPT ONE
+  $$hash{" 2"} = "\xb2";   #   SUPERSCRIPT TWO
+  $$hash{" 3"} = "\xb3";   #   SUPERSCRIPT THREE
+  $$hash{" '"} = "\xb4";   #   ACUTE ACCENT
+  $$hash{"-o"} = "\xba";   #   MASCULINE ORDINAL INDICATOR
+  $$hash{" ."} = "\xb7";   #   MIDDLE DOT
+  $$hash{", "} = "\xb8";   #   CEDILLA
+  $$hash{"Ao"} = "\xc5";   #   LATIN CAPITAL LETTER A WITH RING ABOVE
+  $$hash{"ao"} = "\xe5";   #   LATIN SMALL LETTER A WITH RING ABOVE
+  $$hash{"ox"} = "\xf0";   #   LATIN SMALL LETTER ETH
 
   # upside down characters
 
-  $$hash{"ud!"} = "\xa1";  #   Å°
-  $$hash{"ud?"} = "\xbf";  #   Åø
+  $$hash{"ud!"} = "\xa1";  #   INVERTED EXCLAMATION MARK
+  $$hash{"ud?"} = "\xbf";  #   INVERTED QUESTION MARK
 
   # overlay characters
 
-  $$hash{"X o"} = "\xa4";  #   Å§
-  $$hash{"Y ="} = "\xa5";  #   Å•
-  $$hash{"S o"} = "\xa7";  #   Åß
-  $$hash{"O c"} = "\xa9";  #   Å©    Copyright
-  $$hash{"O R"} = "\xae";  #   ÅÆ
-  $$hash{"D -"} = "\xd0";  #   Å–
-  $$hash{"O /"} = "\xd8";  #   Åÿ
-  $$hash{"o /"} = "\xf8";  #   Å¯
+  $$hash{"X o"} = "\xa4";  #   CURRENCY SIGN
+  $$hash{"Y ="} = "\xa5";  #   YEN SIGN
+  $$hash{"S o"} = "\xa7";  #   SECTION SIGN
+  $$hash{"O c"} = "\xa9";  #   COPYRIGHT SIGN    Copyright
+  $$hash{"O R"} = "\xae";  #   REGISTERED SIGN
+  $$hash{"D -"} = "\xd0";  #   LATIN CAPITAL LETTER ETH
+  $$hash{"O /"} = "\xd8";  #   LATIN CAPITAL LETTER O WITH STROKE
+  $$hash{"o /"} = "\xf8";  #   LATIN SMALL LETTER O WITH STROKE
 
   # special names
 
-  $$hash{"1/4"} = "\xbc";  #   Åº
-  $$hash{"1/2"} = "\xbd";  #   ÅΩ
-  $$hash{"3/4"} = "\xbe";  #   Åæ
-  $$hash{"<<"}  = "\xab";  #   Å´
-  $$hash{">>"}  = "\xbb";  #   Åª
-  $$hash{"cent"}= "\xa2";  #   Å¢
-  $$hash{"lb"}  = "\xa3";  #   Å£
-  $$hash{"mu"}  = "\xb5";  #   Åµ
-  $$hash{"beta"}= "\xdf";  #   Åﬂ
-  $$hash{"para"}= "\xb6";  #   Å∂
-  $$hash{"-|"}  = "\xac";  #   Å¨
-  $$hash{"AE"}  = "\xc6";  #   Å∆
-  $$hash{"ae"}  = "\xe6";  #   ÅÊ
-  $$hash{"x"}   = "\xd7";  #   Å◊
-  $$hash{"P"}   = "\xde";  #   Åﬁ
-  $$hash{"/"}   = "\xf7";  #   Å˜
-  $$hash{"p"}   = "\xfe";  #   Å~
+  $$hash{"1/4"} = "\xbc";  #   VULGAR FRACTION ONE QUARTER
+  $$hash{"1/2"} = "\xbd";  #   VULGAR FRACTION ONE HALF
+  $$hash{"3/4"} = "\xbe";  #   VULGAR FRACTION THREE QUARTERS
+  $$hash{"<<"}  = "\xab";  #   LEFT POINTING DOUBLE ANGLE QUOTATION MARK
+  $$hash{">>"}  = "\xbb";  #   RIGHT POINTING DOUBLE ANGLE QUOTATION MARK
+  $$hash{"cent"}= "\xa2";  #   CENT SIGN
+  $$hash{"lb"}  = "\xa3";  #   POUND SIGN
+  $$hash{"mu"}  = "\xb5";  #   MICRO SIGN
+  $$hash{"beta"}= "\xdf";  #   LATIN SMALL LETTER SHARP S
+  $$hash{"para"}= "\xb6";  #   PILCROW SIGN
+  $$hash{"-|"}  = "\xac";  #   NOT SIGN
+  $$hash{"AE"}  = "\xc6";  #   LATIN CAPITAL LETTER AE
+  $$hash{"ae"}  = "\xe6";  #   LATIN SMALL LETTER AE
+  $$hash{"x"}   = "\xd7";  #   MULTIPLICATION SIGN
+  $$hash{"P"}   = "\xde";  #   LATIN CAPITAL LETTER THORN
+  $$hash{"/"}   = "\xf7";  #   DIVISION SIGN
+  $$hash{"p"}   = "\xfe";  #   LATIN SMALL LETTER THORN
 }
 
 # $hashref = &Date_Init_LANGUAGE;
@@ -5689,7 +5815,8 @@ sub Date_Init_English {
   $$d{"day_name"}=
     [["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]];
   $$d{"day_abb"}=
-    [["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]];
+    [["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+     ["",   "Tues","",  "Thur","",  "",   ""]];
   $$d{"day_char"}=
     [["M","T","W","Th","F","Sa","S"]];
 
@@ -5745,6 +5872,9 @@ sub Date_Init_English {
 sub Date_Init_Italian {
   print "DEBUG: Date_Init_Italian\n"  if ($Curr{"Debug"} =~ /trace/);
   my($d)=@_;
+  my(%h)=();
+  &Char_8Bit(\%h);
+  my($i)=$h{"i'"};
 
   $$d{"month_name"}=
     [[qw(Gennaio Febbraio Marzo Aprile Maggio Giugno
@@ -5755,7 +5885,7 @@ sub Date_Init_Italian {
 
   $$d{"day_name"}=
     [[qw(Lunedi Martedi Mercoledi Giovedi Venerdi Sabato Domenica)],
-     [qw(LunedÌ MartedÌ MercoledÌ GiovedÌ VenerdÌ)]];
+     [qw(Luned${i} Marted${i} Mercoled${i} Gioved${i} Venerd${i})]];
   $$d{"day_abb"}=
     [[qw(Lun Mar Mer Gio Ven Sab Dom)]];
   $$d{"day_char"}=
@@ -5821,13 +5951,13 @@ sub Date_Init_French {
   $$d{"month_name"}=
     [["janvier","fevrier","mars","avril","mai","juin",
       "juillet","aout","septembre","octobre","novembre","decembre"],
-     ["janvier","f$e"."vrier","mars","avril","mai","juin",
-      "juillet","ao$u"."t","septembre","octobre","novembre","d$e"."cembre"]];
+     ["janvier","f${e}vrier","mars","avril","mai","juin",
+      "juillet","ao${u}t","septembre","octobre","novembre","d${e}cembre"]];
   $$d{"month_abb"}=
     [["jan","fev","mar","avr","mai","juin",
       "juil","aout","sept","oct","nov","dec"],
-     ["jan","f$e"."v","mar","avr","mai","juin",
-      "juil","ao$u"."t","sept","oct","nov","d$e"."c"]];
+     ["jan","f${e}v","mar","avr","mai","juin",
+      "juil","ao${u}t","sept","oct","nov","d${e}c"]];
 
   $$d{"day_name"}=
     [["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"]];
@@ -5853,12 +5983,12 @@ sub Date_Init_French {
   $$d{"last"}    =["dernier"];
   $$d{"each"}    =["chaque","tous les","toutes les"];
   $$d{"of"}      =["en","de"];
-  $$d{"at"}      =["a",$a."0"];
+  $$d{"at"}      =["a","${a}0"];
   $$d{"on"}      =["sur"];
   $$d{"future"}  =["en"];
   $$d{"past"}    =["il y a"];
   $$d{"next"}    =["suivant"];
-  $$d{"prev"}    =["precedent","pr$e"."c$e"."dent"];
+  $$d{"prev"}    =["precedent","pr${e}c${e}dent"];
   $$d{"later"}   =["plus tard"];
 
   $$d{"exact"}   =["exactement"];
@@ -5868,7 +5998,7 @@ sub Date_Init_French {
   $$d{"offset"}  =["hier","-0:0:0:1:0:0:0","demain","+0:0:0:1:0:0:0"];
   $$d{"times"}   =["midi","12:00:00","minuit","00:00:00"];
 
-  $$d{"years"}   =["an","annee","ans","annees","ann$e"."e","ann$e"."es"];
+  $$d{"years"}   =["an","annee","ans","annees","ann${e}e","ann${e}es"];
   $$d{"months"}  =["mois"];
   $$d{"weeks"}   =["sem","semaine"];
   $$d{"days"}    =["j","jour","jours"];
@@ -5888,6 +6018,12 @@ sub Date_Init_French {
 sub Date_Init_Romanian {
   print "DEBUG: Date_Init_Romanian\n"  if ($Curr{"Debug"} =~ /trace/);
   my($d)=@_;
+  my(%h)=();
+  &Char_8Bit(\%h);
+  my($p)=$h{"p"};
+  my($i)=$h{"i^"};
+  my($a)=$h{"a~"};
+  my($o)=$h{"-o"};
 
   $$d{"month_name"}=
     [["ianuarie","februarie","martie","aprilie","mai","iunie",
@@ -5899,11 +6035,11 @@ sub Date_Init_Romanian {
 
   $$d{"day_name"}=
     [["luni","marti","miercuri","joi","vineri","simbata","duminica"],
-     ["luni","mar˛i","miercuri","joi","vineri","sÓmb„t„",
-      "duminic„"]];
+     ["luni","mar${p}i","miercuri","joi","vineri","s${i}mb${a}t${a}",
+      "duminic${a}"]];
   $$d{"day_abb"}=
     [["lun","mar","mie","joi","vin","sim","dum"],
-     ["lun","mar","mie","joi","vin","sÓm","dum"]];
+     ["lun","mar","mie","joi","vin","s${i}m","dum"]];
   $$d{"day_char"}=
     [["L","Ma","Mi","J","V","S","D"]];
 
@@ -5923,16 +6059,16 @@ sub Date_Init_Romanian {
       "a douazecisipatra","a douazecisicincea","a douazecisisasea",
       "a douazecisisaptea","a douazecisiopta","a douazecisinoua","a treizecea",
       "a treizecisiuna"],
-     ["prima","a doua","a treia","a patra","a cincea","a ∫asea",
-      "a ∫aptea","a opta","a noua","a zecea","a unsprezecea",
+     ["prima","a doua","a treia","a patra","a cincea","a ${o}asea",
+      "a ${o}aptea","a opta","a noua","a zecea","a unsprezecea",
       "a doisprezecea","a treisprezecea","a patrusprezecea","a cincisprezecea",
-      "a ∫aiprezecea","a ∫aptesprezecea","a optsprezecea",
-      "a nou„sprezecea","a dou„zecea","a dou„zeci∫iuna",
-      "a dou„zeci∫idoua","a dou„zeci∫itreia",
-      "a dou„zeci∫ipatra","a dou„zeci∫icincea",
-      "a dou„zeci∫i∫asea","a dou„zeci∫i∫aptea",
-      "a dou„zeci∫iopta","a dou„zeci∫inoua","a treizecea",
-      "a treizeci∫iuna"],
+      "a ${o}aiprezecea","a ${o}aptesprezecea","a optsprezecea",
+      "a nou${a}sprezecea","a dou${a}zecea","a dou${a}zeci${o}iuna",
+      "a dou${a}zeci${o}idoua","a dou${a}zeci${o}itreia",
+      "a dou${a}zeci${o}ipatra","a dou${a}zeci${o}icincea",
+      "a dou${a}zeci${o}i${o}asea","a dou${a}zeci${o}i${o}aptea",
+      "a dou${a}zeci${o}iopta","a dou${a}zeci${o}inoua","a treizecea",
+      "a treizeci${o}iuna"],
      ["intii", "doi", "trei", "patru", "cinci", "sase", "sapte",
       "opt","noua","zece","unsprezece","doisprezece",
       "treisprezece","patrusprezece","cincisprezece","saiprezece",
@@ -5940,49 +6076,49 @@ sub Date_Init_Romanian {
       "douazecisiunu","douazecisidoi","douazecisitrei",
       "douazecisipatru","douazecisicinci","douazecisisase","douazecisisapte",
       "douazecisiopt","douazecisinoua","treizeci","treizecisiunu"],
-     ["ÓntÓi", "doi", "trei", "patru", "cinci", "∫ase", "∫apte",
-      "opt","nou„","zece","unsprezece","doisprezece",
-      "treisprezece","patrusprezece","cincisprezece","∫aiprezece",
-      "∫aptesprezece","optsprezece","nou„sprezece","dou„zeci",
-      "dou„zeci∫iunu","dou„zeci∫idoi","dou„zeci∫itrei",
-      "dou„zecisipatru","dou„zeci∫icinci","dou„zeci∫i∫ase",
-      "dou„zeci∫i∫apte","dou„zeci∫iopt",
-      "dou„zeci∫inou„","treizeci","treizeci∫iunu"]];
+     ["${i}nt${i}i", "doi", "trei", "patru", "cinci", "${o}ase", "${o}apte",
+      "opt","nou${a}","zece","unsprezece","doisprezece",
+      "treisprezece","patrusprezece","cincisprezece","${o}aiprezece",
+      "${o}aptesprezece","optsprezece","nou${a}sprezece","dou${a}zeci",
+      "dou${a}zeci${o}iunu","dou${a}zeci${o}idoi","dou${a}zeci${o}itrei",
+      "dou${a}zecisipatru","dou${a}zeci${o}icinci","dou${a}zeci${o}i${o}ase",
+      "dou${a}zeci${o}i${o}apte","dou${a}zeci${o}iopt",
+      "dou${a}zeci${o}inou${a}","treizeci","treizeci${o}iunu"]];
 
-  $$d{"now"}     =["acum","azi","astazi","ast„zi"];
+  $$d{"now"}     =["acum","azi","astazi","ast${a}zi"];
   $$d{"last"}    =["ultima"];
   $$d{"each"}    =["fiecare"];
   $$d{"of"}      =["din","in","n"];
   $$d{"at"}      =["la"];
   $$d{"on"}      =["on"];
-  $$d{"future"}  =["in","Ón"];
-  $$d{"past"}    =["in urma", "Ón urm„"];
-  $$d{"next"}    =["urmatoarea","urm„toarea"];
+  $$d{"future"}  =["in","${i}n"];
+  $$d{"past"}    =["in urma", "${i}n urm${a}"];
+  $$d{"next"}    =["urmatoarea","urm${a}toarea"];
   $$d{"prev"}    =["precedenta","ultima"];
-  $$d{"later"}   =["mai tirziu", "mai tÓrziu"];
+  $$d{"later"}   =["mai tirziu", "mai t${i}rziu"];
 
   $$d{"exact"}   =["exact"];
   $$d{"approx"}  =["aproximativ"];
-  $$d{"business"}=["de lucru","lucratoare","lucr„toare"];
+  $$d{"business"}=["de lucru","lucratoare","lucr${a}toare"];
 
   $$d{"offset"}  =["ieri","-0:0:0:1:0:0:0",
                    "alaltaieri", "-0:0:0:2:0:0:0",
-                   "alalt„ieri","-0:0:0:2:0:0:0",
+                   "alalt${a}ieri","-0:0:0:2:0:0:0",
                    "miine","+0:0:0:1:0:0:0",
-                   "mÓine","+0:0:0:1:0:0:0",
+                   "m${i}ine","+0:0:0:1:0:0:0",
                    "poimiine","+0:0:0:2:0:0:0",
-                   "poimÓine","+0:0:0:2:0:0:0"];
+                   "poim${i}ine","+0:0:0:2:0:0:0"];
   $$d{"times"}   =["amiaza","12:00:00",
-                   "amiaz„","12:00:00",
+                   "amiaz${a}","12:00:00",
                    "miezul noptii","00:00:00",
-                   "miezul nop˛ii","00:00:00"];
+                   "miezul nop${p}ii","00:00:00"];
 
   $$d{"years"}   =["ani","an","a"];
-  $$d{"months"}  =["luni","luna","lun„","l"];
-  $$d{"weeks"}   =["saptamini","s„pt„mÓni","saptamina",
-                   "s„pt„mÓna","sapt","s„pt"];
+  $$d{"months"}  =["luni","luna","lun${a}","l"];
+  $$d{"weeks"}   =["saptamini","s${a}pt${a}m${i}ni","saptamina",
+                   "s${a}pt${a}m${i}na","sapt","s${a}pt"];
   $$d{"days"}    =["zile","zi","z"];
-  $$d{"hours"}   =["ore", "ora", "or„", "h"];
+  $$d{"hours"}   =["ore", "ora", "or${a}", "h"];
   $$d{"minutes"} =["minute","min","m"];
   $$d{"seconds"} =["secunde","sec",];
   $$d{"replace"} =["s","secunde"];
@@ -5998,6 +6134,11 @@ sub Date_Init_Romanian {
 sub Date_Init_Swedish {
   print "DEBUG: Date_Init_Swedish\n"  if ($Curr{"Debug"} =~ /trace/);
   my($d)=@_;
+  my(%h)=();
+  &Char_8Bit(\%h);
+  my($ao)=$h{"ao"};
+  my($o) =$h{"o:"};
+  my($a) =$h{"a:"};
 
   $$d{"month_name"}=
     [["Januari","Februari","Mars","April","Maj","Juni",
@@ -6008,11 +6149,11 @@ sub Date_Init_Swedish {
 
   $$d{"day_name"}=
     [["Mandag","Tisdag","Onsdag","Torsdag","Fredag","Lordag","Sondag"],
-     ["MÂndag","Tisdag","Onsdag","Torsdag","Fredag","Lˆrdag",
-      "Sˆndag"]];
+     ["M${ao}ndag","Tisdag","Onsdag","Torsdag","Fredag","L${o}rdag",
+      "S${o}ndag"]];
   $$d{"day_abb"}=
     [["Man","Tis","Ons","Tor","Fre","Lor","Son"],
-     ["MÂn","Tis","Ons","Tor","Fre","Lˆr","Sˆn"]];
+     ["M${ao}n","Tis","Ons","Tor","Fre","L${o}r","S${o}n"]];
   $$d{"day_char"}=
     [["M","Ti","O","To","F","L","S"]];
 
@@ -6028,36 +6169,36 @@ sub Date_Init_Swedish {
       "tjugoforsta","tjugoandra","tjugotredje","tjugofjarde","tjugofemte",
       "tjugosjatte","tjugosjunde","tjugoattonde","tjugonionde",
       "trettionde","trettioforsta"],
-     ["fˆrsta","andra","tredje","fj‰rde","femte","sj‰tte","sjunde",
-      "Âttonde","nionde","tionde","elfte","tolfte","trettonde","fjortonde",
+     ["f${o}rsta","andra","tredje","fj${a}rde","femte","sj${a}tte","sjunde",
+      "${ao}ttonde","nionde","tionde","elfte","tolfte","trettonde","fjortonde",
       "femtonde","sextonde","sjuttonde","artonde","nittonde","tjugonde",
-      "tjugofˆrsta","tjugoandra","tjugotredje","tjugofj‰rde","tjugofemte",
-      "tjugosj‰tte","tjugosjunde","tjugoÂttonde","tjugonionde",
-      "trettionde","trettiofˆrsta"]];
+      "tjugof${o}rsta","tjugoandra","tjugotredje","tjugofj${a}rde","tjugofemte",
+      "tjugosj${a}tte","tjugosjunde","tjugo${ao}ttonde","tjugonionde",
+      "trettionde","trettiof${o}rsta"]];
 
   $$d{"now"}     =["idag","nu"];
-  $$d{"last"}    =["forra","fˆrra","senaste"];
+  $$d{"last"}    =["forra","f${o}rra","senaste"];
   $$d{"each"}    =["varje"];
   $$d{"of"}      =["om"];
   $$d{"at"}      =["kl","kl.","klockan"];
-  $$d{"on"}      =["pa","pÂ"];
+  $$d{"on"}      =["pa","p${ao}"];
   $$d{"future"}  =["om"];
   $$d{"past"}    =["sedan"];
-  $$d{"next"}    =["nasta","n‰sta"];
-  $$d{"prev"}    =["forra","fˆrra"];
+  $$d{"next"}    =["nasta","n${a}sta"];
+  $$d{"prev"}    =["forra","f${o}rra"];
   $$d{"later"}   =["senare"];
 
   $$d{"exact"}   =["exakt"];
-  $$d{"approx"}  =["ungefar","ungef‰r"];
+  $$d{"approx"}  =["ungefar","ungef${a}r"];
   $$d{"business"}=["arbetsdag","arbetsdagar"];
 
-  $$d{"offset"}  =["igÂr","-0:0:0:1:0:0:0","igar","-0:0:0:1:0:0:0",
+  $$d{"offset"}  =["ig${ao}r","-0:0:0:1:0:0:0","igar","-0:0:0:1:0:0:0",
                    "imorgon","+0:0:0:1:0:0:0"];
-  $$d{"times"}   =["mitt pa dagen","12:00:00","mitt pÂ dagen","12:00:00",
+  $$d{"times"}   =["mitt pa dagen","12:00:00","mitt p${ao} dagen","12:00:00",
                    "midnatt","00:00:00"];
 
-  $$d{"years"}   =["ar","Âr"];
-  $$d{"months"}  =["man","manad","manader","mÂn","mÂnad","mÂnader"];
+  $$d{"years"}   =["ar","${ao}r"];
+  $$d{"months"}  =["man","manad","manader","m${ao}n","m${ao}nad","m${ao}nader"];
   $$d{"weeks"}   =["v","vecka","veckor"];
   $$d{"days"}    =["d","dag","dagar"];
   $$d{"hours"}   =["t","tim","timme","timmar"];
@@ -6086,12 +6227,12 @@ sub Date_Init_German {
   $$d{"month_name"}=
     [["Januar","Februar","Maerz","April","Mai","Juni",
       "Juli","August","September","Oktober","November","Dezember"],
-    ["J$a"."nner","Februar","M$a"."rz","April","Mai","Juni",
+    ["J${a}nner","Februar","M${a}rz","April","Mai","Juni",
       "Juli","August","September","Oktober","November","Dezember"]];
   $$d{"month_abb"}=
     [["Jan","Feb","Mar","Apr","Mai","Jun",
       "Jul","Aug","Sep","Okt","Nov","Dez"],
-     ["J$a"."n","Feb","M$a"."r","Apr","Mai","Jun",
+     ["J${a}n","Feb","M${a}r","Apr","Mai","Jun",
       "Jul","Aug","Sep","Okt","Nov","Dez"]];
 
   $$d{"day_name"}=
@@ -6116,13 +6257,13 @@ sub Date_Init_German {
       "vierundzwanzigste","funfundzwanzigste","sechundzwanzigste",
       "siebundzwanzigste","achtundzwanzigste","neunundzwanzigste",
       "dreibigste","einunddreibigste"],
-     ["erste","zweite","dritte","vierte","f$u"."nfte","sechste","siebente",
-      "achte","neunte","zehnte","elfte","zw$o"."lfte","dreizehnte",
-      "vierzehnte","f$u"."nfzehnte","sechzehnte","siebzehnte","achtzehnte",
+     ["erste","zweite","dritte","vierte","f${u}nfte","sechste","siebente",
+      "achte","neunte","zehnte","elfte","zw${o}lfte","dreizehnte",
+      "vierzehnte","f${u}nfzehnte","sechzehnte","siebzehnte","achtzehnte",
       "neunzehnte","zwanzigste","einundzwanzigste","zweiundzwanzigste",
-      "dreiundzwanzigste","vierundzwanzigste","f$u"."nfundzwanzigste",
+      "dreiundzwanzigste","vierundzwanzigste","f${u}nfundzwanzigste",
       "sechundzwanzigste","siebundzwanzigste","achtundzwanzigste",
-      "neunundzwanzigste","drei$b"."igste","einunddrei$b"."igste"],
+      "neunundzwanzigste","drei${b}igste","einunddrei${b}igste"],
     ["erster"]];
 
   $$d{"now"}     =["heute","jetzt"];
@@ -6133,12 +6274,12 @@ sub Date_Init_German {
   $$d{"on"}      =["am"];
   $$d{"future"}  =["in"];
   $$d{"past"}    =["vor"];
-  $$d{"next"}    =["nachste","n$a"."chste","nachsten","n$a"."chsten"];
+  $$d{"next"}    =["nachste","n${a}chste","nachsten","n${a}chsten"];
   $$d{"prev"}    =["vorherigen","vorherige","letzte","letzten"];
-  $$d{"later"}   =["spater","sp$a"."ter"];
+  $$d{"later"}   =["spater","sp${a}ter"];
 
   $$d{"exact"}   =["genau"];
-  $$d{"approx"}  =["ungefahr","ungef$a"."hr"];
+  $$d{"approx"}  =["ungefahr","ungef${a}hr"];
   $$d{"business"}=["Arbeitstag"];
 
   $$d{"offset"}  =["gestern","-0:0:0:1:0:0:0","morgen","+0:0:0:1:0:0:0"];
@@ -6164,6 +6305,8 @@ sub Date_Init_German {
 sub Date_Init_Dutch {
   print "DEBUG: Date_Init_Dutch\n"  if ($Curr{"Debug"} =~ /trace/);
   my($d)=@_;
+  my(%h)=();
+  &Char_8Bit(\%h);
 
   $$d{"month_name"}=
     [["januari","februari","maart","april","mei","juni","juli","augustus",
@@ -6173,12 +6316,13 @@ sub Date_Init_Dutch {
   $$d{"month_abb"}=
     [["jan","feb","maa","apr","mei","jun","jul",
       "aug","sep","oct","nov","dec"],
-     ["","","","","","","","","","okt"]];
+     ["","","mrt","","","","","","","okt"]];
   $$d{"day_name"}=
     [["maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag",
       "zondag"]];
   $$d{"day_abb"}=
-    [["ma","di","wo","do","vr","zat","zon"]];
+    [["ma","di","wo","do","vr","zat","zon"],
+     ["","","","","","za","zo"]];
   $$d{"day_char"}=
     [["M","D","W","D","V","Za","Zo"]];
 
@@ -6257,24 +6401,24 @@ sub Date_Init_Polish {
     [["stycznia","luty","marca","kwietnia","maja","czerwca",
       "lipca","sierpnia","wrzesnia","pazdziernika","listopada","grudnia"],
      ["stycznia","luty","marca","kwietnia","maja","czerwca","lipca",
-      "sierpnia","wrzeúnia","paüdziernika","listopada","grudnia"]];
+      "sierpnia","wrze\x9cnia","pa\x9fdziernika","listopada","grudnia"]];
   $$d{"month_abb"}=
     [["sty.","lut.","mar.","kwi.","maj","cze.",
       "lip.","sie.","wrz.","paz.","lis.","gru."],
      ["sty.","lut.","mar.","kwi.","maj","cze.",
-      "lip.","sie.","wrz.","paü.","lis.","gru."]];
+      "lip.","sie.","wrz.","pa\x9f.","lis.","gru."]];
 
   $$d{"day_name"}=
     [["poniedzialek","wtorek","sroda","czwartek","piatek","sobota",
       "niedziela"],
-     ["poniedziaÅ≥ek","wtorek","úroda","czwartek","piÅπtek",
+     ["poniedzia\x81\xb3ek","wtorek","\x9croda","czwartek","pi\x81\xb9tek",
       "sobota","niedziela"]];
   $$d{"day_abb"}=
     [["po.","wt.","sr.","cz.","pi.","so.","ni."],
-     ["po.","wt.","úr.","cz.","pi.","so.","ni."]];
+     ["po.","wt.","\x9cr.","cz.","pi.","so.","ni."]];
   $$d{"day_char"}=
     [["p","w","e","c","p","s","n"],
-     ["p","w","ú.","c","p","s","n"]];
+     ["p","w","\x9c.","c","p","s","n"]];
 
   $$d{"num_suff"}=
     [["1.","2.","3.","4.","5.","6.","7.","8.","9.","10.",
@@ -6292,48 +6436,48 @@ sub Date_Init_Polish {
       "dwudziestego piatego","dwudziestego szostego",
       "dwudziestego siodmego","dwudziestego osmego",
       "dwudziestego dziewiatego","trzydziestego","trzydziestego pierwszego"],
-     ["pierwszego","drugiego","trzeczego","czwartego","piÅπtego",
-      "szÅÛstego","siÅÛdmego","ÅÛsmego","dziewiÅπtego",
-      "dziesiÅπtego","jedenastego","dwunastego","trzynastego",
-      "czternastego","piÅÍtnastego","szestnastego","siedemnastego",
+     ["pierwszego","drugiego","trzeczego","czwartego","pi\x81\xb9tego",
+      "sz\x81\xf3stego","si\x81\xf3dmego","\x81\xf3smego","dziewi\x81\xb9tego",
+      "dziesi\x81\xb9tego","jedenastego","dwunastego","trzynastego",
+      "czternastego","pi\x81\xeatnastego","szestnastego","siedemnastego",
       "osiemnastego","dziewietnastego","dwudziestego",
       "dwudziestego pierwszego","dwudziestego drugiego",
       "dwudziestego trzeczego","dwudziestego czwartego",
-      "dwudziestego piÅπtego","dwudziestego szÅÛstego",
-      "dwudziestego siÅÛdmego","dwudziestego ÅÛsmego",
-      "dwudziestego dziewiÅπtego","trzydziestego",
+      "dwudziestego pi\x81\xb9tego","dwudziestego sz\x81\xf3stego",
+      "dwudziestego si\x81\xf3dmego","dwudziestego \x81\xf3smego",
+      "dwudziestego dziewi\x81\xb9tego","trzydziestego",
       "trzydziestego pierwszego"]];
 
   $$d{"now"}     =["dzisaj","teraz"];
   $$d{"last"}    =["ostatni","ostatna"];
-  $$d{"each"}    =["kazdy","kaÅødy", "kazdym","kaÅødym"];
+  $$d{"each"}    =["kazdy","ka\x81\xbfdy", "kazdym","ka\x81\xbfdym"];
   $$d{"of"}      =["w","z"];
   $$d{"at"}      =["o","u"];
   $$d{"on"}      =["na"];
   $$d{"future"}  =["za"];
   $$d{"past"}    =["temu"];
-  $$d{"next"}    =["nastepny","nastÅÍpny","nastepnym","nastÅÍpnym",
-                   "przyszly","przyszÅ≥y","przyszlym",
-                   "przyszÅ≥ym"];
-  $$d{"prev"}    =["zeszly","zeszÅ≥y","zeszlym","zeszÅ≥ym"];
+  $$d{"next"}    =["nastepny","nast\x81\xeapny","nastepnym","nast\x81\xeapnym",
+                   "przyszly","przysz\x81\xb3y","przyszlym",
+                   "przysz\x81\xb3ym"];
+  $$d{"prev"}    =["zeszly","zesz\x81\xb3y","zeszlym","zesz\x81\xb3ym"];
   $$d{"later"}   =["later"];
 
-  $$d{"exact"}   =["doklandnie","dokÅ≥andnie"];
-  $$d{"approx"}  =["w przyblizeniu","w przybliÅøeniu","mniej wiecej",
-                   "mniej wiÅÍcej","okolo","okoÅ≥o"];
-  $$d{"business"}=["sluzbowy","sÅ≥uÅøbowy","sluzbowym",
-                   "sÅ≥uÅøbowym"];
+  $$d{"exact"}   =["doklandnie","dok\x81\xb3andnie"];
+  $$d{"approx"}  =["w przyblizeniu","w przybli\x81\xbfeniu","mniej wiecej",
+                   "mniej wi\x81\xeacej","okolo","oko\x81\xb3o"];
+  $$d{"business"}=["sluzbowy","s\x81\xb3u\x81\xbfbowy","sluzbowym",
+                   "s\x81\xb3u\x81\xbfbowym"];
 
-  $$d{"times"}   =["poÅ≥udnie","12:00:00",
-                   "pÅÛÅ≥noc","00:00:00",
+  $$d{"times"}   =["po\x81\xb3udnie","12:00:00",
+                   "p\x81\xf3\x81\xb3noc","00:00:00",
                    "poludnie","12:00:00","polnoc","00:00:00"];
   $$d{"offset"}  =["wczoraj","-0:0:1:0:0:0","jutro","+0:0:1:0:0:0"];
 
   $$d{"years"}   =["rok","lat","lata","latach"];
-  $$d{"months"}  =["m.","miesiac","miesiÅπc","miesiecy",
-                   "miesiÅÍcy","miesiacu","miesiÅπcu"];
-  $$d{"weeks"}   =["ty.","tydzien","tydzieÅÒ","tygodniu"];
-  $$d{"days"}    =["d.","dzien","dzieÅÒ","dni"];
+  $$d{"months"}  =["m.","miesiac","miesi\x81\xb9c","miesiecy",
+                   "miesi\x81\xeacy","miesiacu","miesi\x81\xb9cu"];
+  $$d{"weeks"}   =["ty.","tydzien","tydzie\x81\xf1","tygodniu"];
+  $$d{"days"}    =["d.","dzien","dzie\x81\xf1","dni"];
   $$d{"hours"}   =["g.","godzina","godziny","godzinie"];
   $$d{"minutes"} =["mn.","min.","minut","minuty"];
   $$d{"seconds"} =["s.","sekund","sekundy"];
@@ -6350,6 +6494,8 @@ sub Date_Init_Polish {
 sub Date_Init_Spanish {
   print "DEBUG: Date_Init_Spanish\n"  if ($Curr{"Debug"} =~ /trace/);
   my($d)=@_;
+  my(%h)=();
+  &Char_8Bit(\%h);
 
   $$d{"month_name"}=
     [["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto",
@@ -6391,9 +6537,6 @@ sub Date_Init_Spanish {
       "Vigesimo Septima","Vigesimo Octava","Vigesimo Novena","Trigesima",
       "Trigesimo Primera"]];
 
-
-
-
   $$d{"now"}     =["Hoy","Ahora"];
   $$d{"last"}    =["ultimo"];
   $$d{"each"}    =["cada"];
@@ -6433,11 +6576,22 @@ sub Date_Init_Spanish {
 sub Date_Init_Portuguese {
   print "DEBUG: Date_Init_Portuguese\n"  if ($Curr{"Debug"} =~ /trace/);
   my($d)=@_;
+  my(%h)=();
+  &Char_8Bit(\%h);
+  my($o) = $h{"-o"};
+  my($c) = $h{",c"};
+  my($a) = $h{"a'"};
+  my($e) = $h{"e'"};
+  my($u) = $h{"u'"};
+  my($o2)= $h{"o'"};
+  my($a2)= $h{"a`"};
+  my($a3)= $h{"a~"};
+  my($e2)= $h{"e^"};
 
   $$d{"month_name"}=
     [["Janeiro","Fevereiro","Marco","Abril","Maio","Junho",
       "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"],
-     ["Janeiro","Fevereiro","MarÁo","Abril","Maio","Junho",
+     ["Janeiro","Fevereiro","Mar${c}o","Abril","Maio","Junho",
       "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]];
 
   $$d{"month_abb"}=
@@ -6446,19 +6600,19 @@ sub Date_Init_Portuguese {
 
   $$d{"day_name"}=
     [["Segunda","Terca","Quarta","Quinta","Sexta","Sabado","Domingo"],
-     ["Segunda","TerÁa","Quarta","Quinta","Sexta","S·bado","Domingo"]];
+     ["Segunda","Ter${c}a","Quarta","Quinta","Sexta","S${a}bado","Domingo"]];
   $$d{"day_abb"}=
     [["Seg","Ter","Qua","Qui","Sex","Sab","Dom"],
-     ["Seg","Ter","Qua","Qui","Sex","S·b","Dom"]];
+     ["Seg","Ter","Qua","Qui","Sex","S${a}b","Dom"]];
   $$d{"day_char"}=
     [["Sg","T","Qa","Qi","Sx","Sb","D"]];
 
   $$d{"num_suff"}=
-    [["1∫","2∫","3∫","4∫","5∫","6∫","7∫","8∫",
-      "9∫","10∫","11∫","12∫","13∫","14∫","15∫",
-      "16∫","17∫","18∫","19∫","20∫","21∫","22∫",
-      "23∫","24∫","25∫","26∫","27∫","28∫","29∫",
-      "30∫","31∫"]];
+    [["1${o}","2${o}","3${o}","4${o}","5${o}","6${o}","7${o}","8${o}",
+      "9${o}","10${o}","11${o}","12${o}","13${o}","14${o}","15${o}",
+      "16${o}","17${o}","18${o}","19${o}","20${o}","21${o}","22${o}",
+      "23${o}","24${o}","25${o}","26${o}","27${o}","28${o}","29${o}",
+      "30${o}","31${o}"]];
   $$d{"num_word"}=
     [["primeiro","segundo","terceiro","quarto","quinto","sexto","setimo",
       "oitavo","nono","decimo","decimo primeiro","decimo segundo",
@@ -6467,26 +6621,26 @@ sub Date_Init_Portuguese {
       "vigesimo primeiro","vigesimo segundo","vigesimo terceiro",
       "vigesimo quarto","vigesimo quinto","vigesimo sexto","vigesimo setimo",
       "vigesimo oitavo","vigesimo nono","trigesimo","trigesimo primeiro"],
-     ["primeiro","segundo","terceiro","quarto","quinto","sexto","sÈtimo",
-      "oitavo","nono","dÈcimo","dÈcimo primeiro","dÈcimo segundo",
-      "dÈcimo terceiro","dÈcimo quarto","dÈcimo quinto",
-      "dÈcimo sexto","dÈcimo sÈtimo","dÈcimo oitavo",
-      "dÈcimo nono","vigÈsimo","vigÈsimo primeiro",
-      "vigÈsimo segundo","vigÈsimo terceiro","vigÈsimo quarto",
-      "vigÈsimo quinto","vigÈsimo sexto","vigÈsimo sÈtimo",
-      "vigÈsimo oitavo","vigÈsimo nono","trigÈsimo",
-      "trigÈsimo primeiro"]];
+     ["primeiro","segundo","terceiro","quarto","quinto","sexto","s${e}timo",
+      "oitavo","nono","d${e}cimo","d${e}cimo primeiro","d${e}cimo segundo",
+      "d${e}cimo terceiro","d${e}cimo quarto","d${e}cimo quinto",
+      "d${e}cimo sexto","d${e}cimo s${e}timo","d${e}cimo oitavo",
+      "d${e}cimo nono","vig${e}simo","vig${e}simo primeiro",
+      "vig${e}simo segundo","vig${e}simo terceiro","vig${e}simo quarto",
+      "vig${e}simo quinto","vig${e}simo sexto","vig${e}simo s${e}timo",
+      "vig${e}simo oitavo","vig${e}simo nono","trig${e}simo",
+      "trig${e}simo primeiro"]];
 
   $$d{"now"}     =["agora","hoje"];
-  $$d{"last"}    =["˙ltimo","ultimo"];
+  $$d{"last"}    =["${u}ltimo","ultimo"];
   $$d{"each"}    =["cada"];
   $$d{"of"}      =["da","do"];
-  $$d{"at"}      =["as","‡s"];
+  $$d{"at"}      =["as","${a2}s"];
   $$d{"on"}      =["na","no"];
   $$d{"future"}  =["em"];
-  $$d{"past"}    =["a","‡"];
-  $$d{"next"}    =["proxima","proximo","prÛxima","prÛximo"];
-  $$d{"prev"}    =["ultima","ultimo","˙ltima","˙ltimo"];
+  $$d{"past"}    =["a","${a2}"];
+  $$d{"next"}    =["proxima","proximo","pr${o2}xima","pr${o2}ximo"];
+  $$d{"prev"}    =["ultima","ultimo","${u}ltima","${u}ltimo"];
   $$d{"later"}   =["passadas","passados"];
 
   $$d{"exact"}   =["exactamente"];
@@ -6494,11 +6648,11 @@ sub Date_Init_Portuguese {
   $$d{"business"}=["util","uteis"];
 
   $$d{"offset"}  =["ontem","-0:0:0:1:0:0:0",
-                   "amanha","+0:0:0:1:0:0:0","amanh„","+0:0:0:1:0:0:0"];
+                   "amanha","+0:0:0:1:0:0:0","amanh${a3}","+0:0:0:1:0:0:0"];
   $$d{"times"}   =["meio-dia","12:00:00","meia-noite","00:00:00"];
 
   $$d{"years"}   =["anos","ano","ans","an","a"];
-  $$d{"months"}  =["meses","mÍs","mes","m"];
+  $$d{"months"}  =["meses","m${e2}s","mes","m"];
   $$d{"weeks"}   =["semanas","semana","sem","sems","s"];
   $$d{"days"}    =["dias","dia","d"];
   $$d{"hours"}   =["horas","hora","hr","hrs"];
@@ -6512,6 +6666,381 @@ sub Date_Init_Portuguese {
 
   $$d{"am"}      = ["AM","A.M."];
   $$d{"pm"}      = ["PM","P.M."];
+}
+
+sub Date_Init_Russian {
+  print "DEBUG: Date_Init_Russian\n"  if ($Curr{"Debug"} =~ /trace/);
+  my($d)=@_;
+  my(%h)=();
+  &Char_8Bit(\%h);
+  my($a) =$h{"a:"};
+
+  $$d{"month_name"}=
+    [
+     ["\xd1\xce\xd7\xc1\xd2\xd1","\xc6\xc5\xd7\xd2\xc1\xcc\xd1",
+      "\xcd\xc1\xd2\xd4\xc1","\xc1\xd0\xd2\xc5\xcc\xd1","\xcd\xc1\xd1",
+      "\xc9\xc0\xce\xd1",
+      "\xc9\xc0\xcc\xd1","\xc1\xd7\xc7\xd5\xd3\xd4\xc1",
+      "\xd3\xc5\xce\xd4\xd1\xc2\xd2\xd1","\xcf\xcb\xd4\xd1\xc2\xd2\xd1",
+      "\xce\xcf\xd1\xc2\xd2\xd1","\xc4\xc5\xcb\xc1\xc2\xd2\xd1"],
+     ["\xd1\xce\xd7\xc1\xd2\xd8","\xc6\xc5\xd7\xd2\xc1\xcc\xd8",
+      "\xcd\xc1\xd2\xd4","\xc1\xd0\xd2\xc5\xcc\xd8","\xcd\xc1\xca",
+      "\xc9\xc0\xce\xd8",
+      "\xc9\xc0\xcc\xd8","\xc1\xd7\xc7\xd5\xd3\xd4",
+      "\xd3\xc5\xce\xd4\xd1\xc2\xd2\xd8","\xcf\xcb\xd4\xd1\xc2\xd2\xd8",
+      "\xce\xcf\xd1\xc2\xd2\xd8","\xc4\xc5\xcb\xc1\xc2\xd2\xd8"]
+    ];
+
+  $$d{"month_abb"}=
+    [["\xd1\xce\xd7","\xc6\xc5\xd7","\xcd\xd2\xd4","\xc1\xd0\xd2",
+      "\xcd\xc1\xca","\xc9\xc0\xce",
+      "\xc9\xc0\xcc","\xc1\xd7\xc7","\xd3\xce\xd4","\xcf\xcb\xd4",
+      "\xce\xcf\xd1\xc2","\xc4\xc5\xcb"],
+     ["","\xc6\xd7\xd2","","","\xcd\xc1\xd1","",
+      "","","\xd3\xc5\xce","\xcf\xcb\xd4","\xce\xcf\xd1",""]];
+
+  $$d{"day_name"}=
+    [["\xd0\xcf\xce\xc5\xc4\xc5\xcc\xd8\xce\xc9\xcb",
+      "\xd7\xd4\xcf\xd2\xce\xc9\xcb","\xd3\xd2\xc5\xc4\xc1",
+      "\xde\xc5\xd4\xd7\xc5\xd2\xc7","\xd0\xd1\xd4\xce\xc9\xc3\xc1",
+      "\xd3\xd5\xc2\xc2\xcf\xd4\xc1",
+      "\xd7\xcf\xd3\xcb\xd2\xc5\xd3\xc5\xce\xd8\xc5"]];
+  $$d{"day_abb"}=
+    [["\xd0\xce\xc4","\xd7\xd4\xd2","\xd3\xd2\xc4","\xde\xd4\xd7",
+      "\xd0\xd4\xce","\xd3\xd5\xc2","\xd7\xd3\xcb"],
+     ["\xd0\xcf\xce","\xd7\xd4\xcf","\xd3\xd2e","\xde\xc5\xd4",
+      "\xd0\xd1\xd4","\xd3\xd5\xc2","\xd7\xcf\xd3\xcb"]];
+  $$d{"day_char"}=
+    [["\xd0\xce","\xd7\xd4","\xd3\xd2","\xde\xd4","\xd0\xd4","\xd3\xc2",
+      "\xd7\xd3"]];
+
+  $$d{"num_suff"}=
+    [["1 ","2 ","3 ","4 ","5 ","6 ","7 ","8 ","9 ","10 ",
+      "11 ","12 ","13 ","14 ","15 ","16 ","17 ","18 ","19 ","20 ",
+      "21 ","22 ","23 ","24 ","25 ","26 ","27 ","28 ","29 ","30 ",
+      "31 "]];
+  $$d{"num_word"}=
+    [["\xd0\xc5\xd2\xd7\xd9\xca","\xd7\xd4\xcf\xd2\xcf\xca",
+      "\xd4\xd2\xc5\xd4\xc9\xca","\xde\xc5\xd4\xd7\xc5\xd2\xd4\xd9\xca",
+      "\xd0\xd1\xd4\xd9\xca","\xdb\xc5\xd3\xd4\xcf\xca",
+      "\xd3\xc5\xc4\xd8\xcd\xcf\xca","\xd7\xcf\xd3\xd8\xcd\xcf\xca",
+      "\xc4\xc5\xd7\xd1\xd4\xd9\xca","\xc4\xc5\xd3\xd1\xd4\xd9\xca",
+      "\xcf\xc4\xc9\xce\xce\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xc4\xd7\xc5\xce\xc1\xc4\xde\xc1\xd4\xd9\xca",
+      "\xd4\xd2\xc5\xce\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xde\xc5\xd4\xd9\xd2\xce\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xd0\xd1\xd4\xce\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xdb\xc5\xd3\xd4\xce\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xd3\xc5\xcd\xd8\xce\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xd7\xcf\xd3\xc5\xcd\xd8\xce\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xc4\xc5\xd7\xd1\xd4\xce\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd0\xc5\xd2\xd7\xd9\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd7\xd4\xcf\xd2\xcf\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd4\xd2\xc5\xd4\xc9\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xde\xc5\xd4\xd7\xc5\xd2\xd4\xd9\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd0\xd1\xd4\xd9\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xdb\xc5\xd3\xd4\xcf\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd3\xc5\xc4\xd8\xcd\xcf\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd7\xcf\xd3\xd8\xcd\xcf\xca",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xc4\xc5\xd7\xd1\xd4\xd9\xca",
+      "\xd4\xd2\xc9\xc4\xc3\xc1\xd4\xd9\xca",
+      "\xd4\xd2\xc9\xc4\xc3\xc1\xd4\xd8 \xd0\xc5\xd2\xd7\xd9\xca"],
+
+     ["\xd0\xc5\xd2\xd7\xcf\xc5","\xd7\xd4\xcf\xd2\xcf\xc5",
+      "\xd4\xd2\xc5\xd4\xd8\xc5","\xde\xc5\xd4\xd7\xc5\xd2\xd4\xcf\xc5",
+      "\xd0\xd1\xd4\xcf\xc5","\xdb\xc5\xd3\xd4\xcf\xc5",
+      "\xd3\xc5\xc4\xd8\xcd\xcf\xc5","\xd7\xcf\xd3\xd8\xcd\xcf\xc5",
+      "\xc4\xc5\xd7\xd1\xd4\xcf\xc5","\xc4\xc5\xd3\xd1\xd4\xcf\xc5",
+      "\xcf\xc4\xc9\xce\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xc4\xd7\xc5\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xd4\xd2\xc5\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xde\xc5\xd4\xd9\xd2\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xd0\xd1\xd4\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xdb\xc5\xd3\xd4\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xd3\xc5\xcd\xd8\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xd7\xcf\xd3\xc5\xcd\xd8\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xc4\xc5\xd7\xd1\xd4\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd0\xc5\xd2\xd7\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd7\xd4\xcf\xd2\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd4\xd2\xc5\xd4\xd8\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xde\xc5\xd4\xd7\xc5\xd2\xd4\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd0\xd1\xd4\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xdb\xc5\xd3\xd4\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd3\xc5\xc4\xd8\xcd\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd7\xcf\xd3\xd8\xcd\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xc4\xc5\xd7\xd1\xd4\xcf\xc5",
+      "\xd4\xd2\xc9\xc4\xc3\xc1\xd4\xcf\xc5",
+      "\xd4\xd2\xc9\xc4\xc3\xc1\xd4\xd8 \xd0\xc5\xd2\xd7\xcf\xc5"],
+
+     ["\xd0\xc5\xd2\xd7\xcf\xc7\xcf","\xd7\xd4\xcf\xd2\xcf\xc7\xcf",
+      "\xd4\xd2\xc5\xd4\xd8\xc5\xc7\xcf",
+      "\xde\xc5\xd4\xd7\xc5\xd2\xd4\xcf\xc7\xcf","\xd0\xd1\xd4\xcf\xc7\xcf",
+      "\xdb\xc5\xd3\xd4\xcf\xc7\xcf","\xd3\xc5\xc4\xd8\xcd\xcf\xc7\xcf",
+      "\xd7\xcf\xd3\xd8\xcd\xcf\xc7\xcf",
+      "\xc4\xc5\xd7\xd1\xd4\xcf\xc7\xcf","\xc4\xc5\xd3\xd1\xd4\xcf\xc7\xcf",
+      "\xcf\xc4\xc9\xce\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xc4\xd7\xc5\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xd4\xd2\xc5\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xde\xc5\xd4\xd9\xd2\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xd0\xd1\xd4\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xdb\xc5\xd3\xd4\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xd3\xc5\xcd\xd8\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xd7\xcf\xd3\xc5\xcd\xd8\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xc4\xc5\xd7\xd1\xd4\xce\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd0\xc5\xd2\xd7\xcf\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd7\xd4\xcf\xd2\xcf\xc5",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd4\xd2\xc5\xd4\xd8\xc5\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xde\xc5\xd4\xd7\xc5\xd2\xd4\xcf\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd0\xd1\xd4\xcf\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xdb\xc5\xd3\xd4\xcf\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd3\xc5\xc4\xd8\xcd\xcf\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xd7\xcf\xd3\xd8\xcd\xcf\xc7\xcf",
+      "\xc4\xd7\xc1\xc4\xc3\xc1\xd4\xd8 \xc4\xc5\xd7\xd1\xd4\xcf\xc7\xcf",
+      "\xd4\xd2\xc9\xc4\xc3\xc1\xd4\xcf\xc7\xcf",
+      "\xd4\xd2\xc9\xc4\xc3\xc1\xd4\xd8 \xd0\xc5\xd2\xd7\xcf\xc7\xcf"]];
+
+  $$d{"now"}     =["\xd3\xc5\xc7\xcf\xc4\xce\xd1","\xd3\xc5\xca\xde\xc1\xd3"];
+  $$d{"last"}    =["\xd0\xcf\xd3\xcc\xc5\xc4\xce\xc9\xca"];
+  $$d{"each"}    =["\xcb\xc1\xd6\xc4\xd9\xca"];
+  $$d{"of"}      =[" "];
+  $$d{"at"}      =["\xd7"];
+  $$d{"on"}      =["\xd7"];
+  $$d{"future"}  =["\xd7\xd0\xc5\xd2\xc5\xc4 \xce\xc1"];
+  $$d{"past"}    =["\xce\xc1\xda\xc1\xc4 \xce\xc1 "];
+  $$d{"next"}    =["\xd3\xcc\xc5\xc4\xd5\xc0\xdd\xc9\xca"];
+  $$d{"prev"}    =["\xd0\xd2\xc5\xc4\xd9\xc4\xd5\xdd\xc9\xca"];
+  $$d{"later"}   =["\xd0\xcf\xda\xd6\xc5"];
+
+  $$d{"exact"}   =["\xd4\xcf\xde\xce\xcf"];
+  $$d{"approx"}  =["\xd0\xd2\xc9\xcd\xc5\xd2\xce\xcf"];
+  $$d{"business"}=["\xd2\xc1\xc2\xcf\xde\xc9\xc8"];
+
+  $$d{"offset"}  =["\xd0\xcf\xda\xc1\xd7\xde\xc5\xd2\xc1","-0:0:0:2:0:0:0",
+                   "\xd7\xde\xc5\xd2\xc1","-0:0:0:1:0:0:0",
+                   "\xda\xc1\xd7\xd4\xd2\xc1","+0:0:0:1:0:0:0",
+                   "\xd0\xcf\xd3\xcc\xc5\xda\xc1\xd7\xd4\xd2\xc1",
+                   "+0:0:0:2:0:0:0"];
+  $$d{"times"}   =["\xd0\xcf\xcc\xc4\xc5\xce\xd8","12:00:00",
+                   "\xd0\xcf\xcc\xce\xcf\xde\xd8","00:00:00"];
+
+  $$d{"years"}   =["\xc7","\xc7\xc4","\xc7\xcf\xc4","\xcc\xc5\xd4",
+                   "\xcc\xc5\xd4","\xc7\xcf\xc4\xc1"];
+  $$d{"months"}  =["\xcd\xc5\xd3","\xcd\xc5\xd3\xd1\xc3",
+                   "\xcd\xc5\xd3\xd1\xc3\xc5\xd7"];
+  $$d{"weeks"}   =["\xce\xc5\xc4\xc5\xcc\xd1","\xce\xc5\xc4\xc5\xcc\xd8",
+                   "\xce\xc5\xc4\xc5\xcc\xc9","\xce\xc5\xc4\xc5\xcc\xc0"];
+  $$d{"days"}    =["\xc4","\xc4\xc5\xce\xd8","\xc4\xce\xc5\xca",
+                   "\xc4\xce\xd1"];
+  $$d{"hours"}   =["\xde","\xde.","\xde\xd3","\xde\xd3\xd7","\xde\xc1\xd3",
+                   "\xde\xc1\xd3\xcf\xd7","\xde\xc1\xd3\xc1"];
+  $$d{"minutes"} =["\xcd\xce","\xcd\xc9\xce","\xcd\xc9\xce\xd5\xd4\xc1",
+                   "\xcd\xc9\xce\xd5\xd4"];
+  $$d{"seconds"} =["\xd3","\xd3\xc5\xcb","\xd3\xc5\xcb\xd5\xce\xc4\xc1",
+                   "\xd3\xc5\xcb\xd5\xce\xc4"];
+  $$d{"replace"} =[];
+
+  $$d{"sephm"}   ="[:\xde]";
+  $$d{"sepms"}   ="[:\xcd]";
+  $$d{"sepss"}   ="[:.\xd3]";
+
+  $$d{"am"}      = ["\xc4\xd0","${a}\xf0","${a}.\xf0.","\xce\xcf\xde\xc9",
+                    "\xd5\xd4\xd2\xc1",
+                    "\xc4\xcf \xd0\xcf\xcc\xd5\xc4\xce\xd1"];
+  $$d{"pm"}      = ["\xd0\xd0","\xf0\xf0","\xf0.\xf0.","\xc4\xce\xd1",
+                    "\xd7\xc5\xde\xc5\xd2\xc1",
+                    "\xd0\xcf\xd3\xcc\xc5 \xd0\xcf\xcc\xd5\xc4\xce\xd1",
+                    "\xd0\xcf \xd0\xcf\xcc\xd5\xc4\xce\xc0"];
+}
+
+sub Date_Init_Turkish {
+  print "DEBUG: Date_Init_Turkish\n"  if ($Curr{"Debug"} =~ /trace/);
+  my($d)=@_;
+
+  $$d{"month_name"}=
+    [
+     ["ocak","subat","mart","nisan","mayis","haziran",
+      "temmuz","agustos","eylul","ekim","kasim","aralik"],
+     ["ocak","\xfeubat","mart","nisan","may\xfds","haziran",
+      "temmuz","a\xf0ustos","eyl\xfcl","ekim","kas\xfdm","aral\xfdk"]
+     ];
+
+  $$d{"month_abb"}=
+    [
+     ["oca","sub","mar","nis","may","haz",
+      "tem","agu","eyl","eki","kas","ara"],
+     ["oca","\xfeub","mar","nis","may","haz",
+      "tem","a\xf0u","eyl","eki","kas","ara"]
+     ];
+
+  $$d{"day_name"}=
+    [
+     ["pazartesi","sali","carsamba","persembe","cuma","cumartesi","pazar"],
+     ["pazartesi","sal\xfd","\xe7ar\xfeamba","per\xfeembe","cuma",
+      "cumartesi","pazar"],
+     ];
+
+  $$d{"day_abb"}=
+    [
+     ["pzt","sal","car","per","cum","cts","paz"],
+     ["pzt","sal","\xe7ar","per","cum","cts","paz"],
+     ];
+
+  $$d{"day_char"}=
+    [["Pt","S","Cr","Pr","C","Ct","P"],
+     ["Pt","S","\xc7","Pr","C","Ct","P"]];
+
+  $$d{"num_suff"}=
+    [[ "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "10.",
+       "11.", "12.", "13.", "14.", "15.", "16.", "17.", "18.", "19.", "20.",
+       "21.", "22.", "23.", "24.", "25.", "26.", "27.", "28.", "29.", "30.",
+       "31."]];
+
+  $$d{"num_word"}=
+    [
+     ["birinci","ikinci","ucuncu","dorduncu",
+      "besinci","altinci","yedinci","sekizinci",
+      "dokuzuncu","onuncu","onbirinci","onikinci",
+      "onucuncu","ondordoncu",
+      "onbesinci","onaltinci","onyedinci","onsekizinci",
+      "ondokuzuncu","yirminci","yirmibirinci","yirmikinci",
+      "yirmiucuncu","yirmidorduncu",
+      "yirmibesinci","yirmialtinci","yirmiyedinci","yirmisekizinci",
+      "yirmidokuzuncu","otuzuncu","otuzbirinci"],
+     ["birinci","ikinci","\xfc\xe7\xfcnc\xfc","d\xf6rd\xfcnc\xfc",
+      "be\xfeinci","alt\xfdnc\xfd","yedinci","sekizinci",
+      "dokuzuncu","onuncu","onbirinci","onikinci",
+      "on\xfc\xe7\xfcnc\xfc","ond\xf6rd\xfcnc\xfc",
+      "onbe\xfeinci","onalt\xfdnc\xfd","onyedinci","onsekizinci",
+      "ondokuzuncu","yirminci","yirmibirinci","yirmikinci",
+      "yirmi\xfc\xe7\xfcnc\xfc","yirmid\xf6rd\xfcnc\xfc",
+      "yirmibe\xfeinci","yirmialt\xfdnc\xfd","yirmiyedinci","yirmisekizinci",
+      "yirmidokuzuncu","otuzuncu","otuzbirinci"]
+     ];
+
+  $$d{"now"}     =["\xfeimdi", "simdi", "bugun","bug\xfcn"];
+  $$d{"last"}    =["son", "sonuncu"];
+  $$d{"each"}    =["her"];
+  $$d{"of"}      =["of"];
+  $$d{"at"}      =["saat"];
+  $$d{"on"}      =["on"];
+  $$d{"future"}  =["gelecek"];
+  $$d{"past"}    =["ge\xe7mi\xfe", "gecmis","gecen", "ge\xe7en"];
+  $$d{"next"}    =["gelecek","sonraki"];
+  $$d{"prev"}    =["onceki","\xf6nceki"];
+  $$d{"later"}   =["sonra"];
+
+  $$d{"exact"}   =["tam"];
+  $$d{"approx"}  =["yakla\xfe\xfdk", "yaklasik"];
+  $$d{"business"}=["i\xfe","\xe7al\xfd\xfema","is", "calisma"];
+
+  $$d{"offset"}  =["d\xfcn","-0:0:0:1:0:0:0",
+                   "dun", "-0:0:0:1:0:0:0",
+                   "yar\xfdn","+0:0:0:1:0:0:0",
+                   "yarin","+0:0:0:1:0:0:0"];
+
+  $$d{"times"}   =["\xf6\xf0len","12:00:00",
+                   "oglen","12:00:00",
+                   "yarim","12:300:00",
+                   "yar\xfdm","12:30:00",
+                   "gece yar\xfds\xfd","00:00:00",
+                   "gece yarisi","00:00:00"];
+
+  $$d{"years"}   =["yil","y"];
+  $$d{"months"}  =["ay","a"];
+  $$d{"weeks"}   =["hafta", "h"];
+  $$d{"days"}    =["gun","g"];
+  $$d{"hours"}   =["saat"];
+  $$d{"minutes"} =["dakika","dak","d"];
+  $$d{"seconds"} =["saniye","sn",];
+  $$d{"replace"} =["s","saat"];
+
+  $$d{"sephm"}   =':';
+  $$d{"sepms"}   =':';
+  $$d{"sepss"}   ='[.:,]';
+
+  $$d{"am"}      = ["\xf6gleden \xf6nce","ogleden once"];
+  $$d{"pm"}      = ["\xf6\xf0leden sonra","ogleden sonra"];
+}
+
+sub Date_Init_Danish {
+  print "DEBUG: Date_Init_Danish\n"  if ($Curr{"Debug"} =~ /trace/);
+  my($d)=@_;
+
+  $$d{"month_name"}=
+    [["Januar","Februar","Marts","April","Maj","Juni",
+      "Juli","August","September","Oktober","November","December"]];
+  $$d{"month_abb"}=
+    [["Jan","Feb","Mar","Apr","Maj","Jun",
+      "Jul","Aug","Sep","Okt","Nov","Dec"]];
+
+  $$d{"day_name"}=
+    [["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lordag","Sondag"],
+     ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","L\xf8rdag","S\xf8ndag"]];
+
+  $$d{"day_abb"}=
+    [["Man","Tis","Ons","Tor","Fre","Lor","Son"],
+     ["Man","Tis","Ons","Tor","Fre","L\xf8r","S\xf8n"]];
+  $$d{"day_char"}=
+    [["M","Ti","O","To","F","L","S"]];
+
+  $$d{"num_suff"}=
+    [["1:e","2:e","3:e","4:e","5:e","6:e","7:e","8:e","9:e","10:e",
+      "11:e","12:e","13:e","14:e","15:e","16:e","17:e","18:e","19:e","20:e",
+      "21:e","22:e","23:e","24:e","25:e","26:e","27:e","28:e","29:e","30:e",
+      "31:e"]];
+  $$d{"num_word"}=
+    [["forste","anden","tredie","fjerde","femte","sjette","syvende",
+      "ottende","niende","tiende","elfte","tolvte","trettende","fjortende",
+      "femtende","sekstende","syttende","attende","nittende","tyvende",
+      "enogtyvende","toogtyvende","treogtyvende","fireogtyvende","femogtyvende",
+      "seksogtyvende","syvogtyvende","otteogtyvende","niogtyvende",
+      "tredivte","enogtredivte"],
+     ["f\xf8rste","anden","tredie","fjerde","femte","sjette","syvende",
+      "ottende","niende","tiende","elfte","tolvte","trettende","fjortende",
+      "femtende","sekstende","syttende","attende","nittende","tyvende",
+      "enogtyvende","toogtyvende","treogtyvende","fireogtyvende","femogtyvende",
+      "seksogtyvende","syvogtyvende","otteogtyvende","niogtyvende",
+      "tredivte","enogtredivte"]];
+
+  $$d{"now"}     =["idag","nu"];
+  $$d{"last"}    =["forrige","sidste","nyeste"];
+  $$d{"each"}    =["hver"];
+  $$d{"of"}      =["om"];
+  $$d{"at"}      =["kl","kl.","klokken"];
+  $$d{"on"}      =["pa","p\xe5"];
+  $$d{"future"}  =["om"];
+  $$d{"past"}    =["siden"];
+  $$d{"next"}    =["nasta","n\xe6ste"];
+  $$d{"prev"}    =["forrige"];
+  $$d{"later"}   =["senere"];
+
+  $$d{"exact"}   =["pracist","pr\xe6cist"];
+  $$d{"approx"}  =["circa"];
+  $$d{"business"}=["arbejdsdag","arbejdsdage"];
+
+  $$d{"offset"}  =["ig\xe5r","-0:0:0:1:0:0:0","igar","-0:0:0:1:0:0:0",
+                   "imorgen","+0:0:0:1:0:0:0"];
+  $$d{"times"}   =["midt pa dagen","12:00:00","midt p\xe5 dagen","12:00:00",
+                   "midnat","00:00:00"];
+
+  $$d{"years"}   =["ar","\xe5r"];
+  $$d{"months"}  =["man","maned","maneder","m\xe5n","m\xe5ned","m\xe5neder"];
+  $$d{"weeks"}   =["u","uge","uger"];
+  $$d{"days"}    =["d","dag","dage"];
+  $$d{"hours"}   =["t","tim","time","timer"];
+  $$d{"minutes"} =["min","minut","minutter"];
+  $$d{"seconds"} =["s","sek","sekund","sekunder"];
+  $$d{"replace"} =["m","minut"];
+
+  $$d{"sephm"}   ='[.:]';
+  $$d{"sepms"}   =':';
+  $$d{"sepss"}   ='[.:]';
+
+  $$d{"am"}      = ["FM"];
+  $$d{"pm"}      = ["EM"];
 }
 
 ########################################################################
@@ -6639,6 +7168,7 @@ sub ExpandTilde {
     # of knowing we are on one of these systems:
     return ""  if ($OS eq "Windows"  or
                    $OS eq "Mac"  or
+                   $OS eq "Netware"  or
                    $OS eq "MPE");
     $user=""  if (! defined $user);
 
@@ -6647,6 +7177,7 @@ sub ExpandTilde {
     } else {
       $home= (getpwuid($<))[7];
     }
+    $home = VMS::Filespec::unixpath($home)  if ($OS eq "VMS");
     return ""  if (! $home);
     $file="$home/$file";
   }

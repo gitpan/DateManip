@@ -2,6 +2,27 @@
 # MISC
 ########################################################################
 
+Specify a holiday of:
+  1*12:0:31:0:0:0*FW1             = New Year's Day
+  fails.  Fix it.  Alan Burlison <Alan.Burlison@sun.com>
+
+Add ParseRecur flag:
+   WDn (n=1-7): Day n of the current week.
+
+Jay Jacobs <jay@lach.net>
+   Recurrences are broken slightly.  The way to calculate the Nth date
+   is currently:
+      D(N) = D(N-1) + O
+   This leads to the following:
+      D(0) = Jan 31
+      O    = 1 month
+      D(1) = Feb 28
+      D(2) = Mar 28
+      D(3) = Apr 28
+   The desired dates would be Jan 31, Feb 28, Mar 31, Apr 30, ...
+   To fix this, change the calculation to be:
+      D(N) = D(0) + N*O
+
 James Elson <James@citria.com>
 Make a &now function which returns the current time (so you don't
 have to use a language-dependent word).
@@ -92,11 +113,6 @@ Use autoloader.  Ted Ashton <ashted@southern.edu>
 
 Switch to Math::BigInt instead of using "no integer".  Vishal Bhatia
    <vishalb@hotmail.com>
-
-Add a path separator config variable so PersonalCnfPath can be separated
-by something other than a colon.
-
-Delete DaysSince999.
 
 Make sure that &DateCalc($date1,"") returns an error.  Jim Anderson
   <jander@ml.com>

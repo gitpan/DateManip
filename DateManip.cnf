@@ -36,7 +36,8 @@
 # The following holiday definitions are taken from pcal's config file.
 # Some are commented out if these tend to be ordinary business days.
 
-1/1				= New Year's Day
+1*1:0:1:0:0:0*NWD             = New Year's Day
+#1/1				= New Year's Day
 third Monday in Feb             = Presidents' Day
 # 2/14                          = Valentine's Day
 # 3/17                          = St. Patrick's Day
@@ -55,7 +56,7 @@ fourth Thu in Nov               = Thanksgiving
 # You can also use recurrences.
 
 1*0:0:0:0:0:0*EASTER		= Easter
-1*11:0:11:0:0:0*CWD             = Veteren's Day (observed)
+1*11:0:11:0:0:0*CWD             = Veteran's Day (observed)
 #1*0:0:0:0:0:0*EASTER,PD5	= Good Friday
 
 

@@ -11,7 +11,7 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
-$ntest=3;
+$ntest=5;
 
 print "1..$ntest\n"  if (! $runtests);
 &Date_Init(@Date::Manip::TestArgs);
@@ -32,6 +32,16 @@ $tests="
 4
 %wt %dt %ht %mt %st
   1.3040_9.1278_219.0681_13144.0833_788645.0000
+
+1:6:1:2:3:4:5
+4
+%yd %Md %wd %dd %hd %md %sd
+  1.5000_6.0000_1.3040_2.1278_3.0681_4.0833_5.0000
+
+1:0:1:2:3:4:5
+4
+%yd %wd %dd %hd %md %sd
+  1.0250_1.3040_2.1278_3.0681_4.0833_5.0000
 
 ";
 

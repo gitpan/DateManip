@@ -11,7 +11,7 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
-$ntest=238;
+$ntest=240;
 
 print "1..$ntest\n"  if (! $runtests);
 &Date_Init(@Date::Manip::TestArgs,"ForceDate=1997-03-08-12:30:00");
@@ -131,6 +131,9 @@ thursday week 0 1999
 
 1st sunday in 1999
     1999010300:00:00
+
+1st saturday in 2005
+    2005010100:00:00
 
 sunday wk 22
     1997060100:00:00
@@ -773,6 +776,9 @@ Dec101965
 
 99-02-16T12:30
     1999021612:30:00
+
+20021216090000 -0500
+    2002121609:00:00
 ";
 
 print "Date...\n";
