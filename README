@@ -2,17 +2,13 @@ Copyright (c) 1995,1996 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
-Notes for version 5.05:
-  Fixes a few bugs from 5.04.
-  Adds support for Time Zones.
-  Now parses dates with commas in them.
-  Now parses ctime() format dates and those conforming to RFC 822.
-  Added support for Swedish dates.
-  More flexibility in defining international dates and times (you
-    can now define what separators to use to separate hours, minutes,
-    seconds in a time, add strings like "noon" which refer to specific
-    strings, etc.).
-  Lots of minor (and not so minor) documentation changes.
+Notes for version 5.06:
+  5.05 was broken on SunOS machines (a call to the unix date machine to
+     get the timezone used the %Z format not available there).  Use this
+     version instead.
+  Fixed a couple other minor bugs.
+  Added "today at 4:00" type formats.
+  Added "%Q" format to UnixDate.
 
   If you would like to stay informed about future versions of DateManip,
   and especially if you are interested in beta testing future versions,

@@ -5,6 +5,30 @@ package Date::Manip;
 # modify it under the same terms as Perl itself.
 
 ###########################################################################
+# IMPORTANT NOTE
+###########################################################################
+
+# The internal format used by Date::Manip to store dates is currently
+#    YYYYMMDDHH:MN:SS
+# I am considering changing that to
+#    YYYYMMDDHHMNSS
+# Removing the special characters will make it easier to store these dates
+# in ":" delimited databases, reduce storage if many dates are stored, and
+# will still allow the dates to be used in the same ways as before.  The
+# disadvantage is that backwards compatibility would be lost IF YOU PARSE
+# THE DATES IN THEIR INTERNAL FORMAT.
+#
+# If you only use the Date::Manip routines to extract information from the
+# date, you will not notice any change when/if this change occurs.  If you
+# have routines to parse the dates in the first format, these routines
+# would no longer work (though changing them should be trivial).
+#
+# It is strongly encouraged that you use UnixDate to extract any
+# information from the dates that you need since this will always work.
+#
+# Please send any comments concerning this to beck@qtp.ufl.edu.
+
+###########################################################################
 # The following variables are used in initializing the date routines.  This
 # allows support for international dates.
 
@@ -31,7 +55,7 @@ $Date::Manip::DateFormat="US";
 # methods will work for you, you should set the following variable to
 # be the current time zone.  This variable will be checked last, so if any
 # of the other methods work, you can leave this set to whatever you want.
-$Date::Manip::TZ="GMT";
+$Date::Manip::TZ="EST";
 
 # Any time a date is parsed using ParseDate, it's time zone will default
 # to the current time zone unless an alternate time zone is explicitely
@@ -215,8 +239,23 @@ use strict;
 #    Added ModuloAddition routine and simplified DateCalc.
 #    Date_TimeZone will now also check `date '+%Z'` suggested by
 #       Aharon Schkolnik <aharon@healdb.matat.health.gov.il>.
+#
+# Version 5.06  10/25/96
+#    Fixed another two places where a variable was declared twice using my
+#       (thanks to Ric Steinberger <ric@isl.sri.com>).
+#    Fixed a bug where fractional seconds weren't parsed correctly.
+#    Fixed a bug where "noon" and other special times were not parsed
+#       in the "which day of month" formats.
+#    Added "today at time" formats.
+#    Fixed a minor bug where a few matches were case sensitive.
+#    ParseDateDelta now normalizes the delta as well as DateCalc.
+#    Added %Q format "YYYYMMDD" to UnixDate.  Requested by Rob Perelman
+#       <robp@electriciti.com>.
+#    The command "date +%Z" doesn't work on SunOS machines (and perhaps
+#        others) so 5.05 is effectively broken.  5.06 released to fix this.
+#        Reported by Rob Perelman <robp@electriciti.com>.
 
-$Date::Manip::Version="5.05";
+$Date::Manip::Version="5.06";
 
 ########################################################################
 # TODO
@@ -235,17 +274,36 @@ $Date::Manip::Version="5.05";
 # Change EXPORT to EXPORT_OK (message 9 by Peter Bray)
 
 # Suggested by: Andreas Johansson <Andreas.XS.Johansson@trab.se>
-# Add week parsing:
-#    sunday week 22 [in 1996]
-#    22nd sunday [in 1996]
-#    sunday 22nd week [in 1996]
+#   ParseDate:
+#     sunday week 22 [in 1996]
+#     22nd sunday [in 1996]
+#     sunday 22nd week [in 1996]
 
-# ParseDate:
-#    add "next/last Friday", "next/last week"
+# Mike Bassman (mess 49)
+#   ParseDateDelta:
+#     add weeks ("-1 week")
+
+# Mike Bassman (mess 49)
+#   ParseDate:
+#     next/last Friday
+#     next/last week
+#     in 2 weeks
+#     2 weeks ago
+#     Friday in 2 weeks
+#     in 2 weeks on friday
+#     Friday 2 weeks ago
+#     2 weeks ago friday
+
+# Mike Bassman (mess 49)
+#   Business dates.  A large undertaking, I know.
+#   (e.g. "today + 5 business days" is standard bond settlement
+#   criteria).  People usually have weekends in code, and a
+#   modifiable holiday file that can be changed without a recompile.
 
 ################ MAYBE (undecided whether it should be added)
 
-# ParseDateDelta: add weeks
+# Mike Bassman (mess 49)
+#    "friday before last"
 
 # $Date problems with RCS (mess 35 by Tim Freeman)
 
@@ -592,6 +650,7 @@ sub ParseDateDelta {
   #         reference to a scalar, or a reference to an array was passed in
   # $args : the scalar or refererence passed in
 
+  &Date_Init();
   my($signexp)='(\+|-)';
   my($numexp)='(\d+)';
   my($exp1)='\s* (?: '.$signexp.'? \s* '.$numexp.'  \s*)?';
@@ -679,6 +738,7 @@ sub ParseDateDelta {
     last PARSE;
   }
 
+  $delta=&NormalizeDelta($delta);
   return $delta;
 }
 
@@ -751,6 +811,7 @@ sub UnixDate {
   $f{"R"}=qq|$f{"H"}:$f{"M"}|;
   $f{"T"}=$f{"X"}=qq|$f{"H"}:$f{"M"}:$f{"S"}|;
   $f{"V"}=qq|$m$d$f{"H"}$f{"M"}$f{"y"}|;
+  $f{"Q"}="$y$m$d";
   $f{"F"}=qq|$f{"A"}, $f{"B"} $f{"e"}, $f{"Y"}|;
   # %l is a special case.  Since it requires the use of the calculator
   # which requires this routine, an infinite recursion results.  To get
@@ -800,7 +861,7 @@ sub UnixDate {
 sub ParseDate {
   my($args,@args,@a,$ref,$date)=();
   @a=@_;
-  my($time,$y,$m,$d,$h,$mn,$s,$i,$which,$dofw,$wk,$tmp,$ampm,$z)=();
+  my($y,$m,$d,$h,$mn,$s,$i,$which,$dofw,$wk,$tmp,$z)=();
 
   # @a : is the list of args to ParseDate.  Currently, only one argument
   #      is allowed and it must be a scalar (or a reference to a scalar)
@@ -851,7 +912,7 @@ sub ParseDate {
   my($YY) ='(\d{2}|\d{4})'; # 2 or 4 digits (year)
   my($DD)='(\d{2})';        # 2 digits      (month/day/hour/minute/second)
   my($D) ='(\d{1,2})';      # 1 or 2 digit  (month/day/hour)
-  my($FD)='(?:$ss\d+)?';   # fractional secs
+  my($FD)="(?:$ss\\d+)?";   # fractional secs
   # There are two forms of the time.  Time/time are used when the time is
   # not the last element of the string.  TimeL/timeL are used when the time
   # is the last element.
@@ -871,6 +932,13 @@ sub ParseDate {
   $date="";
   PARSE: while($#a>=0) {
     $_=join(" ",@a);
+
+    # Substitute all special time expressions.
+    if ($timeexp ne "()"  and  /$timeexp/i) {
+      $time=$1;
+      $time=$Date::Manip::Times{$time};
+      s/$timeexp/ $time /;
+    }
 
     if (/^\s*$whichexp\s*$wkexp$in$mmm\s*$YY?(?:$at$timeL)?\s*$/i) {
       # last friday in October 95
@@ -904,11 +972,6 @@ sub ParseDate {
     if ($wkexp ne "()" and /$wkexp/i) {
       $wk=$1;
       s/$wkexp$com/ /i;
-    }
-    if ($timeexp ne "()"  and  /$timeexp/i) {
-      $time=$1;
-      $time=$Date::Manip::Times{$time};
-      s/$timeexp/ $time /;
     }
     s/\s+/ /g;                  # all whitespace are now a single space
     s/^\s+//;
@@ -974,14 +1037,14 @@ sub ParseDate {
     } elsif (/^$timeL$/) {
       ($h,$mn,$s,$ampm,$z)=($1,$2,$3,$4,$5);
 
-    } elsif (/^$time\s*$D$sep$D(?:\7$YY)?$/) {
+    } elsif (/^$time\s*$D$sep$D(?:\7$YY)?$/i) {
       # TimeDate
       # Time Date
       #   Date=mm%dd, mm%dd%YY
       ($h,$mn,$s,$ampm,$z,$m,$d,$y)=($1,$2,$3,$4,$5,$6,$8,$9);
       ($m,$d)=($d,$m)  if ($type ne "US");
 
-    } elsif (/^$time$sep$D\6$D(?:\6$YY)?$/) {
+    } elsif (/^$time$sep$D\6$D(?:\6$YY)?$/i) {
       # Time%Date
       #   Date=mm%dd mm%dd%YY
       ($h,$mn,$s,$ampm,$z,$m,$d,$y)=($1,$2,$3,$4,$5,$7,$8,$9);
@@ -1027,20 +1090,38 @@ sub ParseDate {
       #   Date=ddmmm, ddmmm YY, ddmmmYY
       ($h,$mn,$s,$ampm,$z,$d,$m,$y)=($1,$2,$3,$4,$5,$6,$7,$8);
 
-    } elsif (/^$now$/i) {
+    } elsif (/^$now$at?$timeL?$/i) {
       # now, today
+      ($h,$mn,$s,$ampm,$z)=($2,$3,$4,$5,$6);
       $date=$Date::Manip::Curr;
-      last PARSE;
+      if (defined $h) {
+        if (&Date_ErrorCheck(\$y,\$m,\$d,\$h,\$mn,\$s,\$ampm,\$wk)) {
+          pop(@a);
+          next PARSE;
+        }
+        $date=&Date_SetTime($date,$h,$mn,$s);
+        $date=&Date_ConvTZ($date,$z);
+      }
+      return $date;
 
     } elsif (/^$mmm\s*$D\s+$time\s*$YY$/i) {
       # mmmdd time YY   (ctime format)
       ($m,$d,$h,$mn,$s,$ampm,$z,$y)=($1,$2,$3,$4,$5,$6,$7,$8);
 
-    } elsif (/^$offset$/i) {
+    } elsif (/^$offset$at?$timeL?$/i) {
       # yesterday, tomorrow
-      $offset=$Date::Manip::Offset{lc($1)};
+      ($offset,$h,$mn,$s,$ampm,$z)=($1,$2,$3,$4,$5,$6);
+      $offset=$Date::Manip::Offset{lc($offset)};
       $date=&DateCalc($Date::Manip::Curr,$offset);
-      last PARSE;
+      if (defined $h) {
+        if (&Date_ErrorCheck(\$y,\$m,\$d,\$h,\$mn,\$s,\$ampm,\$wk)) {
+          pop(@a);
+          next PARSE;
+        }
+        $date=&Date_SetTime($date,$h,$mn,$s);
+        $date=&Date_ConvTZ($date,$z);
+      }
+      return $date;
 
     } else {
       pop(@a);
@@ -1213,8 +1294,9 @@ sub Date_TimeZone {
     $tz=~ s/\s*//;
 
   } else {
-    $tz = `date '+%Z'`;
+    $tz = `date`;
     chop($tz);
+    $tz=(split(/\s+/,$tz))[4];
   }
 
   if (! defined $Date::Manip::Zone{lc($tz)}) {
@@ -2232,6 +2314,7 @@ The format options are:
      %R     %H:%M                    - 17:40
      %T,%X  %H:%M:%S                 - 17:40:58
      %V     %m%d%H%M%y               - 0428174095
+     %Q     %Y%m%d                   - 19961025
      %F     %A, %B %e, %Y            - Sunday, January  1, 1996
  Other formats
      %n     insert a newline character
@@ -2244,7 +2327,7 @@ The format options are:
 Note that the ls format applies to date within the past OR future 6 months!
 
 The following formats are currently unused but may be used in the future:
-  goq GJKLNOPQ 1234567890 !@#$^&*()_|-=\`[];',./~{}:<>?
+  goq GJKLNOP 1234567890 !@#$^&*()_|-=\`[];',./~{}:<>?
 
 This routine is loosely based on date.pl (version 3.2) by Terry McGonigal.
 No code was used, but most of his formats were.
@@ -2303,6 +2386,13 @@ components of the delta.  I.e. "-12 yr 6 mon ago" is identical to "+12yr
 because when no sign is explicitely given, it carries the previously
 entered sign).
 
+One thing is worth noting.  When a delta consists only of day/hour/min/sec,
+it is returned in a "normalized" form.  That is, the signs are adjusted
+so as to be all positive or all negative.  For example, "+ 2 day - 2hour"
+does not return "0:0:2:-2:0:0".  It returns "0:0:1:22:0:0" (1 day 22 hours
+which is equivalent).  I find (and I think most others agree) that this is
+a more useful form.
+
 =item DateCalc
 
  $d=&DateCalc($d1,$d2,\$err [,$del])
@@ -2345,6 +2435,10 @@ $err is set to:
 Nothing is returned if an error occurs.
 
 If $del is non-nil, both $d1 and $d2 must be dates.
+
+When an absolutely correct delta is returned, signs are adjusted so that
+they are all positive or all negative.  See the note above in the
+ParseDateDelta section for more explanation.
 
 =item Date_SetTime
 
@@ -2521,6 +2615,10 @@ problems.  RCS replaces strings of the form "$Date...$" with the current
 date.  This form occurs all over in Date::Manip.  Since very few people
 will ever have a desire to do this, I have not worried about it.  Perhaps
 some time in the future.
+
+One other feature (not a bug :-) is that the "%s" format in UnixDate
+returns the number of seconds since Jan 1, 1970 in the CURRENT time zone,
+not since GMT.
 
 =head1 AUTHOR
 
