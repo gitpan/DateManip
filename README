@@ -30,6 +30,10 @@ Also, the Date_DaysSince999 routine is deprecated (replace by
 Date_DaysSince1BC) and will be removed in one of the next releases.
 
 
+Notes for version 5.36:
+   Primarily a bug fix release.  Nothing major, but I want to get the
+      fixes into circulation.
+
 Notes for version 5.35:
    Bug fixes and documentaion changes.
    Added Romanian, Italian; corrections to Swedish, German translation.
@@ -51,6 +55,7 @@ Notes for version 5.35:
    *** Added the PathSep config variable to improve support for non-Unix paths.
    *** Date_Init can now return a list of config variables if called in
       array context.
+   Added Moscow timezones.  Andrey A. Chernov <ache@nagual.pp.ru>
 
 
 Backwards incompatibilities:
@@ -66,7 +71,7 @@ Backwards incompatibilities:
   If you would like to stay informed about future versions of this module,
   and especially if you are interested in beta testing future versions,
   please let me know by email at:
-    sbeck@cise.ufl.edu
+    sbeck@cpan.org
 
   The newest version (which should be considered a beta version) is available
   through my home page:
@@ -84,5 +89,5 @@ to keep it up-to-date in two places.
 
 AUTHOR
 
-Sullivan Beck (sbeck@cise.ufl.edu)
+Sullivan Beck (sbeck@cpan.org)
 

@@ -197,7 +197,7 @@ use IO::File;
 require VMS::Filespec  if ($OS eq "VMS");
 
 use vars qw($VERSION);
-$VERSION="5.35";
+$VERSION="5.36";
 
 ########################################################################
 ########################################################################
@@ -538,6 +538,7 @@ sub Date_Init {
       "adt    -0300 ".  # Atlantic Daylight
       "ndt    -0230 ".  # Newfoundland Daylight
       "at     -0200 ".  # Azores
+      "sast   -0200 ".  # South African Standard
       "wat    -0100 ".  # West Africa
       "gmt    +0000 ".  # Greenwich Mean
       "ut     +0000 ".  # Universal
@@ -561,8 +562,10 @@ sub Date_Init {
       "eest   +0300 ".  # Eastern Europe Summer
       "eetedt +0300 ".  # Eastern Europe, USSR Zone 1
       "idt    +0300 ".  # Israel Daylight
+      "msk    +0300 ".  # Moscow
       "it     +0330 ".  # Iran
       "zp4    +0400 ".  # USSR Zone 3
+      "msd    +0400 ".  # Moscow Daylight
       "zp5    +0500 ".  # USSR Zone 4
       "ist    +0530 ".  # Indian Standard
       "zp6    +0600 ".  # USSR Zone 5
@@ -720,7 +723,7 @@ sub ParseDateString {
   return ""  if (! $_);
 
   my($y,$m,$d,$h,$mn,$s,$i,$wofm,$dofw,$wk,$tmp,$z,$num,$err,$iso,$ampm)=();
-  my($date,$z2,$delta,$from,$to,$which)=();
+  my($date,$z2,$delta,$from,$to,$which,$midnight)=();
 
   # We only need to reinitialize if we have to determine what NOW is.
   &Date_Init()  if (! $Curr{"InitDone"}  or  $Cnf{"UpdateCurrTZ"});
@@ -848,6 +851,11 @@ sub ParseDateString {
 
     # Remove the time
     $iso=1;
+    $midnight=0;
+    $from="24${hm}00(?:${ms}00)?";
+    $to="00${hm}00${ms}00";
+    $midnight=1  if (s/$from/$to/);
+  
     if (/$D$mnsec/i || /$ampmexp/i) {
       $iso=0;
       $tmp=0;
@@ -912,6 +920,10 @@ sub ParseDateString {
         #    YY MMDDHHMN
         #    YY MMDDHH
         ($y,$m,$d,$h,$mn,$s,$tmp,$z2)=($1,$2,$3,$4,$5,$6,$7,$8);
+        if ($h==24 && $mn==0 && $s==0) {
+          $h=0;
+          $midnight=1;
+        }
         $z=""    if (! $h);
         return ""  if ($tmp  and  $z);
         $z=$tmp    if ($tmp  and  $tmp);
@@ -1287,6 +1299,9 @@ sub ParseDateString {
     $date=&Date_Join($y,$m,$d,$h,$mn,$s);
   }
   $date=&Date_ConvTZ($date,$z);
+  if ($midnight) {
+    $date=&DateCalc_DateDelta($date,"+0:0:0:1:0:0:0");
+  }
   return $date;
 }
 
@@ -1705,8 +1720,8 @@ sub UnixDate {
   # minute, second, timezone
   $f{"o"}=&Date_SecsSince1970($m,$d,$y,$h,$mn,$s);
   $f{"s"}=&Date_SecsSince1970GMT($m,$d,$y,$h,$mn,$s);
-  $f{"Z"}=($Cnf{"ConvTZ"} eq "IGNORE" or $Cnf{"ConvTZ"} eq "" ?
-           $Cnf{"TZ"} : $Cnf{"ConvTZ"});
+  $f{"Z"}=($Cnf{"ConvTZ"} eq "IGNORE" or $Cnf{"ConvTZ"} eq "") ?
+           $Cnf{"TZ"} : $Cnf{"ConvTZ"};
   $f{"z"}=$Zone{"n2o"}{lc $f{"Z"}};
 
   # date, time
@@ -1754,7 +1769,7 @@ sub UnixDate {
           &Date_Init();
           $date1=&DateCalc_DateDelta($Curr{"Now"},"-0:6:0:0:0:0:0");
           $date2=&DateCalc_DateDelta($Curr{"Now"},"+0:6:0:0:0:0:0");
-          if (&Date_Cmp($date,$date1)>1  &&  &Date_Cmp($date,$date2)>1) {
+          if (&Date_Cmp($date,$date1)>=0  &&  &Date_Cmp($date,$date2)<=0) {
             $f{"l"}=qq|$f{"b"} $f{"e"} $h:$mn|;
           } else {
             $f{"l"}=qq|$f{"b"} $f{"e"}  $f{"Y"}|;
@@ -2185,83 +2200,228 @@ sub ParseRecur {
 
   ($y,$m,$w,$d,$h,$mn,$s)=(@recur0,@recur1);
   @y=@m=@w=@d=();
+  my(@time)=($h,$mn,$s);
 
-  if ($#recur0==-1) {
-    # * Y-M-W-D-H-MN-S
-    if ($y eq "0") {
-      push(@recur0,0);
-      shift(@recur1);
+ RECUR: while (1) {
 
-    } else {
-      @y=&ReturnList($y);
-      foreach $y (@y) {
-        $y=&FixYear($y)  if (length($y)==2);
-        return ()  if (length($y)!=4  ||  ! &IsInt($y));
-      }
-      @y=sort { $a<=>$b } @y;
+    if ($#recur0==-1) {
+      # * Y-M-W-D-H-MN-S
+      if ($y eq "0") {
+        push(@recur0,0);
+        shift(@recur1);
 
-      $date0=&ParseDate("0000-01-01")          if (! $date0);
-      $date1=&ParseDate("9999-12-31 23:59:59") if (! $date1);
+      } else {
+        @y=&ReturnList($y);
+        foreach $y (@y) {
+          $y=&FixYear($y)  if (length($y)==2);
+          return ()  if (length($y)!=4  ||  ! &IsInt($y));
+        }
+        @y=sort { $a<=>$b } @y;
 
-      if ($m eq "0"  and  $w eq "0") {
-        # * Y-0-0-0-H-MN-S
-        # * Y-0-0-DOY-H-MN-S
-        if ($d eq "0") {
-          @d=(1);
+        $date0=&ParseDate("0000-01-01")          if (! $date0);
+        $date1=&ParseDate("9999-12-31 23:59:59") if (! $date1);
+
+        if ($m eq "0"  and  $w eq "0") {
+          # * Y-0-0-0-H-MN-S
+          # * Y-0-0-DOY-H-MN-S
+          if ($d eq "0") {
+            @d=(1);
+          } else {
+            @d=&ReturnList($d);
+            return ()  if (! @d);
+            foreach $d (@d) {
+              return ()  if (! &IsInt($d,1,366));
+            }
+            @d=sort { $a<=>$b } (@d);
+          }
+
+          @date=();
+          foreach $yy (@y) {
+            foreach $d (@d) {
+              ($y,$m,$dd)=&Date_NthDayOfYear($yy,$d);
+              push(@date, &Date_Join($y,$m,$dd,0,0,0));
+            }
+          }
+          last RECUR;
+
+        } elsif ($w eq "0") {
+          # * Y-M-0-0-H-MN-S
+          # * Y-M-0-DOM-H-MN-S
+
+          @m=&ReturnList($m);
+          return ()  if (! @m);
+          foreach $m (@m) {
+            return ()  if (! &IsInt($m,1,12));
+          }
+          @m=sort { $a<=>$b } (@m);
+
+          if ($d eq "0") {
+            @d=(1);
+          } else {
+            @d=&ReturnList($d);
+            return ()  if (! @d);
+            foreach $d (@d) {
+              return ()  if (! &IsInt($d,1,31));
+            }
+            @d=sort { $a<=>$b } (@d);
+          }
+
+          @date=();
+          foreach $y (@y) {
+            foreach $m (@m) {
+              foreach $d (@d) {
+                $date=&Date_Join($y,$m,$d,0,0,0);
+                push(@date,$date)  if ($d<29 || &Date_Split($date));
+              }
+            }
+          }
+          last RECUR;
+
+        } elsif ($m eq "0") {
+          # * Y-0-WOY-DOW-H-MN-S
+          # * Y-0-WOY-0-H-MN-S
+          @w=&ReturnList($w);
+          return ()  if (! @w);
+          foreach $w (@w) {
+            return ()  if (! &IsInt($w,1,53));
+          }
+
+          if ($d eq "0") {
+            @d=($Cnf{"FirstDay"});
+          } else {
+            @d=&ReturnList($d);
+            return ()  if (! @d);
+            foreach $d (@d) {
+              return ()  if (! &IsInt($d,1,7));
+            }
+            @d=sort { $a<=>$b } (@d);
+          }
+
+          @date=();
+          foreach $y (@y) {
+            foreach $w (@w) {
+              $w="0$w"  if (length($w)==1);
+              foreach $d (@d) {
+                $date=&ParseDateString("$y-W$w-$d");
+                push(@date,$date);
+              }
+            }
+          }
+          last RECUR;
+
         } else {
-          @d=&ReturnList($d);
-          return ()  if (! @d);
-          foreach $d (@d) {
-            return ()  if (! &IsInt($d,1,366));
-          }
-          @d=sort { $a<=>$b } (@d);
-        }
+          # * Y-M-WOM-DOW-H-MN-S
+          # * Y-M-WOM-0-H-MN-S
 
-        @tmp=();
-        foreach $yy (@y) {
-          foreach $d (@d) {
-            ($y,$m,$dd)=&Date_NthDayOfYear($yy,$d);
-            push(@tmp, &Date_Join($y,$m,$dd,0,0,0));
+          @m=&ReturnList($m);
+          return ()  if (! @m);
+          foreach $m (@m) {
+            return ()  if (! &IsInt($m,1,12));
           }
+          @m=sort { $a<=>$b } (@m);
+
+          @w=&ReturnList($w);
+
+          if ($d eq "0") {
+            @d=();
+          } else {
+            @d=&ReturnList($d);
+          }
+
+          @date=&Date_Recur_WoM(\@y,\@m,\@w,\@d,$MWn,$MDn);
+          last RECUR;
         }
-        @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+      }
+    }
+
+    if ($#recur0==0) {
+      # Y * M-W-D-H-MN-S
+      $n=$y;
+      $n=1  if ($n==0);
+
+      @m=&ReturnList($m);
+      return ()  if (! @m);
+      foreach $m (@m) {
+        return ()  if (! &IsInt($m,1,12));
+      }
+      @m=sort { $a<=>$b } (@m);
+
+      if ($m eq "0") {
+        # Y * 0-W-D-H-MN-S   (equiv to Y-0 * W-D-H-MN-S)
+        push(@recur0,0);
+        shift(@recur1);
 
       } elsif ($w eq "0") {
-        # * Y-M-0-0-H-MN-S
-        # * Y-M-0-DOM-H-MN-S
+        # Y * M-0-DOM-H-MN-S
+        return ()  if (! $dateb);
+        $d=1  if ($d eq "0");
 
-        @m=&ReturnList($m);
-        return ()  if (! @m);
-        foreach $m (@m) {
-          return ()  if (! &IsInt($m,1,12));
+        @d=&ReturnList($d);
+        return ()  if (! @d);
+        foreach $d (@d) {
+          return ()  if (! &IsInt($d,1,31));
         }
-        @m=sort { $a<=>$b } (@m);
+        @d=sort { $a<=>$b } (@d);
 
-        if ($d eq "0") {
-          @d=(1);
-        } else {
-          @d=&ReturnList($d);
-          return ()  if (! @d);
-          foreach $d (@d) {
-            return ()  if (! &IsInt($d,1,31));
-          }
-          @d=sort { $a<=>$b } (@d);
-        }
-
-        @tmp=();
-        foreach $y (@y) {
-          foreach $m (@m) {
-            foreach $d (@d) {
-              $date=&Date_Join($y,$m,$d,0,0,0);
-              push(@tmp,$date)  if ($d<29 || &Date_Split($date));
+        # We need to find years that are a multiple of $n from $y(base)
+        ($y0)=( &Date_Split($date0) )[0];
+        ($y1)=( &Date_Split($date1) )[0];
+        ($yb)=( &Date_Split($dateb) )[0];
+        @date=();
+        for ($yy=$y0; $yy<=$y1; $yy++) {
+          if (($yy-$yb)%$n == 0) {
+            foreach $m (@m) {
+              foreach $d (@d) {
+                $date=&Date_Join($yy,$m,$d,0,0,0);
+                push(@date,$date)  if ($d<29 || &Date_Split($date));
+              }
             }
           }
         }
-        @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+        last RECUR;
 
-      } elsif ($m eq "0") {
-        # * Y-0-WOY-DOW-H-MN-S
-        # * Y-0-WOY-0-H-MN-S
+      } else {
+        # Y * M-WOM-DOW-H-MN-S
+        # Y * M-WOM-0-H-MN-S
+        return ()  if (! $dateb);
+        @m=&ReturnList($m);
+        @w=&ReturnList($w);
+        if ($d eq "0") {
+          @d=();
+        } else {
+          @d=&ReturnList($d);
+        }
+
+        ($y0)=( &Date_Split($date0) )[0];
+        ($y1)=( &Date_Split($date1) )[0];
+        ($yb)=( &Date_Split($dateb) )[0];
+        @y=();
+        for ($yy=$y0; $yy<=$y1; $yy++) {
+          if (($yy-$yb)%$n == 0) {
+            push(@y,$yy);
+          }
+        }
+
+        @date=&Date_Recur_WoM(\@y,\@m,\@w,\@d,$MWn,$MDn);
+        last RECUR;
+      }
+    }
+
+    if ($#recur0==1) {
+      # Y-M * W-D-H-MN-S
+
+      if ($w eq "0") {
+        # Y-M * 0-D-H-MN-S   (equiv to Y-M-0 * D-H-MN-S)
+        push(@recur0,0);
+        shift(@recur1);
+
+      } elsif ($m==0) {
+        # Y-0 * WOY-0-H-MN-S
+        # Y-0 * WOY-DOW-H-MN-S
+        return ()  if (! $dateb);
+        $n=$y;
+        $n=1  if ($n==0);
+
         @w=&ReturnList($w);
         return ()  if (! @w);
         foreach $w (@w) {
@@ -2279,320 +2439,183 @@ sub ParseRecur {
           @d=sort { $a<=>$b } (@d);
         }
 
-        @tmp=();
-        foreach $y (@y) {
-          foreach $w (@w) {
-            $w="0$w"  if (length($w)==1);
-            foreach $d (@d) {
-              $date=&ParseDateString("$y-W$w-$d");
-              push(@tmp,$date);
+        # We need to find years that are a multiple of $n from $y(base)
+        ($y0)=( &Date_Split($date0) )[0];
+        ($y1)=( &Date_Split($date1) )[0];
+        ($yb)=( &Date_Split($dateb) )[0];
+        @date=();
+        for ($yy=$y0; $yy<=$y1; $yy++) {
+          if (($yy-$yb)%$n == 0) {
+            foreach $w (@w) {
+              $w="0$w"  if (length($w)==1);
+              foreach $tmp (@d) {
+                $date=&ParseDateString("$yy-W$w-$tmp");
+                push(@date,$date);
+              }
             }
           }
         }
-        @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+        last RECUR;
 
       } else {
-        # * Y-M-WOM-DOW-H-MN-S
-        # * Y-M-WOM-0-H-MN-S
-
-        @m=&ReturnList($m);
-        return ()  if (! @m);
-        foreach $m (@m) {
-          return ()  if (! &IsInt($m,1,12));
-        }
-        @m=sort { $a<=>$b } (@m);
+        # Y-M * WOM-0-H-MN-S
+        # Y-M * WOM-DOW-H-MN-S
+        return ()  if (! $dateb);
+        @tmp=(@recur0);
+        push(@tmp,0)  while ($#tmp<6);
+        $delta=join(":",@tmp);
+        @tmp=&Date_Recur($date0,$date1,$dateb,$delta);
 
         @w=&ReturnList($w);
-
+        @m=();
         if ($d eq "0") {
           @d=();
         } else {
           @d=&ReturnList($d);
         }
 
-        @date=&Date_Recur_WoM(\@y,\@m,\@w,\@d,$MWn,$MDn);
-        @date=&Date_RecurSetTime($date0,$date1,\@date,$h,$mn,$s);
+        @date=&Date_Recur_WoM(\@tmp,\@m,\@w,\@d,$MWn,$MDn);
+        last RECUR;
       }
     }
-  }
 
-  if ($#recur0==0) {
-    # Y * M-W-D-H-MN-S
-    $n=$y;
-    $n=1  if ($n==0);
+    if ($#recur0==2) {
+      # Y-M-W * D-H-MN-S
 
-    @m=&ReturnList($m);
-    return ()  if (! @m);
-    foreach $m (@m) {
-      return ()  if (! &IsInt($m,1,12));
-    }
-    @m=sort { $a<=>$b } (@m);
+      if ($d eq "0") {
+        # Y-M-W * 0-H-MN-S
+        return ()  if (! $dateb);
+        $y=1  if ($y==0 && $m==0 && $w==0);
+        $delta="$y:$m:$w:0:0:0:0";
+        @date=&Date_Recur($date0,$date1,$dateb,$delta);
+        last RECUR;
 
-    if ($m eq "0") {
-      # Y * 0-W-D-H-MN-S   (equiv to Y-0 * W-D-H-MN-S)
-      push(@recur0,0);
-      shift(@recur1);
+      } elsif ($m==0 && $w==0) {
+        # Y-0-0 * DOY-H-MN-S
+        $y=1  if ($y==0);
+        $n=$y;
+        return ()  if (! $dateb  &&  $y!=1);
 
-    } elsif ($w eq "0") {
-      # Y * M-0-DOM-H-MN-S
-      return ()  if (! $dateb);
-      $d=1  if ($d eq "0");
+        @d=&ReturnList($d);
+        return ()  if (! @d);
+        foreach $d (@d) {
+          return ()  if (! &IsInt($d,1,366));
+        }
+        @d=sort { $a<=>$b } (@d);
 
-      @d=&ReturnList($d);
-      return ()  if (! @d);
-      foreach $d (@d) {
-        return ()  if (! &IsInt($d,1,31));
-      }
-      @d=sort { $a<=>$b } (@d);
-
-      # We need to find years that are a multiple of $n from $y(base)
-      ($y0)=( &Date_Split($date0) )[0];
-      ($y1)=( &Date_Split($date1) )[0];
-      ($yb)=( &Date_Split($dateb) )[0];
-      @tmp=();
-      for ($yy=$y0; $yy<=$y1; $yy++) {
-        if (($yy-$yb)%$n == 0) {
-          foreach $m (@m) {
+        # We need to find years that are a multiple of $n from $y(base)
+        ($y0)=( &Date_Split($date0) )[0];
+        ($y1)=( &Date_Split($date1) )[0];
+        ($yb)=( &Date_Split($dateb) )[0];
+        @date=();
+        for ($yy=$y0; $yy<=$y1; $yy++) {
+          if (($yy-$yb)%$n == 0) {
             foreach $d (@d) {
-              $date=&Date_Join($yy,$m,$d,0,0,0);
-              push(@tmp,$date)  if ($d<29 || &Date_Split($date));
+              ($y,$m,$dd)=&Date_NthDayOfYear($yy,$d);
+              push(@date, &Date_Join($y,$m,$dd,0,0,0));
             }
           }
         }
-      }
-      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+        last RECUR;
 
-    } else {
-      # Y * M-WOM-DOW-H-MN-S
-      # Y * M-WOM-0-H-MN-S
-      return ()  if (! $dateb);
-      @m=&ReturnList($m);
-      @w=&ReturnList($w);
-      if ($d eq "0") {
-        @d=();
-      } else {
-        @d=&ReturnList($d);
-      }
+      } elsif ($w>0) {
+        # Y-M-W * DOW-H-MN-S
+        return ()  if (! $dateb);
+        @tmp=(@recur0);
+        push(@tmp,0)  while ($#tmp<6);
+        $delta=join(":",@tmp);
 
-      ($y0)=( &Date_Split($date0) )[0];
-      ($y1)=( &Date_Split($date1) )[0];
-      ($yb)=( &Date_Split($dateb) )[0];
-      @y=();
-      for ($yy=$y0; $yy<=$y1; $yy++) {
-        if (($yy-$yb)%$n == 0) {
-          push(@y,$yy);
-        }
-      }
-
-      @date=&Date_Recur_WoM(\@y,\@m,\@w,\@d,$MWn,$MDn);
-      @date=&Date_RecurSetTime($date0,$date1,\@date,$h,$mn,$s);
-    }
-  }
-
-  if ($#recur0==1) {
-    # Y-M * W-D-H-MN-S
-
-    if ($w eq "0") {
-      # Y-M * 0-D-H-MN-S   (equiv to Y-M-0 * D-H-MN-S)
-      push(@recur0,0);
-      shift(@recur1);
-
-    } elsif ($m==0) {
-      # Y-0 * WOY-0-H-MN-S
-      # Y-0 * WOY-DOW-H-MN-S
-      return ()  if (! $dateb);
-      $n=$y;
-      $n=1  if ($n==0);
-
-      @w=&ReturnList($w);
-      return ()  if (! @w);
-      foreach $w (@w) {
-        return ()  if (! &IsInt($w,1,53));
-      }
-
-      if ($d eq "0") {
-        @d=($Cnf{"FirstDay"});
-      } else {
         @d=&ReturnList($d);
         return ()  if (! @d);
         foreach $d (@d) {
           return ()  if (! &IsInt($d,1,7));
         }
-        @d=sort { $a<=>$b } (@d);
-      }
 
-      # We need to find years that are a multiple of $n from $y(base)
-      ($y0)=( &Date_Split($date0) )[0];
-      ($y1)=( &Date_Split($date1) )[0];
-      ($yb)=( &Date_Split($dateb) )[0];
-      @tmp=();
-      for ($yy=$y0; $yy<=$y1; $yy++) {
-        if (($yy-$yb)%$n == 0) {
-          foreach $w (@w) {
-            $w="0$w"  if (length($w)==1);
-            foreach $tmp (@d) {
-              $date=&ParseDateString("$yy-W$w-$tmp");
-              push(@tmp,$date);
+        # Find out what DofW the basedate is.
+        @tmp2=&Date_Split($dateb);
+        $tmp=&Date_DayOfWeek($tmp2[1],$tmp2[2],$tmp2[0]);
+
+        @date=();
+        foreach $d (@d) {
+          $date_b=$dateb;
+          # Move basedate to DOW
+          if ($d != $tmp) {
+            if (($tmp>=$Cnf{"FirstDay"} && $d<$Cnf{"FirstDay"}) ||
+                ($tmp>=$Cnf{"FirstDay"} && $d>$tmp) ||
+                ($tmp<$d && $d<$Cnf{"FirstDay"})) {
+              $date_b=&Date_GetNext($date_b,$d);
+            } else {
+              $date_b=&Date_GetPrev($date_b,$d);
             }
           }
+          push(@date,&Date_Recur($date0,$date1,$date_b,$delta));
         }
-      }
-      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
+        @date=sort(@date);
+        last RECUR;
 
-    } else {
-      # Y-M * WOM-0-H-MN-S
-      # Y-M * WOM-DOW-H-MN-S
-      return ()  if (! $dateb);
-      @tmp=(@recur0);
-      push(@tmp,0)  while ($#tmp<6);
-      $delta=join(":",@tmp);
-      @tmp=&Date_Recur($date0,$date1,$dateb,$delta);
+      } elsif ($m>0) {
+        # Y-M-0 * DOM-H-MN-S
+        return ()  if (! $dateb);
+        @tmp=(@recur0);
+        push(@tmp,0)  while ($#tmp<6);
+        $delta=join(":",@tmp);
 
-      @w=&ReturnList($w);
-      @m=();
-      if ($d eq "0") {
-        @d=();
-      } else {
         @d=&ReturnList($d);
-      }
-
-      @date=&Date_Recur_WoM(\@tmp,\@m,\@w,\@d,$MWn,$MDn);
-      @date=&Date_RecurSetTime($date0,$date1,\@date,$h,$mn,$s);
-    }
-  }
-
-  if ($#recur0==2) {
-    # Y-M-W * D-H-MN-S
-
-    if ($d eq "0") {
-      # Y-M-W * 0-H-MN-S
-      return ()  if (! $dateb);
-      $y=1  if ($y==0 && $m==0 && $w==0);
-      $delta="$y:$m:$w:0:0:0:0";
-      @tmp=&Date_Recur($date0,$date1,$dateb,$delta);
-      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
-
-    } elsif ($m==0 && $w==0) {
-      # Y-0-0 * DOY-H-MN-S
-      $y=1  if ($y==0);
-      $n=$y;
-      return ()  if (! $dateb  &&  $y!=1);
-
-      @d=&ReturnList($d);
-      return ()  if (! @d);
-      foreach $d (@d) {
-        return ()  if (! &IsInt($d,1,366));
-      }
-      @d=sort { $a<=>$b } (@d);
-
-      # We need to find years that are a multiple of $n from $y(base)
-      ($y0)=( &Date_Split($date0) )[0];
-      ($y1)=( &Date_Split($date1) )[0];
-      ($yb)=( &Date_Split($dateb) )[0];
-      @tmp=();
-      for ($yy=$y0; $yy<=$y1; $yy++) {
-        if (($yy-$yb)%$n == 0) {
-          foreach $d (@d) {
-            ($y,$m,$dd)=&Date_NthDayOfYear($yy,$d);
-            push(@tmp, &Date_Join($y,$m,$dd,0,0,0));
-          }
-        }
-      }
-      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
-
-    } elsif ($w>0) {
-      # Y-M-W * DOW-H-MN-S
-      return ()  if (! $dateb);
-      @tmp=(@recur0);
-      push(@tmp,0)  while ($#tmp<6);
-      $delta=join(":",@tmp);
-
-      @d=&ReturnList($d);
-      return ()  if (! @d);
-      foreach $d (@d) {
-        return ()  if (! &IsInt($d,1,7));
-      }
-
-      # Find out what DofW the basedate is.
-      @tmp2=&Date_Split($dateb);
-      $tmp=&Date_DayOfWeek($tmp2[1],$tmp2[2],$tmp2[0]);
-
-      @tmp=();
-      foreach $d (@d) {
-        $date_b=$dateb;
-        # Move basedate to DOW
-        if ($d != $tmp) {
-          if (($tmp>=$Cnf{"FirstDay"} && $d<$Cnf{"FirstDay"}) ||
-              ($tmp>=$Cnf{"FirstDay"} && $d>$tmp) ||
-              ($tmp<$d && $d<$Cnf{"FirstDay"})) {
-            $date_b=&Date_GetNext($date_b,$d);
-          } else {
-            $date_b=&Date_GetPrev($date_b,$d);
-          }
-        }
-        push(@tmp,&Date_Recur($date0,$date1,$date_b,$delta));
-      }
-      @tmp=sort(@tmp);
-      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
-
-    } elsif ($m>0) {
-      # Y-M-0 * DOM-H-MN-S
-      return ()  if (! $dateb);
-      @tmp=(@recur0);
-      push(@tmp,0)  while ($#tmp<6);
-      $delta=join(":",@tmp);
-
-      @d=&ReturnList($d);
-      return ()  if (! @d);
-      foreach $d (@d) {
-        return ()  if (! &IsInt($d,-31,31)  ||  $d==0);
-      }
-      @d=sort { $a<=>$b } (@d);
-
-      @tmp2=&Date_Recur($date0,$date1,$dateb,$delta);
-      @tmp=();
-      foreach $date (@tmp2) {
-        ($y,$m)=( &Date_Split($date) )[0..1];
-        $tmp2=&Date_DaysInMonth($m,$y);
+        return ()  if (! @d);
         foreach $d (@d) {
-          $d2=$d;
-          $d2=$tmp2+1+$d  if ($d<0);
-          push(@tmp,&Date_Join($y,$m,$d2,0,0,0))  if ($d2<=$tmp2);
+          return ()  if (! &IsInt($d,-31,31)  ||  $d==0);
         }
+        @d=sort { $a<=>$b } (@d);
+
+        @tmp2=&Date_Recur($date0,$date1,$dateb,$delta);
+        @date=();
+        foreach $date (@tmp2) {
+          ($y,$m)=( &Date_Split($date) )[0..1];
+          $tmp2=&Date_DaysInMonth($m,$y);
+          foreach $d (@d) {
+            $d2=$d;
+            $d2=$tmp2+1+$d  if ($d<0);
+            push(@date,&Date_Join($y,$m,$d2,0,0,0))  if ($d2<=$tmp2);
+          }
+        }
+        @date=sort (@date);
+        last RECUR;
+
+      } else {
+        return ();
       }
-      @tmp=sort (@tmp);
-      @date=&Date_RecurSetTime($date0,$date1,\@tmp,$h,$mn,$s);
-
-    } else {
-      return ();
     }
-  }
 
-  if ($#recur0>2) {
-    # Y-M-W-D * H-MN-S
-    # Y-M-W-D-H * MN-S
-    # Y-M-W-D-H-MN * S
-    # Y-M-W-D-H-S
-    return ()  if (! $dateb);
-    @tmp=(@recur0);
-    push(@tmp,0)  while ($#tmp<6);
-    $delta=join(":",@tmp);
-    return ()  if ($delta !~ /[1-9]/);    # return if "0:0:0:0:0:0:0"
-    @date=&Date_Recur($date0,$date1,$dateb,$delta);
-    if (@recur1) {
-      unshift(@recur1,-1)  while ($#recur1<2);
-      @date=&Date_RecurSetTime($date0,$date1,\@date,@recur1);
-    } else {
-      shift(@date);
-      pop(@date);
+    if ($#recur0>2) {
+      # Y-M-W-D * H-MN-S
+      # Y-M-W-D-H * MN-S
+      # Y-M-W-D-H-MN * S
+      # Y-M-W-D-H-S
+      return ()  if (! $dateb);
+      @tmp=(@recur0);
+      push(@tmp,0)  while ($#tmp<6);
+      $delta=join(":",@tmp);
+      return ()  if ($delta !~ /[1-9]/);    # return if "0:0:0:0:0:0:0"
+      @date=&Date_Recur($date0,$date1,$dateb,$delta);
+      if (@recur1) {
+        unshift(@recur1,-1)  while ($#recur1<2);
+        @time=@recur1;
+      } else {
+        shift(@date);
+        pop(@date);
+        @time=();
+      }
     }
+
+    last RECUR;
   }
+  @date=&Date_RecurSetTime($date0,$date1,\@date,@time)  if (@time);
 
   #
   # We've got a list of dates.  Operate on them with the flags.
   #
 
-  my($sign,$forw,$today,$df,$db,$mode);
+  my($sign,$forw,$today,$df,$db,$work,$i);
   if (@flags) {
   FLAG: foreach $f (@flags) {
       $f = uc($f);
@@ -2614,16 +2637,25 @@ sub ParseRecur {
         next FLAG;
       }
 
+      # We want to go forward exact amounts of time instead of
+      # business mode calculations so that we don't change the time
+      # (which may have been set in the recur).
       if ($f =~ /^(F|B)(D|W)(\d+)$/) {
         @tmp=($1,$2,$3);
         $sign="+";
         $sign="-"  if ($tmp[0] eq "B");
-        $mode=0;
-        $mode=2    if ($tmp[1] eq "W");
-        $tmp=$tmp[2];
+        $work=0;
+        $work=1    if ($tmp[1] eq "W");
+        $n=$tmp[2];
         @tmp=();
         foreach $date (@date) {
-          push(@tmp, &DateCalc($date,"${sign}0:0:0:${tmp}:0:0:0",$mode));
+          for ($i=1; $i<=$n; $i++) {
+            while (1) {
+              $date=&DateCalc($date,"${sign}0:0:0:1:0:0:0");
+              last if (! $work  ||  &Date_IsWorkDay($date,0));
+            }
+          }
+          push(@tmp,$date);
         }
         @date=@tmp;
         next FLAG;
@@ -2685,6 +2717,9 @@ sub Date_GetPrev {
   &Date_Init()  if (! $Curr{"InitDone"});
   my($y,$m,$d,$h,$mn,$s,$err,$curr_dow,%dow,$num,$delta,$th,$tm,$ts,
      $adjust,$curr)=();
+  $hr="00"   if (defined $hr   &&  $hr eq "0");
+  $min="00"  if (defined $min  &&  $min eq "0");
+  $sec="00"  if (defined $sec  &&  $sec eq "0");
 
   if (! &Date_Split($date)) {
     $date=&ParseDateString($date);
@@ -2747,6 +2782,9 @@ sub Date_GetNext {
   &Date_Init()  if (! $Curr{"InitDone"});
   my($y,$m,$d,$h,$mn,$s,$err,$curr_dow,%dow,$num,$delta,$th,$tm,$ts,
      $adjust,$curr)=();
+  $hr="00"   if (defined $hr   &&  $hr eq "0");
+  $min="00"  if (defined $min  &&  $min eq "0");
+  $sec="00"  if (defined $sec  &&  $sec eq "0");
 
   if (! &Date_Split($date)) {
     $date=&ParseDateString($date);
@@ -2812,6 +2850,7 @@ sub Date_IsHoliday {
   return undef  if (! $date);
   $date=&Date_SetTime($date,0,0,0);
   my($y)=(&Date_Split($date))[0];
+  &Date_UpdateHolidays($y)  if (! exists $Holiday{"dates"}{$y});
   return undef  if (! exists $Holiday{"dates"}{$y}{$date});
   my($name)=$Holiday{"dates"}{$y}{$date};
   return ""   if (! $name);
@@ -3240,7 +3279,11 @@ sub Date_IsWorkDay {
                 "$h:$m" lt $Cnf{"WorkDayBeg"} or
                 "$h:$m" gt $Cnf{"WorkDayEnd"});
 
-  &Date_UpdateHolidays($y)  if (! exists $Holiday{"dates"}{$y});
+  if (! exists $Holiday{"dates"}{$y}) {
+    # There will be recursion problems if we ever end up here twice.
+    $Holiday{"dates"}{$y}={};
+    &Date_UpdateHolidays($y)
+  }
   $d=&Date_SetTime($date,"00:00:00");
   return 0  if (exists $Holiday{"dates"}{$y}{$d});
   1;
@@ -4624,7 +4667,7 @@ sub Date_UpdateHolidays {
   foreach $key (keys %{ $Holiday{"desc"} }) {
     @tmp=&Recur_Split($key);
     if (@tmp) {
-      $tmp=&ParseDateString("$year-01-01");
+      $tmp=&ParseDateString("${year}010100:00:00");
       ($date)=&ParseRecur($key,$tmp,$tmp,($year+1)."-01-01");
       next  if (! $date);
 
@@ -6147,22 +6190,35 @@ sub ModuloAddition {
 #
 #    undef (rather than 0) is returned if there is an error in either $low
 #    or $high or if $N is completely missing.
+#sub IsInt {
+#  my($N,$low,$high)=@_;
+#  return undef    if (! defined $N);
+#  return 0        if ($N !~ /^\s*([+-]?)\s*(\d+)\s*$/);
+#  $N="$1$2";
+#  if (defined $low  and  length($low)>0) {
+#    return undef  if (! &IsInt($low));
+#    return 0      if ($N<$low);
+#  }
+#  if (defined $high  and  length($high)>0) {
+#    return undef  if (! &IsInt($high));
+#    return 0  if ($N>$high);
+#  }
+#  return 1;
+#}
 sub IsInt {
   my($N,$low,$high)=@_;
   return undef    if (! defined $N);
-  return 0        if ($N !~ /^\s*([+-]?)\s*(\d+)\s*$/);
-  $N="$1$2";
-  if (defined $low  and  length($low)>0) {
-    return undef  if (! &IsInt($low));
-    return 0      if ($N<$low);
-  }
-  if (defined $high  and  length($high)>0) {
-    return undef  if (! &IsInt($high));
-    return 0  if ($N>$high);
-  }
+  local $^W = 0;
+  $N =~ s/\s//g;
+  my($n)=$N;
+  $n =~ s/[^-+0-9]//g;
+  return 0  if ($n ne $N  ||
+                $N != int($N));
+
+  return 0  if (defined $low   &&  $N<$low);
+  return 0  if (defined $high  &&  $N>$high);
   return 1;
 }
-#&&
 
 # $Pos=&SinLindex(\@List,$Str [,$offset [,$CaseInsensitive]]);
 #    Searches for an exact string in a list.

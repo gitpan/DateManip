@@ -565,8 +565,9 @@ good or bad, I use the following convention in Date::Manip:
   midnight = 12:00am = 00:00:00
   noon     = 12:00pm = 12:00:00
 and the day goes from 00:00:00 to 23:59:59.  In other words, midnight is the
-beginning of a day rather than the end of one.  The time 24:00:00 is NOT
-allowed (even though ISO 8601 allows it).
+beginning of a day rather than the end of one.  The time 24:00:00 is also
+allowed (though it is automatically transformed to 00:00:00 of the following
+day).
 
 The format of the date returned is YYYYMMDDHH:MM:SS.  The advantage of this
 time format is that two times can be compared using simple string comparisons
@@ -970,6 +971,10 @@ All flags are applied AFTER the recurrence dates are calculated, and they
 may move a date outside of the date0 to date1 range.  No check is made for
 this.
 
+The workday flags do not act exactly the same as a business mode calculation.
+For example, a date that is Saturday with a FW1 steps forward to the first
+workday (i.e. Monday).
+
 =item Date_Cmp
 
  $flag=&Date_Cmp($date1,$date2);
@@ -1300,7 +1305,7 @@ See The TIMEZONES section below for more information.
 
  $date=&Date_ConvTZ($date);
  $date=&Date_ConvTZ($date,$from);
- $date=&Date_ConvTZ($date,(),$to);
+ $date=&Date_ConvTZ($date,"",$to);
  $date=&Date_ConvTZ($date,$from,$to);
 
 This converts a date (which MUST be in the format returned by ParseDate)
@@ -1458,6 +1463,7 @@ Sharnoff, and Paul Foley (with several additions by myself).
       ADT     -0300    Atlantic Daylight
       NDT     -0230    Newfoundland Daylight
       AT      -0200    Azores
+      SAST    -0200    South African Standard
       WAT     -0100    West Africa
       GMT     +0000    Greenwich Mean
       UT      +0000    Universal (Coordinated)
@@ -1478,8 +1484,10 @@ Sharnoff, and Paul Foley (with several additions by myself).
       SST     +0200    Swedish Summer              sst=South Sumatra    +0700
       EEST    +0300    Eastern Europe Summer
       BT      +0300    Baghdad, USSR Zone 2
+      MSK     +0300    Moscow
       IT      +0330    Iran
       ZP4     +0400    USSR Zone 3
+      MSD     +0300    Moscow Daylight
       ZP5     +0500    USSR Zone 4
       IST     +0530    Indian Standard
       ZP6     +0600    USSR Zone 5
@@ -1667,6 +1675,66 @@ refer to any year, the date must be written such that by simply appending
 the year (separated by spaces) it can be correctly interpreted.  This
 will work for everything except ISO 8601 dates, so ISO 8601 dates may
 not be used in this case.
+
+In cases where you are interested in business type calculations, you'll
+want to define most holidays using recurrences, since they can define
+when a holiday is celebrated in the financial world.  For example,
+Christmas should be defined as:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+
+if you wanted to define both Christmas and Boxing days (Boxing is the
+day after Christmas, and is celebrated in some parts of the world), you
+could do it in one of the following ways:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+   1*12:0:25:0:0:0*FW1  = Boxing
+
+    1*12:0:24:0:0:0*FW1 = Christmas
+   01*12:0:24:0:0:0*FW1 = Boxing
+
+   1*12:0:24:0:0:0*FW1,a  = Christmas
+   1*12:0:25:0:0:0*FW1,b  = Boxing
+
+The following will NOT work:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+   1*12:0:24:0:0:0*FW2  = Boxing
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+   1*12:0:24:0:0:0*FW1  = Boxing
+
+The reasoning behind all this is as follows:
+
+Holidays go into affect the minute they are parsed.  So, the minute the
+line:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+
+is parse, Christmas is defined.  Then, if you tried to use
+
+   1*12:0:24:0:0:0*FW2  = Boxing
+
+it'll step forward 2 work days (skipping Christmas since that's no longer a
+work day) and define the work day two days after Christmas, NOT the day after
+Christmas.  So, the best way to define Boxing day is using either:
+
+   1*12:0:25:0:0:0*FW1  = Boxing
+   1*12:0:24:0:0:0*FW1  = Boxing
+
+with the first being the preferred method since it avoids confusion.  An
+alternative is to use the same recurrence twice in a row:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+   1*12:0:24:0:0:0*FW1  = Boxing
+
+but since the recurrences are currently stored in a hash, this won't work
+as desired.  To fix this, make them unique with either a fake flag, adding
+an innocuous 0 somewhere, etc., so the following would be valid ways to
+define Boxing day:
+
+   1*12:0:24:0:0:0*FW1,a  = Boxing
+   01*12:0:24:0:0:0*FW1   = Boxing
 
 At times, you may want to switch back and forth between two holiday files.
 This can be done by calling the following:
@@ -2365,7 +2433,7 @@ books I haven't seen.
 
 =head1 AUTHOR
 
-Sullivan Beck (sbeck@cise.ufl.edu)
+Sullivan Beck (sbeck@cpan.org)
 
 You can always get the newest beta version of Date::Manip (which may fix
 problems in the current CPAN version... and may add others) from my home

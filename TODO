@@ -2,6 +2,12 @@
 # MISC
 ########################################################################
 
+Make sure there is a correspondance between:
+  time,localtime,gmtime
+  Date_SecsSince1970,Date_SecsSince1970GMT
+  UnixDate(...,"%s"),UnixDate(...,"%u")
+and document it all.
+
 If TZ=XXX (where XXX is not known), report an error.  Aharon (Al) Schkolnik
    <aharon@deltathree.com>
 
@@ -87,6 +93,14 @@ to parse a very strange date.
 Mark Dedlow <dedlow@voro.lbl.gov>
   nth DAY of month
   nth WEEKDAY of month
+
+Mark D. Anderson <mda@discerning.com>
+  support for quarters (Jan-Mar, Apr-Jun, Jul-Sep, Oct-Dec) as an extra
+  sub-module
+	recur returns first day (or business day) of the quarter
+	42nd day of 3rd quarter
+	what is current quarter
+	how many weeks left in a quarter
 
 ########################################################################
 # TESTS

@@ -4,7 +4,7 @@
 Important changes marked with *** (as of 5.20)
 
 Written by:
-   Sullivan Beck (sbeck@cise.ufl.edu)
+   Sullivan Beck (sbeck@cpan.org)
 Any suggestions, bug reports, or donations :-) should be sent to me.
 
 Version 1.0  1995-01-20
@@ -560,6 +560,21 @@ Version 5.35  1999-07-06
    *** Date_Init can now return a list of config variables if called in
       array context.  Based on a suggestion by Matt Tuttle
       <mtuttle@new-breed.com>
+
+Version 5.36  2000-01-21
+   Fixed a bug in ParseRecur.  <ltsao@continuus.co.uk>
+   Fixed a documentation problem with Date_ConvTZ.  Diab Jerius
+      <dj@head-cfa.harvard.edu>
+   Fixed a bug is UnixDate (%l format).  Jon Hedley <jon@hedley.net>
+   Fixed a bug in Date_GetNext/Prev.  Christoph Haas <haas@netlife.de>
+   Fixed a bug in Date_IsHoliday.  Report and patch by Rolf Beutner
+      <Rolf.Beutner@telekom.de>
+   Fixed a bug in UnixDate.  Patch by Kurtis D. Rader <krader@sequent.com>
+   Added support for 24:00:00 to ParseDate.  William H Asquith
+      <wasquith@usgs.gov>
+   Added SAST timezone.  Paul Arzul <patricka@exinet.co.za>
+   Rewrote IsInt routine based on discussion with Sean Hunter
+      <sean@uncarved.co.uk> (approximately 30% faster on a SPARC).
 
 
 #########################################################################
