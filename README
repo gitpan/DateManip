@@ -1,75 +1,51 @@
-Copyright (c) 1995,1996 Sullivan Beck. All rights reserved.
+Copyright (c) 1995-1997 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
-Notes for version 5.09:
-  Another bug fix.  A stupid mistake in 5.08 broke reading config files (which
-    broke business mode since holidays were defined there).
+For information on installing Date::Manip, see the INSTALL file included in
+the distribution.
 
-Notes for version 5.08:
-  Several bug fixes.
-  Lots of new timezones supported (including US/Eastern and PST8PDT forms).
-  Updated all tests to run in 1997.
-  Enhanced (and documented) Date_ConvTZ.
+Please send questions or bug reports to me rather than posting them to
+a newsgroup since I may miss them there, but read the next paragraph
+before you automatically start firing off email to me!
 
-Notes for version 5.07:
-  DateCalc can now handle three modes: exact, approximate, and business
-    mode.  Business mode allows you to ignore weekends/holidays in
-    calculations.
-  A config file has now been added to configure Date::Manip as well as to
-    define holidays.  Date_Init has been changed to handle a new, flexible
-    way of configuring options.  There are lots of new config variables.
-  Deltas are now almost always all positive or all negative (making them
-    much more natural to work with).
-  Date_GetNext and Date_GetPrev enhanced.
-  Added a much needed test suite.
+If you have questions about Date::Manip, refer to the Date::Manip man page
+included as pod documentation in the Manip.pm file.  Don't know what I'm
+talking about?  Read the perlpod man page.  Alternately, an online version
+of the Date::Manip man page is included in my home page given below.
+PLEASE read the man page thoroughly before posting any questions about
+Date::Manip to a newsgroup or emailing me.  If you've done this, I'll be
+glad to answer any questions not covered in the man page.
 
-  Added new formats to UnixDate: %q, %P, %o, %s (changed), %g
-  Added new formats to ParseDate:
-    sunday week 22 [in 1996] [at 12:00]
-    22nd sunday [in 1996] [at 12:00]
-    sunday 22nd week [in 1996] [at 12:00]
-    next/last friday [at time]
-    next/last week [at time]
-    in 2 weeks [at time]
-    2 weeks ago [at time]
-    Friday in 2 weeks
-    in 2 weeks on friday
-    Friday 2 weeks ago
-    2 weeks ago friday
-  Added weeks to ParseDateDelta.
-  Added routine Date_SecsSince1970GMT
-  Date_SetTime now handles international time formats.
-  Subroutines which require 4 digit years now do error checking.
 
-  Several bug fixes.
+Notes for version 5.20:
+  Added ISO 8601 date formats.
+  Added ParseDateString for speed.
+  Changed week handling to meet ISO 8601 standards.
+  Added %J and %K UnixDate formats.
+  Added some speedups (more to come).
+  Added more Parse formats:
+     last day in mmm in YY             "last day of October"
+     dofw                              "Friday" (Friday of current week)
+     Nth                               "12th", "1st" (day of current month)
 
-  Version 5.07 has a few minor incompatibilities with previous versions:
-    The %s format has changed.  The old %s (secs since 1970) is %o.  %s
-       is now secs since 1970 GMT.
-    By default, deltas are stored with fewer signs.  If you want signs for
-       each delta element, set the config variable DeltaSigns=1.
-    Date_Init arguments changed.  The old method is still supported, but
-       old format calls to Date_Init should be rewritten.
-
-  ***NOTE***  The next version of Date::Manip will feature compatibility
-  with ISO 8601.  The standard date format is YYYY-MM-DD and YY-MM-DD (with
-  a number of variations).  This represents an incompatiblity with older
-  versions of Date::Manip.  Based on common American usage, I have parsed
-  dates in the form MM%DD%YY with any of the character ". / -" as separators.
-  That is, 12-10-1965, 12/10/1965, and 12.10.1965 all worked.  Since "-" is
-  the standard character for ISO 8601 dates, there are a couple of conflicts
-  between ISO 8601 formats and previously allowed format.  In the event of a
-  conflict, the ISO 8601 date will take priority.  Although I will try to
-  minimize the incompatibilities, I would encourage people to NOT use "-" as
-  a separator.  If they are used, change them to "/" before passing the date
-  to Date::Manip.  Comments and questions are welcome.
+  
+  Version 5.20 has some incompatibilities with previous versions:
+    Some old formats were removed since they conflicted with ISO 8601
+       formats.  MM-DD-YY (conflicts with YY-MM-DD), YYMMDD (conflicts
+       with YYYYMM).
+    Weekdays are now numbered 1-7 (mon-sun) instead of 0-6 (sun-sat)
+    By default the week now starts with Monday instead of Sunday to meet
+       ISO 8601.  The FirstDay variable can be set to 7 to set Sunday as
+       the first day.
+    By default, the 1st week of the year contains Jan 4 (ISO 8601).  See
+       the Jan1Week1 variable for overriding this.
 
   ############################################################################
   If you would like to stay informed about future versions of this module,
   and especially if you are interested in beta testing future versions,
   please let me know by email at:
-    beck@qtp.ufl.edu
+    sbeck@cise.ufl.edu
 
   The newest version (which should be considered a beta version) is available
   through my home page:
@@ -120,7 +96,7 @@ Among other things, Date::Manip allow you to:
     date 132 days ago or 2 years and 3 months after Jan 2, 1992)
 
 6.  Work with dates with dates using international formats (foreign month
-    names, 12-10-95 referring to October rather than December, etc.).
+    names, 12/10/95 referring to October rather than December, etc.).
 
 Each of these tasks is trivial (one or two lines at most) with this package.
 
@@ -137,7 +113,7 @@ EXAMPLES:
 
   $date=&ParseDate("today");
   $date=&ParseDate("1st thursday in June 1992");
-  $date=&ParseDate("05-10-93");
+  $date=&ParseDate("05/10/93");
   $date=&ParseDate("12:30 Dec 12th 1880");
   $date=&ParseDate("8:00pm december tenth");
   if (! $date) {
@@ -196,5 +172,5 @@ man page.
 
 AUTHOR
 
-Sullivan Beck (beck@qtp.ufl.edu)
+Sullivan Beck (sbeck@cise.ufl.edu)
 

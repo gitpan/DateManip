@@ -1,12 +1,14 @@
-#!/usr/local/bin/perl
+#!/usr/local/bin/perl -w
 
 require 5.001;
 use Date::Manip;
 $runtests=shift(@ARGV);
-if (defined $runtests) {
+if ( -f "t/test.pl" ) {
+  require "t/test.pl";
+} elsif ( -f "test.pl" ) {
   require "test.pl";
 } else {
-  require "t/test.pl";
+  die "ERROR: cannot find test.pl\n";
 }
 
 print "1..32\n"  if (! $runtests);

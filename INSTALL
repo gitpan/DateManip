@@ -47,10 +47,6 @@ To test it, cd to the "t" directory and run the "runtests" command.
 
 TESTS
 
-At this point, the test suite should run on almost any architecture
-correctly.  A number of problems in the suite have been fixed since
-version 5.07 was released.
-
 A few of the tests may fail.  Some will fail if they are run on a very slow
 computer (it will compare two different times that were supposed to be the
 same but aren't because a measurable amount of time passed between
