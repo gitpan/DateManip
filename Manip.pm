@@ -7,8 +7,7 @@ package Date::Manip;
 ###########################################################################
 ###########################################################################
 
-use vars qw($OS %Lang %Holiday %Curr %Cnf %Zone);
-
+use vars qw($OS %Lang %Holiday %Events %Curr %Cnf %Zone);
 
 # Determine the type of OS...
 $OS="Unix";
@@ -31,6 +30,9 @@ $OS="OS2"      if (defined $^O and
 $OS="VMS"      if (defined $^O and
                    $^O =~ /VMS/i);
 
+# Determine if we're doing taint checking
+$NoTaint = eval { local $^W; unlink "$^X$^T"; 1 };
+
 ###########################################################################
 # CUSTOMIZATION
 ###########################################################################
@@ -48,6 +50,7 @@ $Cnf{"IgnoreGlobalCnf"}="";
 # expansions are allowed.  This should be set in Date_Init arguments or in
 # the global config file.
 
+@DatePath=();
 if ($OS eq "Windows") {
   $Cnf{"PathSep"}         = ";";
   $Cnf{"PersonalCnf"}     = "Manip.cnf";
@@ -79,6 +82,7 @@ if ($OS eq "Windows") {
   $Cnf{"PathSep"}         = ":";
   $Cnf{"PersonalCnf"}     = ".DateManip.cnf";
   $Cnf{"PersonalCnfPath"} = ".:~";
+  @DatePath=qw(/bin /usr/bin /usr/local/bin);
 }
 
 ### Date::Manip variables set in the global or personal config file
@@ -168,6 +172,7 @@ require Exporter;
    Date_SetTime
    Date_SetDateField
    Date_IsHoliday
+   Events_List
 
    Date_DaysInMonth
    Date_DayOfWeek
@@ -186,22 +191,15 @@ require Exporter;
    Date_PrevWorkDay
    Date_NearestWorkDay
    Date_NthDayOfYear
-
-   Date_DaysSince999
 );
 use strict;
 use integer;
 use Carp;
-use Cwd;
-
-# To handle -T taint checking (must be after use Cwd).
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 
 use IO::File;
-require VMS::Filespec  if ($OS eq "VMS");
 
 use vars qw($VERSION);
-$VERSION="5.37";
+$VERSION="5.39";
 
 ########################################################################
 ########################################################################
@@ -213,9 +211,14 @@ $Curr{"ResetWorkDay"}  = 1;
 $Curr{"Debug"}         = "";
 $Curr{"DebugVal"}      = "";
 
-$Holiday{"year"}   = 0;
-$Holiday{"dates"}  = {};
-$Holiday{"desc"}   = {};
+$Holiday{"year"}       = 0;
+$Holiday{"dates"}      = {};
+$Holiday{"desc"}       = {};
+
+$Events{"raw"}         = [];
+$Events{"parsed"}      = 0;
+$Events{"dates"}       = [];
+$Events{"recur"}       = [];
 
 ########################################################################
 ########################################################################
@@ -522,8 +525,10 @@ sub Date_Init {
       "hst    -1000 ".  # Hawaii Standard
       "cat    -1000 ".  # Central Alaska
       "ahst   -1000 ".  # Alaska-Hawaii Standard
+      "akst   -0900 ".  # Alaska Standard
       "yst    -0900 ".  # Yukon Standard
       "hdt    -0900 ".  # Hawaii Daylight
+      "akdt   -0800 ".  # Alaska Daylight
       "ydt    -0800 ".  # Yukon Daylight
       "pst    -0800 ".  # Pacific Standard
       "pdt    -0700 ".  # Pacific Daylight
@@ -548,9 +553,11 @@ sub Date_Init {
       "ut     +0000 ".  # Universal
       "utc    +0000 ".  # Universal (Coordinated)
       "wet    +0000 ".  # Western European
+      "west   +0000 ".  # Alias for Western European
       "cet    +0100 ".  # Central European
       "fwt    +0100 ".  # French Winter
       "met    +0100 ".  # Middle European
+      "mez    +0100 ".  # Middle European
       "mewt   +0100 ".  # Middle European Winter
       "swt    +0100 ".  # Swedish Winter
       "bst    +0100 ".  # British Summer             bst=Brazil standard  -0300
@@ -560,6 +567,7 @@ sub Date_Init {
       "fst    +0200 ".  # French Summer
       "ist    +0200 ".  # Israel standard
       "mest   +0200 ".  # Middle European Summer
+      "mesz   +0200 ".  # Middle European Summer
       "metdst +0200 ".  # An alias for mest used by HP-UX
       "sst    +0200 ".  # Swedish Summer             sst=South Sumatra    +0700
       "bt     +0300 ".  # Baghdad, USSR Zone 2
@@ -580,6 +588,7 @@ sub Date_Init {
       "cct    +0800 ".  # China Coast, USSR Zone 7
       "awst   +0800 ".  # West Australian Standard
       "wst    +0800 ".  # West Australian Standard
+      "pht    +0800 ".  # Asia Manila
       "kst    +0900 ".  # Republic of Korea
       "jst    +0900 ".  # Japan Standard, USSR Zone 8
       "rok    +0900 ".  # Republic of Korea
@@ -607,7 +616,11 @@ sub Date_Init {
       "US/Pacific  PST8PDT ".
       "US/Mountain MST7MDT ".
       "US/Central  CST6CDT ".
-      "US/Eastern  EST5EDT";
+      "US/Eastern  EST5EDT ".
+      "Canada/Pacific  PST8PDT ".
+      "Canada/Mountain MST7MDT ".
+      "Canada/Central  CST6CDT ".
+      "Canada/Eastern  EST5EDT";
 
     $Zone{"tz2z"} = {};
     ($Zone{"tzones"},%{ $Zone{"tz2z"} })=
@@ -860,11 +873,11 @@ sub ParseDateString {
     $falsefrom="${hm}24${ms}00";   # Don't trap XX:24:00
     $to="00${hm}00${ms}00";
     $midnight=1  if (!/$falsefrom/  &&  s/$from/$to/);
-  
+
     if (/$D$mnsec/i || /$ampmexp/i) {
       $iso=0;
       $tmp=0;
-      $tmp=1  if (/$mnsec$zone2?\s*$/i);
+      $tmp=1  if (/$mnsec$zone2?\s*$/i);  # or /$mnsec$zone/ ??
       $tmp=0  if (/$ampmexp/i);
       if (s/$apachetime$zone()/$1 /i  ||
           s/$apachetime$zone2?/$1 /i  ||
@@ -872,6 +885,8 @@ sub ParseDateString {
           s/(^|[^a-z])$at\s*$D$mnsec$zone2?/$1 /i  ||
           s/(^|[^0-9])(\d)$mnsec$zone()/$1 /i ||
           s/(^|[^0-9])(\d)$mnsec$zone2?/$1 /i ||
+          (s/(t)$D$mnsec$zone()/$1 /i and (($iso=-$tmp) || 1))  ||
+          (s/(t)$D$mnsec$zone2?/$1 /i and (($iso=-$tmp) || 1))  ||
           (s/()$DD$mnsec$zone()/ /i and (($iso=$tmp) || 1)) ||
           (s/()$DD$mnsec$zone2?/ /i and (($iso=$tmp) || 1))  ||
           s/(^|$at\s*|\s+)$D()()\s*$ampmexp$zone()/ /i  ||
@@ -900,10 +915,15 @@ sub ParseDateString {
     s/\s+$//;
     s/^\s+//;
 
+    # dateTtime ISO 8601 formats
+    my($orig)=$_;
+    s/t$//i  if ($iso<0);
+        
     # Parse ISO 8601 dates now (which may still have a zone stuck to it).
     if ( ($iso && /^[0-9-]+(W[0-9-]+)?$zone?$/i)  ||
          ($iso && /^[0-9-]+(W[0-9-]+)?$zone2?$/i)  ||
          0) {
+
       # ISO 8601 dates
       s,-, ,g;            # Change all ISO8601 seps to spaces
       s/^\s+//;
@@ -965,6 +985,11 @@ sub ParseDateString {
         ($y,$m,$d)=&Date_NthDayOfYear($y,$which);
         last PARSE;
 
+      } elsif ($iso<0) {
+        # We confused something like 1999/August12:00:00
+        # with a dateTtime format
+        $_=$orig;
+
       } else {
         return "";
       }
@@ -972,7 +997,10 @@ sub ParseDateString {
 
     # All deltas that are not ISO-8601 dates are NOT dates.
     return ""  if ($Curr{"InCalc"}  &&  $delta);
-    return &DateCalc_DateDelta($Curr{"Now"},$delta)  if ($delta);
+    if ($delta) {
+      &Date_Init()  if (! $Cnf{"UpdateCurrTZ"});
+      return &DateCalc_DateDelta($Curr{"Now"},$delta);
+    }
 
     # Check for some special types of dates (next, prev)
     foreach $from (keys %{ $Lang{$L}{"Repl"} }) {
@@ -1015,9 +1043,16 @@ sub ParseDateString {
         $d=&Date_DaysInMonth($m,$y);
         last PARSE;
 
-      } elsif (/^$next?\s*$week$/i) {
-        # next friday
+      } elsif (/^$week$/i) {
         # friday
+        ($dofw)=($1);
+        &Date_Init()  if (! $Cnf{"UpdateCurrTZ"});
+        $date=&Date_GetPrev($Curr{"Now"},$Cnf{"FirstDay"},1);
+        $date=&Date_GetNext($date,$dofw,1,$h,$mn,$s);
+        last PARSE;
+
+      } elsif (/^$next\s*$week$/i) {
+        # next friday
         ($dofw)=($1);
         &Date_Init()  if (! $Cnf{"UpdateCurrTZ"});
         $date=&Date_GetNext($Curr{"Now"},$dofw,0,$h,$mn,$s);
@@ -2218,7 +2253,7 @@ sub ParseRecur {
       } else {
         @y=&ReturnList($y);
         foreach $y (@y) {
-          $y=&FixYear($y)  if (length($y)==2);
+          $y=&Date_FixYear($y)  if (length($y)==2);
           return ()  if (length($y)!=4  ||  ! &IsInt($y));
         }
         @y=sort { $a<=>$b } @y;
@@ -2862,6 +2897,77 @@ sub Date_IsHoliday {
   $name;
 }
 
+sub Events_List {
+  print "DEBUG: Events_List\n"  if ($Curr{"Debug"} =~ /trace/);
+  my(@args)=@_;
+  &Date_Init()  if (! $Curr{"InitDone"});
+  &Events_ParseRaw();
+
+  my($tmp,$date0,$date1,$flag);
+  $date0=&ParseDateString($args[0]);
+  warn "Invalid date $args[0]", return undef  if (! $date0);
+
+  if ($#args == 0) {
+    return &Events_Calc($date0);
+  }
+
+  if ($args[1]) {
+    $date1=&ParseDateString($args[1]);
+    warn "Invalid date $args[1]\n", return undef  if (! $date1);
+    if (&Date_Cmp($date0,$date1)>0) {
+      $tmp=$date1;
+      $date1=$date0;
+      $date0=$tmp;
+    }
+  } else {
+    $date0=&Date_SetTime($date0,"00:00:00");
+    $date1=&DateCalc_DateDelta($date0,"+0:0:0:1:0:0:0");
+  }
+    
+  $tmp=&Events_Calc($date0,$date1);
+
+  $flag=$args[2];
+  return $tmp  if (! $flag);
+
+  my(@tmp,%ret,$delta)=();
+  @tmp=@$tmp;
+  push(@tmp,$date1);
+
+  if ($flag==1) {
+    while ($#tmp>0) {
+      ($date0,$tmp)=splice(@tmp,0,2);
+      $date1=$tmp[0];
+      $delta=&DateCalc_DateDate($date0,$date1);
+      foreach $flag (@$tmp) {
+        if (exists $ret{$flag}) {
+          $ret{$flag}=&DateCalc_DeltaDelta($ret{$flag},$delta);
+        } else {
+          $ret{$flag}=$delta;
+        }
+      }
+    }
+    return \%ret;
+    
+  } elsif ($flag==2) {
+    while ($#tmp>0) {
+      ($date0,$tmp)=splice(@tmp,0,2);
+      $date1=$tmp[0];
+      $delta=&DateCalc_DateDate($date0,$date1);
+      $flag=join("+",sort @$tmp);
+      next  if (! $flag);
+      if (exists $ret{$flag}) {
+        $ret{$flag}=&DateCalc_DeltaDelta($ret{$flag},$delta);
+      } else {
+        $ret{$flag}=$delta;
+      }
+    }
+    return \%ret;
+  }
+
+  warn "Invalid flag $flag\n";
+  return undef;
+}
+
 ###
 # NOTE: The following routines may be called in the routines below with very
 #       little time penalty.
@@ -2987,39 +3093,6 @@ sub Date_SecsSince1970GMT {
 }
 use integer;
 
-#####
-# This is deprecated and will be removed.
-#####
-sub Date_DaysSince999 {
-  print "DEBUG: Date_DaysSince999\n"  if ($Curr{"Debug"} =~ /trace/);
-  my($m,$d,$y)=@_;
-  $y=&Date_FixYear($y)  if (length($y)!=4);
-  my($Ny,$N4,$N100,$N400,$dayofyear,$days)=();
-  my($cc,$yy)=();
-
-  $y=~ /(\d{2})(\d{2})/;
-  ($cc,$yy)=($1,$2);
-
-  # Number of full years since Dec 31, 0999
-  $Ny=$y-1000;
-
-  # Number of full 4th years (incl. 1000) since Dec 31, 0999
-  $N4=($Ny-1)/4 + 1;
-  $N4=0         if ($y==1000);
-
-  # Number of full 100th years (incl. 1000)
-  $N100=$cc-9;
-  $N100--       if ($yy==0);
-
-  # Number of full 400th years
-  $N400=($N100+1)/4;  # BUG!!!
-
-  $dayofyear=&Date_DayOfYear($m,$d,$y);
-  $days= $Ny*365 + $N4 - $N100 + $N400 + $dayofyear;
-
-  return $days;
-}
-
 sub Date_DaysSince1BC {
   print "DEBUG: Date_DaysSince1BC\n"  if ($Curr{"Debug"} =~ /trace/);
   my($m,$d,$y)=@_;
@@ -3039,6 +3112,7 @@ sub Date_DaysSince1BC {
 
   # Number of full 100th years (incl. 0000)
   $N100=$cc + 1;
+  $N100--       if ($yy==0);
   $N100=0       if ($y==0);
 
   # Number of full 400th years (incl. 0000)
@@ -3215,22 +3289,53 @@ sub Date_TimeZone {
 
   push(@tz,$Cnf{"TZ"})  if (defined $Cnf{"TZ"});  # TZ config var
   push(@tz,$ENV{"TZ"})  if (exists $ENV{"TZ"});   # TZ environ var
+
+  # The `date` command... if we're doing taint checking, we need to
+  # always call it with a full path... otherwise, use the user's path.
+  #
   # Microsoft operating systems don't have a date command built in.  Try
   # to trap all the various ways of knowing we are on one of these systems:
   unless (($^X =~ /perl\.exe$/i) or
           $OS eq "Windows") {
-    $tz = `date`;
-    chomp($tz);
-    $tz=(split(/\s+/,$tz))[4];
-    push(@tz,$tz);
+    if ($Date::Manip::NoTaint) {
+      $tz=`date`;
+      chomp($tz);
+      $tz=(split(/\s+/,$tz))[4];
+      push(@tz,$tz);
+    } else {
+      foreach my $dir (@Date::Manip::DatePath) {
+        next  if (! -x "$dir/date");
+        $tz=`$dir/date`;
+        chomp($tz);
+        $tz=(split(/\s+/,$tz))[4];
+        push(@tz,$tz);
+      }
+    }
   }
+
   push(@tz,$main::TZ)         if (defined $main::TZ);         # $main::TZ
+
   if (-s "/etc/TIMEZONE") {                                   # /etc/TIMEZONE
     $in=new IO::File;
     $in->open("/etc/TIMEZONE","r");
     while (! eof($in)) {
       $tmp=<$in>;
       if ($tmp =~ /^TZ\s*=\s*(.*?)\s*$/) {
+        push(@tz,$1);
+        last;
+      }
+    }
+    $in->close;
+  }
+
+  if (-s "/etc/timezone") {                                   # /etc/timezone
+    $in=new IO::File;
+    $in->open("/etc/timezone","r");
+    while (! eof($in)) {
+      $tmp=<$in>;
+      next  if ($tmp =~ /^\s*\043/);
+      chomp($tmp);
+      if ($tz =~ /^\s*(.*?)\s*$/) {
         push(@tz,$1);
         last;
       }
@@ -4752,6 +4857,224 @@ sub EraseHolidays {
   $Holiday{"desc"}={};
 }
 
+# This returns a pointer to a list of times and events in the format
+#    [ date, [ events ], date, [ events ], ... ]
+# where each list of events are events that are in effect at the date
+# immediately preceding the list.
+#
+# This takes either one date or two dates as arguments.
+sub Events_Calc {
+  print "DEBUG: Events_Calc\n"  if ($Curr{"Debug"} =~ /trace/);
+
+  my($date0,$date1)=@_;
+
+  my($tmp);
+  $date0=&ParseDateString($date0);
+  return undef  if (! $date0);
+  if ($date1) {
+    $date1=&ParseDateString($date1);
+    if (&Date_Cmp($date0,$date1)>0) {
+      $tmp=$date1;
+      $date1=$date0;
+      $date0=$tmp;
+    }
+  } else {
+    $date1=&DateCalc_DateDelta($date0,"+0:0:0:0:0:0:1");
+  }
+
+  #
+  #   [ d0,d1,del,name ]     => [ d0, d1+del )
+  #   [ d0,0,del,name ]      => [ d0, d0+del )
+  #
+  my(%ret,$d0,$d1,$del,$name,$c0,$c1);
+  my(@tmp)=@{ $Events{"dates"} };
+ DATE: while (@tmp) {
+    ($d0,$d1,$del,$name)=splice(@tmp,0,4);
+    $d0=&ParseDateString($d0);
+    $d1=&ParseDateString($d1)   if ($d1);
+    $del=&ParseDateDelta($del)  if ($del);
+    if ($d1) {
+      if ($del) {
+        $d1=&DateCalc_DateDelta($d1,$del);
+      }
+    } else {
+      $d1=&DateCalc_DateDelta($d0,$del);
+    }
+    if (&Date_Cmp($d0,$d1)>0) {
+      $tmp=$d1;
+      $d1=$d0;
+      $d0=$tmp;
+    }
+    #         [ date0,date1 )
+    # [ d0,d1 )      OR     [ d0,d1 )
+    next DATE  if (&Date_Cmp($d1,$date0)<=0  ||
+                   &Date_Cmp($d0,$date1)>=0);
+    #      [ date0,date1 )
+    # [ d0,d1 )
+    # [ d0,                  d1 )
+    if (&Date_Cmp($d0,$date0)<=0) {
+      push @{ $ret{$date0} },$name;
+      push @{ $ret{$d1} },"!$name"  if (&Date_Cmp($d1,$date1)<0);
+      next DATE;
+    }
+    #      [ date0,date1 )
+    #                 [ d0,d1 )
+    if (&Date_Cmp($d1,$date1)>=0) {
+      push @{ $ret{$d0} },$name;
+      next DATE;
+    }
+    #      [ date0,date1 )
+    #         [ d0,d1 )
+    push @{ $ret{$d0} },$name;
+    push @{ $ret{$d1} },"!$name";
+  }
+
+  #
+  #   [ recur,delta0,delta1,name ]   => [ {date-delta0},{date+delta1} )
+  #
+  my($rec,$del0,$del1,@d);
+  @tmp=@{ $Events{"recur"} };
+ RECUR: while (@tmp) {
+    ($rec,$del0,$del1,$name)=splice(@tmp,0,4);
+    @d=();
+
+  }
+
+  # Sort them AND take into account the "!$name" entries.
+  my(%tmp,$date,@tmp2,@ret);
+  @d=sort { &Date_Cmp($a,$b) } keys %ret;
+  foreach $date (@d) {
+    @tmp=@{ $ret{$date} };
+    @tmp2=();
+    foreach $tmp (@tmp) {
+      push(@tmp2,$tmp), next  if ($tmp =~ /^!/);
+      $tmp{$tmp}=1;
+    }
+    foreach $tmp (@tmp2) {
+      $tmp =~ s/^!//;
+      delete $tmp{$tmp};
+    }
+    push(@ret,$date,[ keys %tmp ]);
+  }
+
+  return \@ret;
+}
+
+# This parses the raw events list
+sub Events_ParseRaw {
+  print "DEBUG: Events_ParseRaw\n"  if ($Curr{"Debug"} =~ /trace/);
+
+  # Only need to be parsed once
+  my($force)=@_;
+  $Events{"parsed"}=0  if ($force);
+  return  if ($Events{"parsed"});
+  $Events{"parsed"}=1;
+
+  my(@events)=@{ $Events{"raw"} };
+  my($event,$name,@event,$date0,$date1,$tmp,$delta,$recur0,$recur1,@recur,$r,
+     $recur);
+ EVENT: while (@events) {
+    ($event,$name)=splice(@events,0,2);
+    @event=split(/\s*;\s*/,$event);
+
+    if ($#event == 0) {
+
+      if ($date0=&ParseDateString($event[0])) {
+        #
+        # date = event
+        #
+        $tmp=&ParseDateString("$event[0] 00:00:00");
+        if ($tmp  &&  $tmp eq $date0) {
+          $delta="+0:0:0:1:0:0:0";
+        } else {
+          $delta="+0:0:0:0:1:0:0";
+        }
+        push @{ $Events{"dates"} },($date0,0,$delta,$name);
+
+      } elsif ($recur=&ParseRecur($event[0])) {
+        #
+        # recur = event
+        #
+        ($recur0,$recur1)=&Recur_Split($recur);
+        if ($recur0) {
+          if ($recur1) {
+            $r="$recur0:$recur1";
+          } else {
+            $r=$recur0;
+          }
+        } else {
+          $r=$recur1;
+        }
+        (@recur)=split(/:/,$r);
+        if (pop(@recur)==0  &&  pop(@recur)==0  &&  pop(@recur)==0) {
+          $delta="+0:0:0:1:0:0:0";
+        } else {
+          $delta="+0:0:0:0:1:0:0";
+        }
+        push @{ $Events{"recur"} },($recur,0,$delta,$name);
+
+      } else {
+        # ??? = event
+        warn "WARNING: illegal event ignored [ @event ]\n";
+        next EVENT;
+      }
+
+    } elsif ($#event == 1) {
+
+      if ($date0=&ParseDateString($event[0])) {
+
+        if ($date1=&ParseDateString($event[1])) {
+          #
+          # date ; date = event
+          #
+          $tmp=&ParseDateString("$event[1] 00:00:00");
+          if ($tmp  &&  $tmp eq $date1) {
+            $date1=&DateCalc_DateDelta($date1,"+0:0:0:1:0:0:0");
+          }
+          push @{ $Events{"dates"} },($date0,$date1,0,$name);
+
+        } elsif ($delta=&ParseDateDelta($event[1])) {
+          #
+          # date ; delta = event
+          #
+          push @{ $Events{"dates"} },($date0,0,$delta,$name);
+
+        } else {
+          # date ; ??? = event
+          warn "WARNING: illegal event ignored [ @event ]\n";
+          next EVENT;
+        }
+
+      } elsif ($recur=&ParseRecur($event[0])) {
+
+        if ($delta=&ParseDateDelta($event[1])) {
+          #
+          # recur ; delta = event
+          #
+          push @{ $Events{"recur"} },($recur,0,$delta,$name);
+
+        } else {
+          # recur ; ??? = event
+          warn "WARNING: illegal event ignored [ @event ]\n";
+          next EVENT;
+        }
+
+      } else {
+        # ??? ; ??? = event
+        warn "WARNING: illegal event ignored [ @event ]\n";
+        next EVENT;
+      }
+
+    } else {
+      # date ; delta0 ; delta1 = event
+      # recur ; delta0 ; delta1 = event
+      # ??? ; ??? ; ??? ... = event
+      warn "WARNING: illegal event ignored [ @event ]\n";
+      next EVENT;
+    }
+  }
+}
+
 # This reads an init file.
 sub Date_InitFile {
   print "DEBUG: Date_InitFile\n"  if ($Curr{"Debug"} =~ /trace/);
@@ -4772,6 +5095,9 @@ sub Date_InitFile {
       $section="holiday";
       &EraseHolidays()  if ($section =~ /holiday/i  &&  $Cnf{"EraseHolidays"});
       next;
+    } elsif (/^\*events/i) {
+      $section="events";
+      next;
     }
 
     if ($section =~ /var/i) {
@@ -4786,6 +5112,12 @@ sub Date_InitFile {
       ($recur,$name)=($1,$2);
       $name=""  if (! defined $name);
       $Holiday{"desc"}{$recur}=$name;
+
+    } elsif ($section =~ /events/i) {
+      confess "ERROR: invalid Date::Manip config file line.\n  $_\n"
+        if (! /(.*\S)\s*=\s*(.*)$/);
+      ($val,$var)=($1,$2);
+      push @{ $Events{"raw"} },($val,$var);
 
     } else {
       # A section not currently used by Date::Manip (but may be
@@ -6192,36 +6524,12 @@ sub ModuloAddition {
 #    Returns 1 if $String is a valid integer, 0 otherwise.  If $low is
 #    entered, $String must be >= $low.  If $high is entered, $String must
 #    be <= $high.  It is valid to check only one of the bounds.
-#
-#    undef (rather than 0) is returned if there is an error in either $low
-#    or $high or if $N is completely missing.
-#sub IsInt {
-#  my($N,$low,$high)=@_;
-#  return undef    if (! defined $N);
-#  return 0        if ($N !~ /^\s*([+-]?)\s*(\d+)\s*$/);
-#  $N="$1$2";
-#  if (defined $low  and  length($low)>0) {
-#    return undef  if (! &IsInt($low));
-#    return 0      if ($N<$low);
-#  }
-#  if (defined $high  and  length($high)>0) {
-#    return undef  if (! &IsInt($high));
-#    return 0  if ($N>$high);
-#  }
-#  return 1;
-#}
 sub IsInt {
   my($N,$low,$high)=@_;
-  return undef    if (! defined $N);
-  local $^W = 0;
-  $N =~ s/\s//g;
-  my($n)=$N;
-  $n =~ s/[^-+0-9]//g;
-  return 0  if ($n ne $N  ||
-                $N != int($N));
-
-  return 0  if (defined $low   &&  $N<$low);
-  return 0  if (defined $high  &&  $N>$high);
+  return 0  if (! defined $N  or
+                $N !~ /^\s*[-+]?\d+\s*$/  or
+                defined $low   &&  $N<$low  or
+                defined $high  &&  $N>$high);
   return 1;
 }
 
@@ -6309,20 +6617,15 @@ sub ExpandTilde {
 }
 
 # $File=&FullFilePath($file);
-#   Returns the full path to $file (expanding "~" if necessary and turning
-#   relative paths into full paths).  Returns an empty string if a "~"
-#   expansion cannot be interpreted.  The path does not need to exist.
-#   CleanFile is called.
-#
-#   I'd like to get rid of the call to cwd (which does `pwd`).
+#   Returns the full or relative path to $file (expanding "~" if necessary).
+#   Returns an empty string if a "~" expansion cannot be interpreted.  The
+#   path does not need to exist.  CleanFile is called.
 sub FullFilePath {
   my($file)=shift;
+  my($rootpat) = '^/'; #default pattern to match absolute path
+  $rootpat = '^(\\|/|([A-Za-z]:[\\/]))' if ($OS eq 'Windows');
   $file=&ExpandTilde($file);
   return ""  if (! $file);
-  my($cwd) = cwd;
-  # $cwd = VMS::Filespec::unixpath($cwd) if (defined $^O and $^O eq 'VMS');
-  $cwd = VMS::Filespec::unixpath($cwd) if ($OS eq "VMS");
-  $file="$cwd/$file"  if ($file !~ m|^/|);   # $file = "a/b/c"
   return &CleanFile($file);
 }
 

@@ -30,6 +30,7 @@ t/delta_delta_1.t
 t/delta_delta_2a.t
 t/delta_delta_2b.t
 t/delta_format.t
+t/events.t
 t/nthday.t
 t/recur_0.t
 t/recur_1.t

@@ -26,48 +26,13 @@ a string will stop working when/if I make this change.  Even if I
 don't, the internal format for both will change, so the above routines
 should be used.
 
-Also, the Date_DaysSince999 routine is deprecated (replace by
-Date_DaysSince1BC) and will be removed in one of the next releases.
 
-
-Notes for version 5.37:
-   5.36 introduced a serious bug.  Please use 5.37 instead.
-
-Notes for version 5.36:
-   Primarily a bug fix release.  Nothing major, but I want to get the
-      fixes into circulation.
-
-Notes for version 5.35:
-   Bug fixes and documentaion changes.
-   Added Romanian, Italian; corrections to Swedish, German translation.
-   Modified Date_GetPrev/Date_GetNext to take $curr=2.
-   Added Apache log file format "dd/mmm/yyyy:hh:mm:ss (time zone)".
-   Added OS/2 support.
-   Deprecated the function Date_DaysSince999. 
-   Fixed support for years 0000-0999.
-   Many changes to recurrences including:
-      *** Flags are now supported
-      Added test suite
-      Added support for Easter
-      Fixed a bug where base/date0/date1 not treated correctly
-   Added some timezones.
-   Improved holiday support considerably:
-      *** Added support for recurrences and one-year-only holidays
-      Fixed Veteren's day, added Good Friday (off by default)
-   Added Date_IsHoliday routine.
-   *** Added the PathSep config variable to improve support for non-Unix paths.
-   *** Date_Init can now return a list of config variables if called in
-      array context.
-   Added Moscow timezones.  Andrey A. Chernov <ache@nagual.pp.ru>
-
-
-Backwards incompatibilities:
-
-  Version 5.35
-  Deprecated the function Date_DaysSince999.  It's been replaced by
-    Date_DaysSince1BC.  It will disappear in the next version.
-  *** Added the PathSep variable which may cause problems on WinXX platforms
-    with old config files where a colon is assumed.
+Notes for version 5.39:
+   Fixed problem where the timezone wasn't getting correctly found due
+      to changes made in 5.38.
+   Added timezenes.
+   Support for /etc/timezone (Debian).
+   One bug fix.
 
 
   ############################################################################

@@ -51,6 +51,9 @@ Date::Manip - date manipulation routines
 
  $name=&Date_IsHoliday($date);
 
+ $listref=&Events_List($date);
+ $listref=&Events_List($date0,$date1);
+
  &Date_Init();
  &Date_Init("VAR=VAL","VAR=VAL",...);
  @list=&Date_Init();
@@ -158,25 +161,33 @@ an hour of each other, etc.
 
 NOTE:  Support for this will be added in the future.
 
+=item HOLIDAYS and EVENTS
+
+These are basically a named time.  Holidays are used in business mode
+calculations.  Events allow things like calendar and scheduling
+applications to be designed much more easily.
+
 =back
 
 Among other things, Date::Manip allow you to:
 
 1.  Enter a date and be able to choose any format convenient
 
-2.  Compare two dates, entered in widely different formats to determine
-    which is earlier
+2.  Compare two dates, entered in widely different formats
+    to determine which is earlier
 
-3.  Extract any information you want from ANY date using a format string
-    similar to the Unix date command
+3.  Extract any information you want from ANY date using a
+    format string similar to the Unix date command
 
 4.  Determine the amount of time between two dates
 
-5.  Add a time offset to a date to get a second date (i.e. determine the
-    date 132 days ago or 2 years and 3 months after Jan 2, 1992)
+5.  Add a time offset to a date to get a second date (i.e.
+    determine the date 132 days ago or 2 years and 3 months
+    after Jan 2, 1992)
 
-6.  Work with dates with dates using international formats (foreign month
-    names, 12/10/95 referring to October rather than December, etc.).
+6.  Work with dates with dates using international formats
+    (foreign month names, 12/10/95 referring to October
+    rather than December, etc.).
 
 7.  To find a list of dates where a recurring event happens.
 
@@ -213,20 +224,22 @@ cases, a non-English equivalent will work equally well.
 
 3.  Extract information from a date.
 
-  print &UnixDate("today","The time is now %T on %b %e, %Y.");
-  =>  "The time is now 13:24:08 on Feb  3, 1996."
+  print &UnixDate("today","It is now %T on %b %e, %Y.");
+    =>  "It is now 13:24:08 on Feb  3, 1996."
 
 4.  The amount of time between two dates.
 
   $date1=&ParseDate($string1);
   $date2=&ParseDate($string2);
   $delta=&DateCalc($date1,$date2,\$err);
-  => 0:0:WK:DD:HH:MM:SS   the weeks, days, hours, minutes, and seconds
-                          between the two
+    => 0:0:WK:DD:HH:MM:SS   the weeks, days, hours, minutes,
+                            and seconds between the two
   $delta=&DateCalc($date1,$date2,\$err,1);
-  => YY:MM:WK:DD:HH:MM:SS  the years, months, etc. between the two
+    => YY:MM:WK:DD:HH:MM:SS  the years, months, etc. between
+                             the two
 
-  Read the documentation below for an explanation of the difference.
+  Read the documentation below for an explanation of the
+  difference.
 
 5.  To determine a date a given offset from another.
 
@@ -242,8 +255,8 @@ cases, a non-English equivalent will work equally well.
   &Date_Init("Language=French","DateFormat=non-US");
   $date=&ParseDate("1er decembre 1990");
 
-7.  To find a list of dates where a recurring event happens (including
-    quite complex ones).
+7.  To find a list of dates where a recurring event happens
+    (including quite complex ones).
 
   # To find the 2nd tuesday of every month
   @date=&ParseRecur("0:1*2:2:0:0:0",$base,$start,$stop);
@@ -291,7 +304,7 @@ which can do _EVERY_ conceivable date/time manipulation that you'll run
 into in everyday life.
 
 The downside is that Date::Manip is slow.  The much simpler Date modules
-listed above are all faster (usually be a significant amount).  Although I
+listed above are all faster (usually by a significant amount).  Although I
 am working on making Date::Manip faster, it will never be as fast as these
 modules.  And before anyone asks, Date::Manip will never be translated to C
 (at least by me).  I write C because I have to.  I write perl because I
@@ -510,7 +523,7 @@ Miscellaneous other allowed formats are:
   last day in mmm in YY        "last day of October"
   dofw                         "Friday" (Friday of current week)
   Nth                          "12th", "1st" (day of current month)
-  ecpoch SECS                  seconds since the epoch
+  epoch SECS                   seconds since the epoch
 
 ** Note that the formats "sunday week 22" and "22nd sunday" give very
 different bahaviors.  "sunday week 22" returns the sunday of the 22nd week
@@ -880,7 +893,8 @@ NOTE: A recurrence specifying the week of a month is NOT clearly defined
 in common usage.  What is the 1st week in a month?  The behavior (with
 respect to this module) is well defined (using the FDn and FIn flags
 below), but in common usage, this is so ambiguous that this form should
-probably never be used.
+probably never be used.  It is included here solely for the sake of
+completeness.
 
 NOTE: Depending on whether M and W are 0 or nonzero, D means different
 things.  This is given in the following table.
@@ -1194,6 +1208,82 @@ This returns undef if $date is not a holiday, or a string containing the
 name of the holiday otherwise.  An empty string is returned for an unnamed
 holiday.
 
+=item Events_List
+
+ $ref=&Events_List($date);
+ $ref=&Events_List($date ,0      [,$flag]);
+ $ref=&Events_List($date0,$date1 [,$flag]);
+
+This returns a list of events.  Events are defined in the Events section
+of the config file (discussed below).
+
+In the first form (a single argument), $date is any string containing a
+date.  A list of events active at that precise time will be returned.
+The format is similar to when $flag=0, except only a single time will
+be returned.
+
+In all other cases, a range of times will be used.  If the 2nd argument
+evaluates to 0, the range of times will be the 24 hour period from
+midnight to midnight containing $date.  Otherwise, the range is given
+by the two dates.
+
+The value of $flag determines the format of the information that is
+returned.
+
+With $flag=0, the events are returned as a reference to a list of the form:
+
+  [ date, [ list_of_events ], date, [ list_of_events ], ... ]
+
+For example, if the following events are defined (using the syntax
+discussed below in the description of the Event section of the config
+file):
+
+  2000-01-01 ; 2000-03-21  = Winter
+  2000-03-22 ; 2000-06-21  = Spring
+  2000-02-01               = Event1
+  2000-05-01               = Event2
+  2000-04-01-12:00:00      = Event3
+
+might result in the following output:
+
+  &Events_List("2000-04-01")
+   => [ 2000040100:00:00, [ Spring ] ]
+
+  &Events_List("2000-04-01 12:30");
+   => [ 2000040112:30:00, [ Spring, Event3 ] ]
+
+  &Events_List("2000-04-01",0);
+   => [ 2000040100:00:00, [ Spring ],
+        2000040112:00:00, [ Spring, Event3 ],
+        2000040113:00:00, [ Spring ] ]
+
+  &Events_List("2000-03-15","2000-04-10");
+   => [ 2000031500:00:00, [ Winter ],
+        2000032200:00:00, [ Spring ]
+        2000040112:00:00, [ Spring, Event3 ]
+        2000040113:00:00, [ Spring ] ]
+
+Much more complicated events can be defined using recurrences.
+
+When $flag is non-zero, the format of the output is changed.  If $flag
+is 1, then a tally of the amount of time given to each event is returned.
+Time for which two or more events apply is counted for both.
+
+  &Events_List("2000-03-15","2000-04-10",1);
+   => { Winter => +0:0:1:0:0:0:0,
+        Spring => +0:0:2:5:0:0:0,
+        Event3 => +0:0:0:0:1:0:0 }
+
+When $flag is 2, a more complex tally with no event counted twice is
+returned.
+
+  &Events_List("2000-03-15","2000-04-10",2);
+   => { Winter => +0:0:1:0:0:0:0,
+        Spring => +0:0:2:4:23:0:0,
+        Event3+Spring => +0:0:0:0:1:0:0 }
+
+The hash contains one element for each combination of events.
+
 =item Date_DayOfWeek
 
  $day=&Date_DayOfWeek($m,$d,$y);
@@ -1443,8 +1533,10 @@ Sharnoff, and Paul Foley (with several additions by myself).
       HST     -1000    Hawaii Standard
       CAT     -1000    Central Alaska
       AHST    -1000    Alaska-Hawaii Standard
+      AKST    -0900    Alaska Standard
       YST     -0900    Yukon Standard
       HDT     -0900    Hawaii Daylight
+      AKDT    -0800    Alaska Daylight
       YDT     -0800    Yukon Daylight
       PST     -0800    Pacific Standard
       PDT     -0700    Pacific Daylight
@@ -1469,9 +1561,11 @@ Sharnoff, and Paul Foley (with several additions by myself).
       UT      +0000    Universal (Coordinated)
       UTC     +0000    Universal (Coordinated)
       WET     +0000    Western European
+      WEST    +0000    Alias for Western European
       CET     +0100    Central European
       FWT     +0100    French Winter
       MET     +0100    Middle European
+      MEZ     +0100    Middle European
       MEWT    +0100    Middle European Winter
       SWT     +0100    Swedish Winter
       BST     +0100    British Summer              bst=Brazil standard  -0300
@@ -1480,6 +1574,7 @@ Sharnoff, and Paul Foley (with several additions by myself).
       EET     +0200    Eastern Europe, USSR Zone 1
       FST     +0200    French Summer
       MEST    +0200    Middle European Summer
+      MESZ    +0200    Middle European Summer
       METDST  +0200    An alias for MEST used by HP-UX
       SST     +0200    Swedish Summer              sst=South Sumatra    +0700
       EEST    +0300    Eastern Europe Summer
@@ -1496,6 +1591,7 @@ Sharnoff, and Paul Foley (with several additions by myself).
       CCT     +0800    China Coast, USSR Zone 7
       AWST    +0800    West Australian Standard
       WST     +0800    West Australian Standard
+      PHT     +0800    Asia Manila
       JST     +0900    Japan Standard, USSR Zone 8
       ROK     +0900    Republic of Korea
       CAST    +0930    Central Australian Standard
@@ -1518,6 +1614,7 @@ this by looking in the following places:
    the unix `date` command (if available)
    $main::TZ
    /etc/TIMEZONE
+   /etc/timezone
 
 At least one of these should contain a timezone in one of the supported
 forms.  If none do by default, the TZ variable must be set with Date_Init.
@@ -1531,6 +1628,10 @@ forms are also available and are treated similar to the STD#DST forms:
       US/Mountain
       US/Central
       US/Eastern
+      Canada/Pacific
+      Canada/Mountain
+      Canada/Central
+      Canada/Eastern
 
 =head1 BUSINESS MODE
 
@@ -1611,9 +1712,8 @@ define holidays.
 Finally, any variables passed in through Date_Init override all other
 values.
 
-A config file can be composed of several sections (though only 2 of them
-are currently used).  The first section sets configuration variables.  Lines
-in this section are of the form:
+A config file can be composed of several sections.  The first section sets
+configuration variables.  Lines in this section are of the form:
 
    VARIABLE = VALUE
 
@@ -1625,124 +1725,14 @@ Only variables described below may be used.  Blank lines and lines beginning
 with a pound sign (#) are ignored.  All spaces are optional and strings are
 case insensitive.
 
-A line which starts with an asterisk (*) designates a new section.  The only
-section currently used is the Holiday section.  All lines are of the form:
-
-   DATE = HOLIDAY
-
-HOLIDAY is the name of the holiday (or it can be blank in which case the
-day will still be treated as a holiday... for example the day after
-Thanksgiving or Christmas is often a work holiday though neither are
-named).
-
-DATE is a string which can be parsed to give a valid date in any year.  It
-can be of the form
-
-   Date
-   Date + Delta
-   Date - Delta
-   Recur
-
-A valid holiday section would be:
+A line which starts with an asterisk (*) designates a new section.  For
+example, the HOLIDAY section starts with a line:
 
    *Holiday
 
-   1/1                             = New Year's Day
-   third Monday in Feb             = Presidents' Day
-   fourth Thu in Nov               = Thanksgiving
+The various sections are defined below.
 
-   # The Friday after Thanksgiving is an unnamed holiday most places
-   fourth Thu in Nov + 1 day       =
-
-   1*0:0:0:0:0:0*EASTER            = Easter
-   1*11:0:11:0:0:0*CWD             = Veteren's Day (observed)
-   1*0:0:0:0:0:0*EASTER,PD5        = Good Friday
-
-In a Date + Delta or Date - Delta string, you can use business mode by
-including the appropriate string (see documentation on DateCalc) in the
-Date or Delta.  So (in English), the first workday before Christmas could
-be defined as:
-
-   12/25 - 1 business day          =
-
-The date's may optionally contain the year.  For example, the dates
-
-  1/1
-  1/1/1999
-
-refers to Jan 1 in any year or in only 1999 respectively.  For dates that
-refer to any year, the date must be written such that by simply appending
-the year (separated by spaces) it can be correctly interpreted.  This
-will work for everything except ISO 8601 dates, so ISO 8601 dates may
-not be used in this case.
-
-In cases where you are interested in business type calculations, you'll
-want to define most holidays using recurrences, since they can define
-when a holiday is celebrated in the financial world.  For example,
-Christmas should be defined as:
-
-   1*12:0:24:0:0:0*FW1  = Christmas
-
-if you wanted to define both Christmas and Boxing days (Boxing is the
-day after Christmas, and is celebrated in some parts of the world), you
-could do it in one of the following ways:
-
-   1*12:0:24:0:0:0*FW1  = Christmas
-   1*12:0:25:0:0:0*FW1  = Boxing
-
-    1*12:0:24:0:0:0*FW1 = Christmas
-   01*12:0:24:0:0:0*FW1 = Boxing
-
-   1*12:0:24:0:0:0*FW1,a  = Christmas
-   1*12:0:25:0:0:0*FW1,b  = Boxing
-
-The following will NOT work:
-
-   1*12:0:24:0:0:0*FW1  = Christmas
-   1*12:0:24:0:0:0*FW2  = Boxing
-
-   1*12:0:24:0:0:0*FW1  = Christmas
-   1*12:0:24:0:0:0*FW1  = Boxing
-
-The reasoning behind all this is as follows:
-
-Holidays go into affect the minute they are parsed.  So, the minute the
-line:
-
-   1*12:0:24:0:0:0*FW1  = Christmas
-
-is parse, Christmas is defined.  Then, if you tried to use
-
-   1*12:0:24:0:0:0*FW2  = Boxing
-
-it'll step forward 2 work days (skipping Christmas since that's no longer a
-work day) and define the work day two days after Christmas, NOT the day after
-Christmas.  So, the best way to define Boxing day is using either:
-
-   1*12:0:25:0:0:0*FW1  = Boxing
-   1*12:0:24:0:0:0*FW1  = Boxing
-
-with the first being the preferred method since it avoids confusion.  An
-alternative is to use the same recurrence twice in a row:
-
-   1*12:0:24:0:0:0*FW1  = Christmas
-   1*12:0:24:0:0:0*FW1  = Boxing
-
-but since the recurrences are currently stored in a hash, this won't work
-as desired.  To fix this, make them unique with either a fake flag, adding
-an innocuous 0 somewhere, etc., so the following would be valid ways to
-define Boxing day:
-
-   1*12:0:24:0:0:0*FW1,a  = Boxing
-   01*12:0:24:0:0:0*FW1   = Boxing
-
-At times, you may want to switch back and forth between two holiday files.
-This can be done by calling the following:
-
-  &Date_Init("EraseHolidays=1","PersonalCnf=FILE1");
-  ...
-  &Date_Init("EraseHolidays=1","PersonalCnf=FILE2");
-  ...
+=head1 DATE::MANIP VARIABLES
 
 All Date::Manip variables which can be used are described in the following
 section.
@@ -1802,23 +1792,24 @@ Paths may have a tilde (~) expansion on platforms where this is supported
 =item Language
 
 Date::Manip can be used to parse dates in many different languages.
-Currently, it is configured to read  the following languages:
+Currently, it is configured to read  the following languages (the version
+in which they added is included for historical interest):
 
-  English (default)
-  Dutch
-  French
-  German
-  Italian
-  Polish
-  Portuguese
-  Romanian
-  Spanish
-  Swedish
+  English      (default)
+  French       (5.02)
+  Swedish      (5.05)
+  German       (5.31)
+  Dutch        (5.32)     aka Nederlands
+  Polish       (5.32)
+  Spanish      (5.33)
+  Portuguese   (5.34)
+  Romanian     (5.35)
+  Italian      (5.35)
 
-but others can be added easily.  Language is set to the language used to
-parse dates.  If you are interested in providing a translation for a new
-language, email me (see the AUTHOR section below) and I'll send you a
-list of things that I need.
+Others can be added easily.  Language is set to the language used to parse
+dates.  If you are interested in providing a translation for a new
+language, email me (see the AUTHOR section below) and I'll send you a list
+of things that I need.
 
 =item DateFormat
 
@@ -1951,7 +1942,7 @@ during the course of running it (i.e. when daylight savings time starts or
 ends).  As a result, parsing dates may start putting them in the wrong time
 zone.  Since a lot of overhead can be saved if we don't have to check the
 current timezone every time a date is parsed, by default checking is turned
-off.  Setting this to non-nill will force timezone checking to be done every
+off.  Setting this to non-nil will force timezone checking to be done every
 time a date is parsed... but this will result in a considerable performance
 penalty.
 
@@ -1973,6 +1964,195 @@ format given above.
 
 =back
 
+=head1 HOLIDAY SECTION
+
+The holiday section of the config file is used to define holidays.  Each
+line is of the form:
+
+   DATE = HOLIDAY
+
+HOLIDAY is the name of the holiday (or it can be blank in which case the
+day will still be treated as a holiday... for example the day after
+Thanksgiving or Christmas is often a work holiday though neither are
+named).
+
+DATE is a string which can be parsed to give a valid date in any year.  It
+can be of the form
+
+   Date
+   Date + Delta
+   Date - Delta
+   Recur
+
+A valid holiday section would be:
+
+   *Holiday
+
+   1/1                             = New Year's Day
+   third Monday in Feb             = Presidents' Day
+   fourth Thu in Nov               = Thanksgiving
+
+   # The Friday after Thanksgiving is an unnamed holiday most places
+   fourth Thu in Nov + 1 day       =
+
+   1*0:0:0:0:0:0*EASTER            = Easter
+   1*11:0:11:0:0:0*CWD             = Veteren's Day (observed)
+   1*0:0:0:0:0:0*EASTER,PD5        = Good Friday
+
+In a Date + Delta or Date - Delta string, you can use business mode by
+including the appropriate string (see documentation on DateCalc) in the
+Date or Delta.  So (in English), the first workday before Christmas could
+be defined as:
+
+   12/25 - 1 business day          =
+
+The date's may optionally contain the year.  For example, the dates
+
+  1/1
+  1/1/1999
+
+refers to Jan 1 in any year or in only 1999 respectively.  For dates that
+refer to any year, the date must be written such that by simply appending
+the year (separated by spaces) it can be correctly interpreted.  This
+will work for everything except ISO 8601 dates, so ISO 8601 dates may
+not be used in this case.
+
+In cases where you are interested in business type calculations, you'll
+want to define most holidays using recurrences, since they can define
+when a holiday is celebrated in the financial world.  For example,
+Christmas should be defined as:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+
+if you wanted to define both Christmas and Boxing days (Boxing is the
+day after Christmas, and is celebrated in some parts of the world), you
+could do it in one of the following ways:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+   1*12:0:25:0:0:0*FW1  = Boxing
+
+    1*12:0:24:0:0:0*FW1 = Christmas
+   01*12:0:24:0:0:0*FW1 = Boxing
+
+   1*12:0:24:0:0:0*FW1,a  = Christmas
+   1*12:0:25:0:0:0*FW1,b  = Boxing
+
+The following will NOT work:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+   1*12:0:24:0:0:0*FW2  = Boxing
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+   1*12:0:24:0:0:0*FW1  = Boxing
+
+The reasoning behind all this is as follows:
+
+Holidays go into affect the minute they are parsed.  So, the minute the
+line:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+
+is parse, Christmas is defined.  Then, if you tried to use
+
+   1*12:0:24:0:0:0*FW2  = Boxing
+
+it'll step forward 2 work days (skipping Christmas since that's no longer a
+work day) and define the work day two days after Christmas, NOT the day after
+Christmas.  So, the best way to define Boxing day is using either:
+
+   1*12:0:25:0:0:0*FW1  = Boxing
+   1*12:0:24:0:0:0*FW1  = Boxing
+
+with the first being the preferred method since it avoids confusion.  An
+alternative is to use the same recurrence twice in a row:
+
+   1*12:0:24:0:0:0*FW1  = Christmas
+   1*12:0:24:0:0:0*FW1  = Boxing
+
+but since the recurrences are currently stored in a hash, this won't work
+as desired.  To fix this, make them unique with either a fake flag, adding
+an innocuous 0 somewhere, etc., so the following would be valid ways to
+define Boxing day:
+
+   1*12:0:24:0:0:0*FW1,a  = Boxing
+   01*12:0:24:0:0:0*FW1   = Boxing
+
+At times, you may want to switch back and forth between two holiday files.
+This can be done by calling the following:
+
+  &Date_Init("EraseHolidays=1","PersonalCnf=FILE1");
+  ...
+  &Date_Init("EraseHolidays=1","PersonalCnf=FILE2");
+  ...
+
+=head1 EVENTS SECTION
+
+The Events section of the config file is similar to the Holiday section.
+It is used to name certain days or times, but there are a few important
+differences:
+
+=over 4
+
+=item Events can be assigned to any time and duration
+
+All holidays are exactly 1 day long.  They are assigned to a period
+of time from midnight to midnight.
+
+Events can be based at any time of the day, and may be of any duration.
+
+=item Events don't affect business mode calculations
+
+Unlike holidays, events are completely ignored when doing business
+mode calculations.
+
+=back
+
+Whereas holidays were added with business mode math in mind, events
+were added with calendar and scheduling applications in mind.
+
+Every line in the events section is of the form:
+
+   EVENT = NAME
+
+where NAME is the name of the event, and EVENT defines when it occurs
+and it's duration.  An EVENT can be defined in the following ways:
+
+   Date
+   Date*
+   Recur    [NYI]
+   Recur*   [NYI]
+
+   Date  ; Date
+   Date  ; Delta
+   Recur ; Delta   [NYI]
+
+   Date  ; Delta ; Delta   [NYI]
+   Recur ; Delta ; Delta   [NYI]
+
+Here, Date* refers to a string containing a Date with NO TIME fields
+(Jan 12, 1/1/2000, 2010-01-01) while Date does contain time fields.
+Similarily, Recur* stands for a recurrence with the time fields all
+equal to 0) while Recur stands for a recurrence with at least one
+non-zero time field.
+
+Both Date* and Recur* refer to an event very similar to a holiday which
+goes from midnight to midnight.
+
+Date and Recur refer to events which occur at the time given and with
+a duration of 1 hour.
+
+Events given by "Date ; Date", "Date ; Delta", and "Recur ; Delta"
+contain both the starting date and either ending date or duration.
+
+Events given as three elements "Date ; Delta ; Delta" or "Recur ; Delta ;
+Delta" take a date and add both deltas to it to give the starting and
+ending time of the event.  The order and sign of the deltas is
+unimportant (and both can be the same sign to give a range of times
+which does not contain the base date).
+
+Items marked with [NYI] are not yet implemented but will be by the
+time this is released.
+
 =head1 BACKWARDS INCOMPATIBILITIES
 
 For the most part, Date::Manip has remained backward compatible at every
@@ -1980,6 +2160,12 @@ release.  There have been a few minor incompatibilities introduced at
 various stages.  Major differences are marked with bullets.
 
 =over 4
+
+=item VERSION 5.38
+
+=item Removed Date_DaysSince999
+
+The Date_DaysSince999 function (deprecated in 5.35) has been removed.
 
 =item VERSION 5.35
 
@@ -2260,7 +2446,7 @@ is used in the sort.  For example, the following code fails:
        my($date1, $date2);
        $date1 = &ParseDate($a);
        $date2 = &ParseDate($b);
-       return ($date1 cmp $date2);
+       return (&Date_Cmp($date1,$date2));
    }
    @date = ("Fri 16 Aug 96",
             "Mon 19 Aug 96",
@@ -2421,6 +2607,10 @@ their help.  A number of people have made suggestions which have not yet
 been implemented.  When (and if) the suggestion is implemented, they will
 go in the HISTORY file as well, but even if the suggestion is never
 implemented, my thanks to them as well.
+
+Thanks to Alan Cezar and Greg Schiedler for paying me to implement the
+Events_List routine.  They gave me the idea, and were then willing to
+pay me for my time to get it implemented quickly.
 
 I'd also like a couple of authors.  Date::Manip has recently been getting
 some really good press in a couple of books.  Since no one's paying me to

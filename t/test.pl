@@ -78,6 +78,7 @@ sub test_Func {
 
     # Separate out the note and expected value
     if ($exp == -1) {
+      @exp=();
       $exp=pop(@args);
       $exp=~ s/\s+//g;
       $exp=~ s/_/ /g;
@@ -85,6 +86,7 @@ sub test_Func {
       @exp=splice(@args,$exp+1);
       $exp=join(" ",@exp);
     }
+    $exp=~s/  +/ /g;
 
     $note="";
     if ($args[$#args] =~ /^>/) {
@@ -101,11 +103,37 @@ sub test_Func {
       $ans2=DateCalc($exp,"+10");
     }
 
-    if (@exp) {
-      $ans=join(" ",&$funcref(@args,@extra));
-    } else {
-      $ans=&$funcref(@args,@extra);
+    my(@out,@ans,$tmp,%tmp,@tmp);
+    @ans=&$funcref(@args,@extra);
+    while (@ans) {
+      $tmp=shift(@ans);
+      if (ref $tmp) {
+         if (ref $tmp eq "SCALAR") {
+            unshift(@ans,$$tmp);
+         } elsif (ref $tmp eq "ARRAY") {
+            unshift(@ans,"[",@$tmp,"]");
+         } elsif (ref $tmp eq "HASH") {
+            %tmp=%$tmp;
+            @tmp=();
+            foreach $tmp (sort keys %tmp) {
+               push(@tmp,$tmp,"=>",$tmp{$tmp});
+            }
+            unshift(@ans,"{",@tmp,"}");
+         } else {
+           push @out,ref $tmp;
+         }
+      } else {
+        push @out,$tmp;
+      }
     }
+    $ans=join(" ",@out);
+    $ans=~s/  +/ /g;
+#   if (@exp) {
+#     $ans=join(" ",&$funcref(@args,@extra));
+#   } else {
+#     $ans=&$funcref(@args,@extra);
+#   }
+
     $bad=1;
     $bad=0  if ($exp eq $ans  or  $exp eq "nil" && $ans eq "");
     $bad=0  if ($approx  and  $ans ge $ans1 && $ans le $ans2);

@@ -2,6 +2,63 @@
 # MISC
 ########################################################################
 
+Add Date_LocaleInit which calls Date_Init and then sets DateFormat
+config varialbe.  Benjamin Low <ben@snrc.uow.edu.au>
+   Essentially, I use POSIX::strftime to print a known date in the locale
+   'native' format ('%x'), and parse the result to determine d/m/y, m/d/y,
+   or y/m/d.
+   
+   Here's what I do for Date::Parse, perhaps for your module you could just
+   substitute a default value for DateFormat:
+   
+   sub _dmorder
+   # determine the "natural" day/month order for the current locale
+   # - returns a sub which will expect two arguments (month, day) and
+   #   return the arguments swapped as appropriate
+   {  
+	# %x - preferred (year, month, day) representation
+	# - some examples: 1999-12-31, 31/12/99, 30.12.1999, 12/31/99
+	my @d = (POSIX::strftime('%x', 0, 0, 0, 31, 12-1, 99) =~ 
+		/(\d+)\D+(\d+)\D+(\d+)/);
+
+	# check we got one each of "31", "12", and "[19]99" back
+	$@ = "couldn't determine day,month order (got [@d])";
+	warn("$@\n"), return sub { @_ } unless @d == 3;
+	my %d;	$d{$1} = $d{$2} = $d{$3} = 1;
+	warn("$@\n"), return sub { @_ } 
+		unless ($d{31} and $d{12} and ($d{99} or $d{1999}));
+
+	if ($1 == 31) { $@ = undef; return sub { ($_[1], $_[0]) } };	# d/m/y
+	if ($2 == 31) { $@ = undef; return sub { ($_[0], $_[1]) } };	# m/d/y
+	if ($3 == 31) { $@ = undef; return sub { ($_[0], $_[1]) } };	# y/m/d
+
+	return sub { @_ };	# undetermined, use default
+   }
+   
+   *dmorder = _dmorder();
+   
+   # and then later in Parse::Date, after month/day regexps (\d+/\d+)...
+     - ($month, $day) = ($1, $2);    becomes...
+     + ($month, $day) = dmorder($1, $2);
+
+
+Make DateFormat variable handle y/m/d y/d/m m/d/y and d/m/y formats
+in addition to m/d vs. d/m .  Also, make "%D" and "%x" UnixDate formats
+use this variable.  Benjamin Low <ben@snrc.uow.edu.au>
+
+Make `date` check `/bin/date`, etc., so that there is no reason to
+have the ENV{PATH} = ... line.
+
+In DateCalc, make a way to go:
+  date + delta
+  date - delta
+  delta + delta
+  delta - delta
+  Steve Berlage <steve.berlage@entegee.com>
+
+From jfh:
+  /(a|b)/ evals 10 times slower than /a/ || /b/
+
 Change UpdateCurrTZ to UpdateCurrTime and fix docs.  Paul Stone
   <paul@milestone.com>
 

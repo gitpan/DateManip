@@ -11,7 +11,7 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
-$ntest=235;
+$ntest=238;
 
 print "1..$ntest\n"  if (! $runtests);
 &Date_Init(@Date::Manip::TestArgs,"ForceDate=1997-03-08-12:30:00");
@@ -765,6 +765,14 @@ Dec101965
 2000-02-16 15:24:00
     2000021615:24:00
 
+2000-02-16T12:30:30
+    2000021612:30:30
+
+2000-02-16T12:30
+    2000021612:30:00
+
+99-02-16T12:30
+    1999021612:30:00
 ";
 
 print "Date...\n";
