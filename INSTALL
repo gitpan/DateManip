@@ -1,9 +1,36 @@
+Before you install Date::Manip, check out the variables at the top of
+Date/Manip.pm.  If you are not in the United States, you may wish to
+change the default language (DefLang) or whether 01/02 means Jan 2 or
+Feb 1 (DefDateFormat).  Also, check to make sure that Date::Manip can
+correctly determine the time zone or set the TZ variable.
+
+AUTOMATIC INSTALLATION
+
 To install, just type
   perl Makefile.PL
   make
   make install
 
-If you want to skip the makefile, just copy Date/Manip.pm to somewhere in
-your perl include path.  Also, copy the man page into a directory in your
-manpath.
+
+MANUAL INSTALLATION
+
+Some people have reported problems with the automatic installation above.
+If the above fails, installing manually is very simple.  Just do the
+following:
+
+Take a look at the value of @INC in a perl script (run the debugger and
+print @INC).  In any of the directories that it lists, create a directory
+named Date.  Copy Date/Manip.pm to this directory.
+
+In our installation, I have installed DateManip as:
+        /usr/local/lib/perl5/site_perl/Date/Manip.pm
+
+Make sure that in your perl script you have the line:
+        use Date::Manip;
+
+
+You can also create the man page using the command:
+        pod2man Manip.pm > Date::Manip.3
+and install it somewhere in your MANPATH.  I have it in:
+        /usr/local/man/man3/Date::Manip.3
 

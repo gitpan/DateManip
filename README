@@ -2,16 +2,25 @@ Copyright (c) 1995,1996 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
-Notes for version 5.04:
-  Mainly a bug fix.  You ought to get this rather than 5.03.
+Notes for version 5.05:
+  Fixes a few bugs from 5.04.
+  Adds support for Time Zones.
+  Now parses dates with commas in them.
+  Now parses ctime() format dates and those conforming to RFC 822.
+  Added support for Swedish dates.
+  More flexibility in defining international dates and times (you
+    can now define what separators to use to separate hours, minutes,
+    seconds in a time, add strings like "noon" which refer to specific
+    strings, etc.).
+  Lots of minor (and not so minor) documentation changes.
 
-  Also, if you would like to stay informed about future versions of
-  DateManip, let me know.  Anyone who asks will be added to a mail
-  alias which I will use to keep people informed of new versions and
-  bug fixes as I come out with them.  DateManip is currently under
-  fairly active development.  I have made a lot of changes in the
-  last 3 months.  If you want me to mail you when a new version comes
-  out, send mail to beck@qtp.ufl.edu.
+  If you would like to stay informed about future versions of DateManip,
+  and especially if you are interested in beta testing future versions,
+  let me know.  I announce new releases to comp.lang.perl.announce and
+  comp.lang.perl, so if you read these regularly and don't care about the
+  latest bug fix or beta-test version, you probably aren't interested in
+  this.  If you ARE interested, send mail to beck@qtp.ufl.edu and I'll
+  add you the the list.
 
 
 This is a set of routines to work with the Gregorian calendar (the one
@@ -81,7 +90,7 @@ EXAMPLES:
 
 3.  Extract information from a date.
 
-  print &UnixDate("today","The time is now %T on %b %f, %Y.");
+  print &UnixDate("today","The time is now %T on %b %e, %Y.");
   =>  "The time is now 13:24:08 on Feb  3, 1996."
 
 4.  The amount of time between two dates.
@@ -93,7 +102,7 @@ EXAMPLES:
   $delta=&DateCalc($date1,$date2,\$err,1);
   => YY:MM:DD:HH:MM:SS  the years, months, etc. between the two
 
-  Read the documentation below for an explanation of the difference.
+  Read the documentation in the man page for an explanation of the difference.
 
 5.  To determine a date a given offset from another.
 
