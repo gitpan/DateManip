@@ -2,39 +2,99 @@ Copyright (c) 1995,1996 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
-Notes for version 5.06:
-  5.05 was broken on SunOS machines (a call to the unix date machine to
-     get the timezone used the %Z format not available there).  Use this
-     version instead.
-  Fixed a couple other minor bugs.
-  Added "today at 4:00" type formats.
-  Added "%Q" format to UnixDate.
+Notes for version 5.07:
+  DateCalc can now handle three modes: exact, approximate, and business
+    mode.  Business mode allows you to ignore weekends/holidays in
+    calculations.
+  A config file has now been added to configure Date::Manip as well as to
+    define holidays.  Date_Init has been changed to handle a new, flexible
+    way of configuring options.  There are lots of new config variables.
+  Deltas are now almost always all positive or all negative (making them
+    much more natural to work with).
+  Date_GetNext and Date_GetPrev enhanced.
+  Added a much needed test suite.
 
-  If you would like to stay informed about future versions of DateManip,
+  Added new formats to UnixDate: %q, %P, %o, %s (changed), %g
+  Added new formats to ParseDate:
+    sunday week 22 [in 1996] [at 12:00]
+    22nd sunday [in 1996] [at 12:00]
+    sunday 22nd week [in 1996] [at 12:00]
+    next/last friday [at time]
+    next/last week [at time]
+    in 2 weeks [at time]
+    2 weeks ago [at time]
+    Friday in 2 weeks
+    in 2 weeks on friday
+    Friday 2 weeks ago
+    2 weeks ago friday
+  Added weeks to ParseDateDelta.
+  Added routine Date_SecsSince1970GMT
+  Date_SetTime now handles international time formats.
+  Subroutines which require 4 digit years now do error checking.
+
+  Several bug fixes.
+
+  Version 5.07 has a few minor incompatibilities with previous versions:
+    The %s format has changed.  The old %s (secs since 1970) is %o.  %s
+       is now secs since 1970 GMT.
+    By default, deltas are stored with fewer signs.  If you want signs for
+       each delta element, set the config variable DeltaSigns=1.
+    Date_Init arguments changed.  The old method is still supported, but
+       old format calls to Date_Init should be rewritten.
+
+  ***NOTE***  The next version of Date::Manip will feature compatibility
+  with ISO 8601.  The standard date format is YYYY-MM-DD and YY-MM-DD (with
+  a number of variations).  This represents an incompatiblity with older
+  versions of Date::Manip.  Based on common American usage, I have parsed
+  dates in the form MM%DD%YY with any of the character ". / -" as separators.
+  That is, 12-10-1965, 12/10/1965, and 12.10.1965 all worked.  Since "-" is
+  the standard character for ISO 8601 dates, there are a number of conflicts
+  between ISO 8601 formats and previously allowed format.  In the event of a
+  conflict, the ISO 8601 date will take priority.  Although I will try to
+  minimize the incompatibilities, I would encourage people to NOT use "-" as
+  a separator.  If they are used, change them to "/" before passing the date
+  to Date::Manip.  Comments and questions are welcome.
+
+  ############################################################################
+  If you would like to stay informed about future versions of this module,
   and especially if you are interested in beta testing future versions,
-  let me know.  I announce new releases to comp.lang.perl.announce and
-  comp.lang.perl, so if you read these regularly and don't care about the
-  latest bug fix or beta-test version, you probably aren't interested in
-  this.  If you ARE interested, send mail to beck@qtp.ufl.edu and I'll
-  add you the the list.
+  please let me know by email at:
+    beck@qtp.ufl.edu
+
+  The newest version (which should be considered a beta version) is available
+  through my home page:
+    http://www.qtp.ufl.edu/~beck
+  Feel free to try it out.
+
+  The current (non-beta) version of this module is available from you nearest
+  CPAN site and is NOT available from my home page.  I will announce new
+  (non-beta) releases in comp.lang.perl.misc and comp.lang.perl.announce.  
+  ############################################################################
 
 
-This is a set of routines to work with the Gregorian calendar (the one
-currently in use).  The Julian calendar defined leap years as every 4th
-year.  The Gregorian calendar improved this by making every 100th year
-NOT a leap year, unless it was also the 400th year.  The Gregorian
-calendar has been extrapolated back to the year 1000 AD and forward to
-the year 9999 AD.  Note that in historical context, the Julian calendar
-was in use until 1582 when the Gregorian calendar was adopted by the
-Catholic church.  Protestant countries did not accept it until later;
-Germany and Netherlands in 1698, British Empire in 1752, Russia in 1918.
+This is a set of routines designed to make any common date/time
+manipulation easy to do.  Operations such as comparing two times,
+calculating a time a given amount of time from another, or parsing
+international times are all easily done.
 
-Note that the Gregorian calendar is itself imperfect.  Each year is on
-average 26 seconds too long, which means that every 3,323 years, a day
-should be removed from the calendar.  No attempt is made to correct for
-that.
+Date::Manip deals only with the Gregorian calendar (the one currently in
+use).  The Julian calendar defined leap years as every 4th year.  The
+Gregorian calendar improved this by making every 100th year NOT a leap
+year, unless it was also the 400th year.  The Gregorian calendar has been
+extrapolated back to the year 1000 AD and forward to the year 9999 AD.
+Note that in historical context, the Julian calendar was in use until 1582
+when the Gregorian calendar was adopted by the Catholic church.  Protestant
+countries did not accept it until later; Germany and Netherlands in 1698,
+British Empire in 1752, Russia in 1918.  Note that the Gregorian calendar
+is itself imperfect.  Each year is on average 26 seconds too long, which
+means that every 3,323 years, a day should be removed from the calendar.
+No attempt is made to correct for that.
 
-Among other things, these routines allow you to:
+Date::Manip is therefore not equipped to truly deal with historacle dates,
+but should be able to perform (virtually) any operation dealing with a
+modern time and date.
+
+Among other things, Date::Manip allow you to:
 
 1.  Enter a date and be able to choose any format conveniant
 
@@ -55,11 +115,11 @@ Among other things, these routines allow you to:
 Each of these tasks is trivial (one or two lines at most) with this package.
 
 Although the word date is used extensively here, it is actually somewhat
-misleading.  This package works with the full date AND time (year, month,
+misleading.  Date::Manip works with the full date AND time (year, month,
 day, hour, minute, second).
 
-In the documentation below, US formats are used, but in most cases, a
-non-English equivalent will work equally well.
+In the documentation below, US formats are used, but in most (if not all)
+cases, a non-English equivalent will work equally well.
 
 EXAMPLES:
 
@@ -105,10 +165,21 @@ EXAMPLES:
   $date=&DateCalc("today","+ 3hours 12minutes 6 seconds",\$err);
   $date=&DateCalc("12 hours ago","12:30 6Jan90",\$err);
 
+  It even works with business days:
+
+  $date=&DateCalc("today","+ 3 business days",\$err);
+
 6.  To work with dates in another language.
 
-  &Date_Init("French","non-US");
+  &Date_Init("Language=French","DateFormat=non-US");
   $date=&ParseDate("1er decembre 1990");
+
+NOTE: Some date forms do not work as well in languages other than English,
+but this is not because DateManip is incapable of doing so (almost nothing
+in this module is language dependent).  It is simply that I do not have the
+correct translation available for some words.  If there is a date form that
+works in English but does not work in a language you need, let me know and
+if you can provide me the translation, I will fix DateManip.
 
 For documentation on all of the date manipulation routines, read the
 man page.

@@ -9,6 +9,7 @@ AUTOMATIC INSTALLATION
 To install, just type
   perl Makefile.PL
   make
+  make test
   make install
 
 
@@ -34,3 +35,17 @@ You can also create the man page using the command:
 and install it somewhere in your MANPATH.  I have it in:
         /usr/local/man/man3/Date::Manip.3
 
+
+Once it is installed, you can run the "runtests" command in the "t"
+directory to make sure everything works.
+
+
+TESTS
+
+If any of the tests fail... don't panic.  This is the first release with a
+test suite, and the tests themselves may have bugs in them.  Some of them
+may run correctly only in the EST timezone for example.  Some will fail if
+they are run on a very slow computer (it will compare two different times
+that were supposed to be the same but aren't because a measurable amount of
+time passed between determining the time in two different ways).  I will
+try to get any bugs out of the test suite quickly.
