@@ -10,18 +10,14 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
+$ntest=89;
 
-print "1..89\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
+print "1..$ntest\n"  if (! $runtests);
+&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST",
+           "ForceDate=1997-03-08-12:30:00");
 
-($currS,$currMN,$currH,$currD,$currM,$currY)=localtime(time);
-$currY+=1900;
-$currM++;
-$currM ="0$currM"   while (length $currM < 2);
-$currD ="0$currD"   while (length $currD < 2);
-$currH ="0$currH"   while (length $currH < 2);
-$currMN="0$currMN"  while (length $currMN < 2);
-$currS ="0$currS"   while (length $currS < 2);
+($currS,$currMN,$currH,$currD,$currM,$currY)=("00","30","12","08","03","1997");
+
 $today="$currY$currM$currD$currH:$currMN:$currS";
 #$todaydate="$currY$currM$currD";
 $yesterday="$currY$currM". $currD-1 ."$currH:$currMN:$currS";
@@ -30,19 +26,19 @@ $tomorrow ="$currY$currM". $currD+1 ."$currH:$currMN:$currS";
 $dates="
 
 aujourd'hui
-    >May safely fail on a slow computer.
+    >Ignore failure on a slow computer.
     ~$today
 
 maintenant
-    >May safely fail on a slow computer.
+    >Ignore failure on a slow computer.
     ~$today
 
 hier
-    >May safely fail on a slow computer or on 1st day of month.
+    >Ignore failure on a slow computer or on the 1st day of the month.
     ~$yesterday
 
 demain
-    >May safely fail on a slow computer or on last day of month.
+    >Ignore failure on a slow computer or on the last day of the month.
     ~$tomorrow
 
 dernier mar en Juin 96
@@ -304,6 +300,6 @@ DeC premier 1965
 
 print "Date (French)...\n";
 &Date_Init("Language=French","DateFormat=US","Internal=0");
-&test_Func(\&ParseDate,$dates,$runtests);
+&test_Func($ntest,\&ParseDate,$dates,$runtests);
 
 1;

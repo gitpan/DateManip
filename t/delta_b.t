@@ -10,8 +10,9 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
+$ntest=4;
 
-print "1..4\n"  if (! $runtests);
+print "1..$ntest\n"  if (! $runtests);
 &Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 &Date_Init("DeltaSigns=1");
@@ -33,6 +34,6 @@ $deltas="
 ";
 
 print "Delta (signs)...\n";
-&test_Func(\&ParseDateDelta,$deltas,$runtests);
+&test_Func($ntest,\&ParseDateDelta,$deltas,$runtests);
 
 1;

@@ -10,18 +10,14 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
+$ntest=213;
 
-print "1..213\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
+print "1..$ntest\n"  if (! $runtests);
+&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST",
+           "ForceDate=1997-03-08-12:30:00");
 
-($currS,$currMN,$currH,$currD,$currM,$currY)=localtime(time);
-$currY+=1900;
-$currM++;
-$currM ="0$currM"   while (length $currM < 2);
-$currD ="0$currD"   while (length $currD < 2);
-$currH ="0$currH"   while (length $currH < 2);
-$currMN="0$currMN"  while (length $currMN < 2);
-$currS ="0$currS"   while (length $currS < 2);
+($currS,$currMN,$currH,$currD,$currM,$currY)=("00","30","12","08","03","1997");
+
 $today="$currY$currM$currD$currH:$currMN:$currS";
 $todaydate    ="$currY$currM$currD";
 $yesterdaydate="$currY$currM". $currD-1;
@@ -35,19 +31,19 @@ $dates="
 # slow computer.  On the 1st or last day of the month, the yesterday/today
 # test will fail because of the simplicity of the test.
 now
-    >May safely fail on a slow computer.
+    >Ignore failure on a slow computer.
     ~$today
 
 today
-    >May safely fail on a slow computer.
+    >Ignore failure on a slow computer.
     ~$today
 
 yesterday
-    >May safely fail on a slow computer or on 1st day of month.
+    >Ignore failure on a slow computer or on the 1st day of the month.
     ~$yesterday
 
 tomorrow
-    >May safely fail on a slow computer or on last day of month.
+    >Ignore failure on a slow computer or on the last day of the month.
     ~$tomorrow
 
 today at 4:00
@@ -63,27 +59,23 @@ today at 12:00 am
     $todaydate 00:00:00
 
 today at 12:00 GMT
-    >May safely fail if not in EST timezone.
     $todaydate 07:00:00
 
 today at 4:00 PST
-    >May safely fail if not in EST timezone.
     $todaydate 07:00:00
 
 today at 4:00 -0800
-    >May safely fail if not in EST timezone.
     $todaydate 07:00:00
 
 today at noon
     $todaydate 12:00:00
 
 tomorrow at noon
-    >May safely fail on last day of month.
+    >Ignore failure on a slow computer or on the last day of the month.
     $tomorrowdate 12:00:00
 
 # Test weeks
 22nd sunday
-    >May safely fail in 1998.
     1997060100:00:00
 
 97W227
@@ -114,23 +106,18 @@ twenty-second sunday 1996
     1996060200:00:00
 
 22nd sunday 12:00
-    >May safely fail in 1998.
     1997060112:00:00
 
 22nd sunday at 12:00
-    >May safely fail in 1998.
     1997060112:00:00
 
 22nd sunday at 12:00 EST
-    >May safely fail in 1998 or when not in EST.
     1997060112:00:00
 
 22nd sunday in 1996 at 12:00 EST
-    >May safely fail when not in EST.
     1996060212:00:00
 
 sunday wk 22
-    >May safely fail in 1998.
     1997060100:00:00
 
 sunday week twenty-second 1996
@@ -140,23 +127,18 @@ sunday w 22 in 1996
     1996060200:00:00
 
 sunday wks 22 12:00
-    >May safely fail in 1998.
     1997060112:00:00
 
 sunday week 22 at 12:00
-    >May safely fail in 1998.
     1997060112:00:00
 
 sunday week 22 at 12:00 EST
-    >May safely fail in 1998 or when not in EST.
     1997060112:00:00
 
 sunday week 22 in 1996 at 12:00 EST
-    >May safely fail when not in EST.
     1996060212:00:00
 
 sunday 22 wk
-    >May safely fail in 1998.
     1997060100:00:00
 
 sunday twenty-second week 1996
@@ -166,19 +148,15 @@ sunday 22 w in 1996
     1996060200:00:00
 
 sunday 22 wks 12:00
-    >May safely fail in 1998.
     1997060112:00:00
 
 sunday 22 week at 12:00
-    >May safely fail in 1998.
     1997060112:00:00
 
 sunday 22 week at 12:00 EST
-    >May safely fail in 1998 or when not in EST.
     1997060112:00:00
 
 sunday 22 week in 1996 at 12:00 EST
-    >May safely fail when not in EST.
     1996060212:00:00
 
 # Tests 'which day in mon' formats
@@ -186,14 +164,12 @@ last tue in Jun 96
     1996062500:00:00
 
 last tueSday of June
-    >Needs to be fixed in 1998.
     1997062400:00:00
 
 first tue in Jun 1996
     1996060400:00:00
 
 1st tue in June
-    >Needs to be fixed in 1998.
     1997060300:00:00
 
 3rd tuesday in Jun 96
@@ -209,11 +185,9 @@ first tue in Jun 1996
     1996061822:30:00
 
 3rd tuesday in Jun 96 at 10:30 pm GMT
-    >May safely fail if not in EST timezone
     1996061817:30:00
 
 3rd tuesday in Jun 96 at 10:30 pm CET
-    >May safely fail if not in EST timezone
     1996061816:30:00
 
 # Tests YYMMDD time
@@ -260,15 +234,12 @@ first tue in Jun 1996
     1993120117:30:25
 
 1993120105:30:25 pM GMT
-    >May safely fail if not in EST timezone.
     1993120112:30:25
 
 19931201 at 05:30:25 pM GMT
-    >May safely fail if not in EST timezone.
     1993120112:30:25
 
 19931201at05:30:25 pM GMT
-    >May safely fail if not in EST timezone.
     1993120112:30:25
 
 # Tests YYMMDDHHMNSS
@@ -297,7 +268,6 @@ first tue in Jun 1996
     1965121017:30:00
 
 12/10/65/5:30 pm GMT
-    >May safely fail if not in EST timezone.
     1965121012:30:00
 
 12/10/65 at 5:30:25
@@ -343,7 +313,6 @@ first tue in Jun 1996
     $currY 121005:30:25
 
 12/10 at 05:30:25 GMT
-    >May safely fail if not in EST timezone.
     $currY 121000:30:25
 
 12/10  5:30
@@ -393,7 +362,6 @@ Dec/10/65/5:30 pm
     1965121017:30:00
 
 Dec/10/65/5:30 pm GMT
-    >May safely fail if not in EST timezone.
    1965121012:30:00
 
 Dec/10/65 at 5:30:25
@@ -439,7 +407,6 @@ Dec/10 at 05:30:25
     $currY 121005:30:25
 
 Dec/10 at 05:30:25 GMT
-    >May safely fail if not in EST timezone.
    $currY 121000:30:25
 
 Dec/10  5:30
@@ -483,7 +450,6 @@ DeC first 1965
     1965121017:30:00
 
 10/Dec/65/5:30 pm GMT
-    >May safely fail if not in EST timezone.
    1965121012:30:00
 
 10/Dec/65 at 5:30:25
@@ -538,7 +504,6 @@ DeC first 1965
     $currY 121005:30:25
 
 10-Dec at 05:30:25 GMT
-    >May safely fail if not in EST timezone.
    $currY 121000:30:25
 
 10-Dec  5:30
@@ -566,7 +531,6 @@ DeC first 1965
     1965121017:30:00
 
 5:30 pm GMT 12/10/65
-    >May safely fail if not in EST timezone.
     1965121012:30:00
 
 5:30:25/12/10/65
@@ -597,7 +561,6 @@ DeC first 1965
     1965121017:30:00
 
 5:30 pm GMT 12  10  65
-    >May safely fail if not in EST timezone.
     1965121012:30:00
 
 5:30:25 12  10  1965
@@ -622,7 +585,6 @@ DeC first 1965
     $currY 121005:30:25
 
 05:30:25 GMT 12/10
-    >May safely fail if not in EST timezone.
     $currY 121000:30:25
 
 5:30 12/10
@@ -739,7 +701,7 @@ last day in October 1997
 ";
 
 print "Date...\n";
-&test_Func(\&ParseDateString,$dates,$runtests);
+&test_Func($ntest,\&ParseDateString,$dates,$runtests);
 
 1;
 

@@ -10,8 +10,9 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
+$ntest=22;
 
-print "1..22\n"  if (! $runtests);
+print "1..$ntest\n"  if (! $runtests);
 &Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 $calcs="
@@ -109,6 +110,6 @@ Mon Dec 30 1996 noon
 &Date_Init("WorkDayBeg=08:00","WorkDayEnd=17:00");
 print "DateCalc (date,date,business 8:00-5:00)...\n";
 $err="";
-&test_Func(\&DateCalc,$calcs,$runtests,\$err,2);
+&test_Func($ntest,\&DateCalc,$calcs,$runtests,\$err,2);
 
 1;

@@ -17,8 +17,13 @@
 # WorkDay24Hr		= 0
 # WorkDayBeg		= 08:00
 # WorkDayEnd		= 17:00
+# TomorrowFirst		= 1
 # DeltaSigns		= 0
 # Jan1Week1		= 0
+# YYtoYYYY              = 89
+# UpdateCurrTZ		= 0
+# IntCharSet 		= 0
+# ForceDate		=
 
 ################################
 # HOLIDAYS

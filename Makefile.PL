@@ -1,5 +1,5 @@
 use ExtUtils::MakeMaker;
 WriteMakefile(
 	NAME => "Date::Manip",
-	VERSION => "5.07"
+	VERSION => "5.21"
 );

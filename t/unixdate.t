@@ -10,8 +10,9 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
+$ntest=2;
 
-print "1..2\n"  if (! $runtests);
+print "1..$ntest\n"  if (! $runtests);
 &Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 $tests="
@@ -27,7 +28,7 @@ Wed Jan 3, 1996  at 8:11:12
 ";
 
 print "UnixDate...\n";
-&test_Func(\&UnixDate,$tests,$runtests);
+&test_Func($ntest,\&UnixDate,$tests,$runtests);
 
 1;
 

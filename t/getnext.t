@@ -10,8 +10,9 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
+$ntest=32;
 
-print "1..32\n"  if (! $runtests);
+print "1..$ntest\n"  if (! $runtests);
 &Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 $tests ="
@@ -244,6 +245,6 @@ nil
 ";
 
 print "GetNext...\n";
-&test_Func(\&Date_GetNext,$tests,$runtests);
+&test_Func($ntest,\&Date_GetNext,$tests,$runtests);
 
 1;

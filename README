@@ -1,4 +1,4 @@
-Copyright (c) 1995-1997 Sullivan Beck. All rights reserved.
+Copyright (c) 1995-1998 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
@@ -6,7 +6,7 @@ For information on installing Date::Manip, see the INSTALL file included in
 the distribution.
 
 Please send questions or bug reports to me rather than posting them to
-a newsgroup since I may miss them there, but read the next paragraph
+a newsgroup since I may miss them there, BUT read the next paragraph
 before you automatically start firing off email to me!
 
 If you have questions about Date::Manip, refer to the Date::Manip man page
@@ -16,6 +16,21 @@ of the Date::Manip man page is included in my home page given below.
 PLEASE read the man page thoroughly before posting any questions about
 Date::Manip to a newsgroup or emailing me.  If you've done this, I'll be
 glad to answer any questions not covered in the man page.
+
+
+** IMPORTANT NOTE **
+The internal format of a delta has changed (a week field has been added).
+I realize that this is going to cause some problems, but I am adding two
+other types of data (granularity and recurrence) to Date::Manip.  Both
+will resemble a delta, and both will have week fields, and I wanted all three
+to be as similar as possible.  You should use FormatDelta to extract
+information from a delta rather than doing it manually.  This is especially
+important since the format for a delta will be changed again in one of the
+next versions from Y:M:W:D:H:MN:S to Y:M:W:D:H:MN:S*FLAGS.
+
+I also plan on changing the internal format for a date to include
+the timezone ( YYYYMMDDHH:MN:SS+HHMN ).  Using UnixDate to extract information
+from a date is recommended.
 
 
 Notes for version 5.20:
@@ -29,8 +44,27 @@ Notes for version 5.20:
      dofw                              "Friday" (Friday of current week)
      Nth                               "12th", "1st" (day of current month)
 
+Notes for version 5.21:
+  Now passes taint checks (for 5.004_03 ... I haven't checked 5.004_04
+    which apparently does better taint checking).
+  Several speedups (significantly faster now).
+  Added some config variables:
+    YYtoYYYY, UpdateCurrTZ, TomorrowFirst
+  Added the Date_NearestWorkDay and Date_SetDateField functions.
+  Some minor bugfixes.
+  Fixed handling of ISO 8601 weeks 01, 52, and 53 (and added %G and %L formats
+    to UnixDate to acommadate this).
+  Better handling of foreign languages (now handles accents reasonably well).
+  Several minor additions to parsing formats:
+    British date formats
+    Added Sept as a valid abbreviation
+    Time can be written as 5pm
+  Added ForceDate variable.
+  Tests now work for all years.
   
-  Version 5.20 has some incompatibilities with previous versions:
+Backwards incompatibilities:
+
+  Version 5.20
     Some old formats were removed since they conflicted with ISO 8601
        formats.  MM-DD-YY (conflicts with YY-MM-DD), YYMMDD (conflicts
        with YYYYMM).
@@ -40,6 +74,11 @@ Notes for version 5.20:
        the first day.
     By default, the 1st week of the year contains Jan 4 (ISO 8601).  See
        the Jan1Week1 variable for overriding this.
+
+  Version 5.21
+    When running processes (running over time zone changes).  See UpdateCurrTZ
+       documentation.
+    The UnixDate formats %W and %U no longer return week 00.
 
   ############################################################################
   If you would like to stay informed about future versions of this module,

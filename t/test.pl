@@ -19,8 +19,10 @@
 #
 # If $runtests=0, everything is printed.  If it equals -N, only test N is
 # run.  If it equals N, start at test N.
+#
+# $ntest is the total number of tests.
 sub test_Func {
-  my($funcref,$tests,$runtests,@extra)=@_;
+  my($ntest,$funcref,$tests,$runtests,@extra)=@_;
   my(@tests)=split(/\n/,$tests);
   my($comment)="#";
   my($test,@args,$note,$exp,$ans,$approx,$ans1,$ans2,$t)=();
@@ -106,6 +108,7 @@ sub test_Func {
     }
   }
   print "$t tests\n"  if (defined $runtests);
+  print "ntest: $ntest\n"  if (defined $runtests && $ntest != $t);
 }
 
 1;

@@ -10,8 +10,9 @@ if ( -f "t/test.pl" ) {
 } else {
   die "ERROR: cannot find test.pl\n";
 }
+$ntest=2;
 
-print "1..2\n"  if (! $runtests);
+print "1..$ntest\n"  if (! $runtests);
 &Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 $dates="
@@ -26,6 +27,6 @@ $dates="
 
 print "Date (English,Internal=2)...\n";
 &Date_Init("Internal=2");
-&test_Func(\&ParseDate,$dates,$runtests);
+&test_Func($ntest,\&ParseDate,$dates,$runtests);
 
 1;
