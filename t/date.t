@@ -9,7 +9,7 @@ if (defined $runtests) {
   require "t/test.pl";
 }
 
-print "1..197\n"  if (! $runtests);
+print "1..198\n"  if (! $runtests);
 
 open(IN,"date +%Y%m%d%H:%M:%S |");
 $today=<IN>;
@@ -56,17 +56,17 @@ today at 16:00:00:05
 today at 12:00 am
     $todaydate 00:00:00
 
-today at 4:00 GMT
+today at 12:00 GMT
     >May safely fail if not in EST timezone.
-    $todaydate 09:00:00
+    $todaydate 07:00:00
 
 today at 4:00 PST
     >May safely fail if not in EST timezone.
-    $todaydate 01:00:00
+    $todaydate 07:00:00
 
 today at 4:00 -0800
     >May safely fail if not in EST timezone.
-    $todaydate 01:00:00
+    $todaydate 07:00:00
 
 today at noon
     $todaydate 12:00:00
@@ -77,8 +77,8 @@ tomorrow at noon
 
 # Test weeks
 22nd sunday
-    >May safely fail in 1997.
-    1996060200:00:00
+    >May safely fail in 1998.
+    1997060100:00:00
 
 twenty-second sunday 1996
     1996060200:00:00
@@ -87,24 +87,24 @@ twenty-second sunday 1996
     1996060200:00:00
 
 22nd sunday 12:00
-    >May safely fail in 1997.
-    1996060212:00:00
+    >May safely fail in 1998.
+    1997060112:00:00
 
 22nd sunday at 12:00
-    >May safely fail in 1997.
-    1996060212:00:00
+    >May safely fail in 1998.
+    1997060112:00:00
 
 22nd sunday at 12:00 EST
-    >May safely fail in 1997 or when not in EST.
-    1996060212:00:00
+    >May safely fail in 1998 or when not in EST.
+    1997060112:00:00
 
 22nd sunday in 1996 at 12:00 EST
-    >May safely fail in 1997 or when not in EST.
+    >May safely fail when not in EST.
     1996060212:00:00
 
 sunday wk 22
-    >May safely fail in 1997.
-    1996060200:00:00
+    >May safely fail in 1998.
+    1997060100:00:00
 
 sunday week twenty-second 1996
     1996060200:00:00
@@ -113,24 +113,24 @@ sunday w 22 in 1996
     1996060200:00:00
 
 sunday wks 22 12:00
-    >May safely fail in 1997.
-    1996060212:00:00
+    >May safely fail in 1998.
+    1997060112:00:00
 
 sunday week 22 at 12:00
-    >May safely fail in 1997.
-    1996060212:00:00
+    >May safely fail in 1998.
+    1997060112:00:00
 
 sunday week 22 at 12:00 EST
-    >May safely fail in 1997 or when not in EST.
-    1996060212:00:00
+    >May safely fail in 1998 or when not in EST.
+    1997060112:00:00
 
 sunday week 22 in 1996 at 12:00 EST
-    >May safely fail in 1997 or when not in EST.
+    >May safely fail when not in EST.
     1996060212:00:00
 
 sunday 22 wk
-    >May safely fail in 1997.
-    1996060200:00:00
+    >May safely fail in 1998.
+    1997060100:00:00
 
 sunday twenty-second week 1996
     1996060200:00:00
@@ -139,19 +139,19 @@ sunday 22 w in 1996
     1996060200:00:00
 
 sunday 22 wks 12:00
-    >May safely fail in 1997.
-    1996060212:00:00
+    >May safely fail in 1998.
+    1997060112:00:00
 
 sunday 22 week at 12:00
-    >May safely fail in 1997.
-    1996060212:00:00
+    >May safely fail in 1998.
+    1997060112:00:00
 
 sunday 22 week at 12:00 EST
-    >May safely fail in 1997 or when not in EST.
-    1996060212:00:00
+    >May safely fail in 1998 or when not in EST.
+    1997060112:00:00
 
 sunday 22 week in 1996 at 12:00 EST
-    >May safely fail in 1997 or when not in EST.
+    >May safely fail when not in EST.
     1996060212:00:00
 
 # Tests 'which day in mon' formats
@@ -159,15 +159,15 @@ last tue in Jun 96
     1996062500:00:00
 
 last tueSday of June
-    >Needs to be fixed in 1997.
-    1996062500:00:00
+    >Needs to be fixed in 1998.
+    1997062400:00:00
 
 first tue in Jun 1996
     1996060400:00:00
 
 1st tue in June
-    >Needs to be fixed in 1997.
-    1996060400:00:00
+    >Needs to be fixed in 1998.
+    1997060300:00:00
 
 3rd tuesday in Jun 96
     1996061800:00:00
@@ -183,7 +183,11 @@ first tue in Jun 1996
 
 3rd tuesday in Jun 96 at 10:30 pm GMT
     >May safely fail if not in EST timezone
-    1996061903:30:00
+    1996061817:30:00
+
+3rd tuesday in Jun 96 at 10:30 pm CET
+    >May safely fail if not in EST timezone
+    1996061816:30:00
 
 # Tests YYMMDD time
 1996061800:00:00
@@ -230,15 +234,15 @@ first tue in Jun 1996
 
 1993120105:30:25 pM GMT
     >May safely fail if not in EST timezone.
-    1993120122:30:25
+    1993120112:30:25
 
 19931201 at 05:30:25 pM GMT
     >May safely fail if not in EST timezone.
-    1993120122:30:25
+    1993120112:30:25
 
 19931201at05:30:25 pM GMT
     >May safely fail if not in EST timezone.
-    1993120122:30:25
+    1993120112:30:25
 
 # Tests YYMMDDHHMNSS
 19960618000000
@@ -267,7 +271,7 @@ first tue in Jun 1996
 
 12/10/65/5:30 pm GMT
     >May safely fail if not in EST timezone.
-    1965121022:30:00
+    1965121012:30:00
 
 12/10/65 at 5:30:25
     1965121005:30:25
@@ -313,7 +317,7 @@ first tue in Jun 1996
 
 12/10 at 05:30:25 GMT
     >May safely fail if not in EST timezone.
-    $currY 121010:30:25
+    $currY 121000:30:25
 
 12/10  5:30
     $currY 121005:30:00
@@ -363,7 +367,7 @@ Dec/10/65/5:30 pm
 
 Dec/10/65/5:30 pm GMT
     >May safely fail if not in EST timezone.
-   1965121022:30:00
+   1965121012:30:00
 
 Dec/10/65 at 5:30:25
     1965121005:30:25
@@ -409,7 +413,7 @@ Dec/10 at 05:30:25
 
 Dec/10 at 05:30:25 GMT
     >May safely fail if not in EST timezone.
-   $currY 121010:30:25
+   $currY 121000:30:25
 
 Dec/10  5:30
     $currY 121005:30:00
@@ -453,7 +457,7 @@ DeC first 1965
 
 10/Dec/65/5:30 pm GMT
     >May safely fail if not in EST timezone.
-   1965121022:30:00
+   1965121012:30:00
 
 10/Dec/65 at 5:30:25
     1965121005:30:25
@@ -508,7 +512,7 @@ DeC first 1965
 
 10-Dec at 05:30:25 GMT
     >May safely fail if not in EST timezone.
-   $currY 121010:30:25
+   $currY 121000:30:25
 
 10-Dec  5:30
     $currY 121005:30:00
@@ -536,7 +540,7 @@ DeC first 1965
 
 5:30 pm GMT 12/10/65
     >May safely fail if not in EST timezone.
-    1965121022:30:00
+    1965121012:30:00
 
 5:30:25/12/10/65
     1965121005:30:25
@@ -567,7 +571,7 @@ DeC first 1965
 
 5:30 pm GMT 12  10  65
     >May safely fail if not in EST timezone.
-    1965121022:30:00
+    1965121012:30:00
 
 5:30:25 12  10  1965
     1965121005:30:25
@@ -592,7 +596,7 @@ DeC first 1965
 
 05:30:25 GMT 12/10
     >May safely fail if not in EST timezone.
-    $currY 121010:30:25
+    $currY 121000:30:25
 
 5:30 12/10
     $currY 121005:30:00
@@ -675,10 +679,10 @@ DeC first 1965
 
 # Test ctime formats
 DeCember 10 05:30:12 1996
-    $currY 121005:30:12
+    1996121005:30:12
 
 DeC10 05:30:12 96
-    $currY 121005:30:12
+    1996121005:30:12
 
 ";
 

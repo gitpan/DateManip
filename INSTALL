@@ -36,8 +36,7 @@ and install it somewhere in your MANPATH.  I have it in:
         /usr/local/man/man3/Date::Manip.3
 
 
-Once it is installed, you can run the "runtests" command in the "t"
-directory to make sure everything works.
+To test it, cd to the "t" directory and run the "runtests" command.
 
 
 TESTS
@@ -49,3 +48,24 @@ they are run on a very slow computer (it will compare two different times
 that were supposed to be the same but aren't because a measurable amount of
 time passed between determining the time in two different ways).  I will
 try to get any bugs out of the test suite quickly.
+
+There are a few things which will almost always cause problems.  If you
+modify any of the default options in Manip.pm before running tests, some
+tests will probably fail.  Also, if you modify the DateManip.cnf file,
+tests may fail.  To get around this, you should probably run the following
+sequence of commands using an UNMODIFIED version of Date::Manip.
+
+   perl Makefile.PL
+   make
+   make test
+
+If all the tests pass, you're fine, so proceed with the installation.  Modify
+any defaults in Manip.pm you want and then type:
+
+   make
+   make install
+
+So, you build Date::Manip twice.  Once using an unmodified version which is
+used only to run the tests and a second time using any local modifications
+which you will then install.
+

@@ -2,6 +2,12 @@ Copyright (c) 1995,1996 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
+Notes for version 5.08:
+  Several bug fixes.
+  Lots of new timezones supported (including US/Eastern and PST8PDT forms).
+  Updated all tests to run in 1997.
+  Enhanced (and documented) Date_ConvTZ.
+
 Notes for version 5.07:
   DateCalc can now handle three modes: exact, approximate, and business
     mode.  Business mode allows you to ignore weekends/holidays in

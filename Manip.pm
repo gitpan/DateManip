@@ -322,15 +322,30 @@ use strict;
 #    ParseDateDelta now returns "" rather than "+0:0:0:0:0:0" when there is
 #       an error.
 #    Fixed a bug where "today" was not converted to the correct timezone.
-
+#
+# Version 5.07p2  01/03/97
+#    Added lots of timezone abbreviations.
+#    Can now understand PST8PDT type zones (but only in Date_TimeZone).
+#    Fixed some tests (good for another year).
+#    Fixed a bug where a delta component of "-0" would mess things up.
+#       Reported by Nigel Chapman <nigel@macavon.demon.co.uk>.
+#    Released two patches for 5.07.
+#
+# Version 5.08  01/24/97
+#    Fixed serious bug in ConvTZ pointed out by David Hall
+#       <dhall@sportsline.com>.
+#    Modified Date_ConvTZ (and documented it).
+#    Released 5.08 to get this and the other two patches into circulation.
 
 # Incompatibilities or changes from older version
+#
+# In 5.07
 #   %s format changed
 #   By default, the signs of stored in a different format (only minimum
 #     number of signs stored).  Backwards compatible if you set DeltaSigns=1.
 #   Date_Init arguments changed (old method supported but depreciated)
 
-$Date::Manip::Version="5.07";
+$Date::Manip::Version="5.08";
 
 ########################################################################
 # TODO
@@ -417,6 +432,15 @@ $Date::Manip::Version="5.07";
 
 ### MISC
 
+# Add to ParseDate (Rob Perelman)
+#    dofw           (Friday == &Date_GetNext("today","friday",0,"00:00:00")
+
+# Document how you need to use the stock .DateManip.cnf file when running
+# the tests.  Make sure that TZ=EST is set in the sample one.
+
+# Add a bunch of dayofyear formats (dayofyear is a 3 digit field that
+# replaces day/mon or mon/day.
+
 # Fix Date::Manip:: Future,Past,Next,Prev
 
 # Clean up ParseDate
@@ -440,8 +464,6 @@ $Date::Manip::Version="5.07";
 # Fill in some of the language variables ($past, $future, $zones).
 
 # Check Swedish/French special characters.
-
-# Add more timezone names.
 
 # Change EXPORT to EXPORT_OK (message 9 by Peter Bray)
 
@@ -1536,30 +1558,40 @@ sub Date_DaySuffix {
 }
 
 sub Date_ConvTZ {
-  my($date,$tz)=@_;
-  $tz=$Date::Manip::ConvTZ  if (! defined $tz  or  ! $tz);
-  return $date  if ($tz eq "IGNORE");
-  $tz=$Date::Manip::TZ  if (! $tz);
-  my($from,$to,$gmt)=();
-  $from=$Date::Manip::TZ;
-  $from=$Date::Manip::Zone{lc($from)}
+  my($date,$from,$to)=@_;
+  my($gmt)=();
+
+  if (! defined $to  or  ! $to) {
+    # 2 argument form, convert $from to $Date::Manip::ConvTZ
+    return $date
+      if (! defined $from  or  ! $from  or  $Date::Manip::ConvTZ eq "IGNORE");
+
+    $to=$Date::Manip::ConvTZ  if (! defined $to  or  ! $to);
+    $to=$Date::Manip::TZ  if (! $to);
+  }
+  if (! defined $from  or  ! $from) {
+    $from=$Date::Manip::ConvTZ;
+    $from=$Date::Manip::TZ  if (! $from);
+  }
+
+  $to=$Date::Manip::Zone{lc($to)}
+    if (exists $Date::Manip::Zone{lc($to)});
+  $from=$Date::Manip::Zone{lc($from)} 
     if (exists $Date::Manip::Zone{lc($from)});
-  $to=$tz;
-  $to=$Date::Manip::Zone{lc($to)}  if (exists $Date::Manip::Zone{lc($to)});
   $gmt=$Date::Manip::Zone{gmt};
 
   return $date  if ($from !~ /^[+-]\d{4}$/ or $to !~ /^[+-]\d{4}$/);
   return $date  if ($from eq $to);
 
   my($h,$m,$err)=();
-  # Convert $date from ConvTZ to GMT
+  # Convert $date from $from to GMT
   if ($from ne $gmt) {
     $from=~/([+-]\d{2})(\d{2})/;
     ($h,$m)=($1,$2);
     $h=-$h;
     $date=&DateCalc_DateDelta($date,"+0:0:0:$h:$m:00",\$err,0);
   }
-  # Convert $date from GMT to $tz
+  # Convert $date from GMT to $to
   if ($to ne $gmt) {
     $to=~/([+-]\d{2})(\d{2})/;
     ($h,$m)=($1,$2);
@@ -1569,45 +1601,44 @@ sub Date_ConvTZ {
 }
 
 sub Date_TimeZone {
-  my($null,$tz)=();
+  my($null,$tz,@tz,$std,$dst,$time,$isdst)=();
 
-  $tz="";
+  # Get timezones from all of the relevant places
 
-  if (defined $Date::Manip::TZ) {
-    $tz=$Date::Manip::TZ;
-    return $tz  if (defined $Date::Manip::Zone{lc($tz)} or $tz=~/^[+-]\d{4}/);
-  }
-
-  if (exists $ENV{"TZ"}) {
-    $tz=$ENV{"TZ"};
-    return $tz  if (defined $Date::Manip::Zone{lc($tz)} or $tz=~/^[+-]\d{4}/);
-  }
-
-  if (defined $main::TZ) {
-    $tz=$main::TZ;
-    return $tz  if (defined $Date::Manip::Zone{lc($tz)} or $tz=~/^[+-]\d{4}/);
-  }
-
-  if (-s "/etc/TIMEZONE") {
+  push(@tz,$Date::Manip::TZ)  if (defined $Date::Manip::TZ);  # TZ config var
+  push(@tz,$ENV{"TZ"})        if (exists $ENV{"TZ"});         # TZ environ var
+  push(@tz,$main::TZ)         if (defined $main::TZ);         # $main::TZ
+  if (-s "/etc/TIMEZONE") {                                   # /etc/TIMEZONE
     ($null,$tz) = split (/\=/,`grep ^TZ /etc/TIMEZONE`);
     chomp($tz);
-    $tz=~ s/\s*//;
-    return $tz  if (defined $Date::Manip::Zone{lc($tz)} or $tz=~/^[+-]\d{4}/);
+    $tz=~ s/\s+//g;
+    push(@tz,$tz);
   }
-
-  # The date command doesn't work on NT
-  if (defined $ENV{OS}  and  $ENV{OS} ne 'Windows_NT') {
-    $tz = `date`;
+  unless (defined $ENV{OS}  and  $ENV{OS} ne 'Windows_NT') {  # date command
+    $tz = `date`;                                             #  not on NT!
     chomp($tz);
     $tz=(split(/\s+/,$tz))[4];
-    return $tz  if (defined $Date::Manip::Zone{lc($tz)} or $tz=~/^[+-]\d{4}/);
+    push(@tz,$tz);
   }
 
-  $tz=$Date::Manip::TZ;
-  if (! defined $Date::Manip::Zone{lc($tz)} and $tz!~/^[+-]\d{4}/) {
-    die "ERROR: Date::Manip unable to determine TimeZone.\n";
+  # Now parse each one to find the first valid one.
+  foreach $tz (@tz) {
+    return $tz  if (defined $Date::Manip::Zone{lc($tz)} or $tz=~/^[+-]\d{4}/);
+
+    # Handle STD#DST# format
+    if ($tz =~ /^([a-z]+)\d([a-z]+)\d?$/i) {
+      ($std,$dst)=($1,$2);
+      next  if (! defined $Date::Manip::Zone{lc($std)} or
+                ! defined $Date::Manip::Zone{lc($dst)});
+      $time = time();
+      ($null,$null,$null,$null,$null,$null,$null,$null,$isdst) =
+        localtime($time);
+      return $dst  if ($isdst);
+      return $std;
+    }
   }
-  return $tz;
+
+  die "ERROR: Date::Manip unable to determine TimeZone.\n";
 }
 
 sub Date_Init {
@@ -2067,8 +2098,73 @@ sub Date_Init {
     #    $ZoneExp: regular expression
     #    %Zone   : all zones with their translation
     #    $Zone   : the current time zone
-    $zonesrfc="ut +0000 utc +0000 gmt +0000 est -0500 edt -0400 cst -0600 ".
-      "cdt -0500 mst -0700 mdt -0600 pst -0800 pdt -0700 z +0000 ".
+    $zonesrfc=
+      "US/Pacific  -0800 ".
+      "US/Mountain -0700 ".
+      "US/Central  -0600 ".
+      "US/Eastern  -0500 ".
+      "idlw -1200 ".  # International Date Line West
+      "nt   -1100 ".  # Nome
+      "hst  -1000 ".  # Hawaii Standard
+      "cat  -1000 ".  # Central Alaska
+      "ahst -1000 ".  # Alaska-Hawaii Standard
+      "yst  -0900 ".  # Yukon Standard
+      "hdt  -0900 ".  # Hawaii Daylight
+      "ydt  -0800 ".  # Yukon Daylight
+      "pst  -0800 ".  # Pacific Standard
+      "pdt  -0700 ".  # Pacific Daylight
+      "mst  -0700 ".  # Mountain Standard
+      "mdt  -0600 ".  # Mountain Daylight
+      "cst  -0600 ".  # Central Standard
+      "cdt  -0500 ".  # Central Daylight
+      "est  -0500 ".  # Eastern Standard
+      "edt  -0400 ".  # Eastern Daylight
+      "ast  -0400 ".  # Atlantic Standard
+      #"nst -0330 ".  # Newfoundland Standard       nst=North Sumatra    +0630
+      "nft  -0330 ".  # Newfoundland
+      #"gst -0300 ".  # Greenland Standard          gst=Guam Standard    +1000
+      "bst  -0300 ".  # Brazil Standard             bst=British Summer   +0100
+      "adt  -0300 ".  # Atlantic Daylight
+      "ndt  -0230 ".  # Newfoundland Daylight
+      "at   -0200 ".  # Azores
+      "wat  -0100 ".  # West Africa
+      "gmt  +0000 ".  # Greenwich Mean
+      "ut   +0000 ".  # Universal (Coordinated)
+      "utc  +0000 ".  # Universal (Coordinated)
+      "wet  +0000 ".  # Western European
+      "cet  +0100 ".  # Central European
+      "fwt  +0100 ".  # French Winter
+      "met  +0100 ".  # Middle European
+      "mewt +0100 ".  # Middle European Winter
+      "swt  +0100 ".  # Swedish Winter
+      #"bst +0100 ".  # British Summer              bst=Brazil standard  -0300
+      "eet  +0200 ".  # Eastern Europe, USSR Zone 1
+      "fst  +0200 ".  # French Summer
+      "mest +0200 ".  # Middle European Summer
+      "sst  +0200 ".  # Swedish Summer              sst=South Sumatra    +0700
+      "bt   +0300 ".  # Baghdad, USSR Zone 2
+      "it   +0330 ".  # Iran
+      "zp4  +0400 ".  # USSR Zone 3
+      "zp5  +0500 ".  # USSR Zone 4
+      "ist  +0530 ".  # Indian Standard
+      "zp6  +0600 ".  # USSR Zone 5
+      "nst  +0630 ".  # North Sumatra               nst=Newfoundland Std -0330
+      "wast +0700 ".  # West Australian Standard
+      #"sst +0700 ".  # South Sumatra, USSR Zone 6  sst=Swedish Summer   +0200
+      "jt   +0730 ".  # Java (3pm in Cronusland!)
+      "cct  +0800 ".  # China Coast, USSR Zone 7
+      "wadt +0800 ".  # West Australian Daylight
+      "jst  +0900 ".  # Japan Standard, USSR Zone 8
+      "cast +0930 ".  # Central Australian Standard
+      "east +1000 ".  # Eastern Australian Standard
+      "gst  +1000 ".  # Guam Standard, USSR Zone 9  gst=Greenland Std    -0300
+      "cadt +1030 ".  # Central Australian Daylight
+      "eadt +1100 ".  # Eastern Australian Daylight
+      "idle +1200 ".  # International Date Line East
+      "nzst +1200 ".  # New Zealand Standard
+      "nzt  +1200 ".  # New Zealand
+      "nzdt +1300 ".  # New Zealand Daylight
+      "z +0000 ".
       "a -0100 b -0200 c -0300 d -0400 e -0500 f -0600 g -0700 h -0800 ".
       "i -0900 k -1000 l -1100 m -1200 ".
       "n +0100 o +0200 p +0300 q +0400 r +0500 s +0600 t +0700 u +0800 ".
@@ -2077,6 +2173,8 @@ sub Date_Init {
     ($Date::Manip::ZoneExp,%Date::Manip::Zone)=
       &Date_Regexp("$zonesrfc $zones","sort,lc,under,back,opt,PRE,POST",
                    "keys");
+    # In order to handle "US/Eastern", quote "/" characters.
+    $Date::Manip::ZoneExp =~ s|/|\/|g;
     $Date::Manip::TZ=&Date_TimeZone;
 
     # Date::Manip:: misc. variables
@@ -2379,7 +2477,7 @@ sub NormalizeDelta {
   return "+0:+0:+0:+0:+0:+0"
     if ($delta =~ /^([+-]?0+:){5}[+-]?0+/ and $Date::Manip::DeltaSigns);
   return "+0:0:0:0:0:0" if ($delta =~ /^([+-]?0+:){5}[+-]?0+/);
-                            
+
   my($tmp,$sign1,$sign2,$len)=();
 
   # Calculate the length of the day in minutes
@@ -2409,6 +2507,9 @@ sub NormalizeDelta {
   $y    = ($tmp=int($mon/12));           # convert m to y
   $mon -= $tmp*12;
 
+  $y=0    if ($y eq "-0");               # get around silly -0 problem
+  $mon=0  if ($mon eq "-0");
+
   # Do the day/hour/min/sec part
 
   $s += $d*$len*60 + $h*3600 + $m*60;    # convert d/h/m to s
@@ -2425,8 +2526,14 @@ sub NormalizeDelta {
   $h  = ($tmp=int($m/60));               # convert m to h
   $m -= $tmp*60;
 
-  # Only include the 2nd sign if necessary
+  $d=0    if ($d eq "-0");               # get around silly -0 problem
+  $h=0    if ($h eq "-0");
+  $m=0    if ($m eq "-0");
+  $s=0    if ($s eq "-0");
+
+  # Only include two signs if necessary
   $sign1=$sign2  if ($y==0 and $mon==0);
+  $sign2=$sign1  if ($d==0 and $h==0 and $m==0 and $s==0);
   $sign2=""  if ($sign1 eq $sign2  and  ! $Date::Manip::DeltaSigns);
 
   if ($Date::Manip::DeltaSigns) {
@@ -3174,6 +3281,7 @@ sub ExpandTilde {
   my($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell)=();
   # ~USER/a =~      ~ USER      /a
   if ($file =~ m% ^~ ([^\/]*) (\/.*)? %x) {
+    return ""  if ($^O =~ /MacOS/);
     ($user,$file)=($1,$2);
     $user=""  if (! defined $user);
     $file=""  if (! defined $file);
@@ -3607,12 +3715,8 @@ this can be overridden using the Date_Init routine described below).  After
 that, the time zone is never used.  Once converted, information about the
 time zone is no longer stored or used.
 
-Timezones which are currently understood are:
-    Universal:  GMT, UT, UTC
-    US zones :  EST, EDT, CST, CDT, MST, MDT, PST, PDT
-    Military :  A to Z (except J)
-    Other    :  +HHMM or -HHMM
-Others will be added in the future.
+See the section below on TIMEZONEs for a list of all defined timezone
+names.
 
 Spaces in the date are almost always optional when there is absolutely
 no ambiguity if they are not present.  Years can be entered as 2 or 4 digits,
@@ -3725,8 +3829,7 @@ will work but
 will not (because Jul 16, 1996 is Tuesday, not Wednesday).  Note that
 depending on where the weekday comes, it may give unexpected results when
 used in array context.  For example, the date ("Jun","25","Sun","1990")
-would return June 25 of the current year since only Jun 25, 1990 is not
-Sunday.
+would return June 25 of the current year since Jun 25, 1990 is not Sunday.
 
 The times "12:00 am", "12:00 pm", and "midnight" are not well defined.  For
 good or bad, I use the following convention in Date::Manip:
@@ -3734,13 +3837,13 @@ good or bad, I use the following convention in Date::Manip:
   noon     = 12:00pm = 12:00:00
 and the day goes from 00:00:00 to 23:59:59.  In otherwords, midnight is the
 beginning of a day rather than the end of one.  At midnight on July 5, July
-5 has just begun.
+5 has just begun.  The time 24:00:00 is NOT allowed.
 
-The date returned is YYYYMMDDHH:MM:SS.  The advantage of this time
-format is that two times can be compared using simple string
-comparisons to find out which is later.  Also, it is readily understood
-by a human.  Alternately, the form YYYYMMDDHHMMSS can be used if that
-is more conveniant.  See Date_Init below.
+The format of the date returned is YYYYMMDDHH:MM:SS.  The advantage of this
+time format is that two times can be compared using simple string comparisons
+to find out which is later.  Also, it is readily understood by a human.
+Alternate forms can be used if that is more conveniant.  See Date_Init below
+and the config variable Internal.
 
 =item UnixDate
 
@@ -4126,14 +4229,53 @@ international dates.
 
  $tz=&Date_TimeZone
 
-This returns a timezone.  It looks in the following places for a
-timezone in the following order:
+This returns a timezone.  It looks in the following places for a timezone
+in the following order:
+
    $ENV{TZ}
    $main::TZ
    /etc/TIMEZONE
    date '+%Z'
-If it's not found in any of those places, GMT is returned.
-Obviously, this does not guarantee the correct timezone.
+
+If it's not found in any of those places, an error occurs:
+
+   ERROR: Date::Manip unable to determine TimeZone.
+
+Date_TimeZone is able to read zones of the format PST8PDT (see TIMEZONES
+documentation below).
+
+=item Date_ConvTZ
+
+ $date=&Date_ConvTZ($date,$from)
+ $date=&Date_ConvTZ($date,$from,$to)
+
+This converts a date (which MUST be in the format returned by ParseDate)
+from one timezone to another.  The behavior of Date_ConvTZ depends on
+whether it is called with 2 or 3 arguments.
+
+If it is called with 2 arguments, $date is assumed to be in timezone given
+in $from and it is converted to the timzone specified by the config
+variable ConvTZ.  If ConvTZ is set to "IGNORE", no conversion is done and
+$date is returned unmodified (see documentation on ConvTZ below).  This
+form is most often used internally by the Date::Manip module.  The 3
+argument form is of more use to most users.
+
+If Date_ConvTZ is called with 3 arguments, the config variable ConvTZ is
+ignored and $date is given in the timezone $from and is converted to the
+timzone $to.  If $from is not given, it defaults to the working timezone.
+NOTE: As in all other cases, the $date returned from Date_ConvTZ has no
+timezone information included as part of it, so calling UnixDate with the
+"%z" format will return the timezone that Date::Manip is working in
+(usually the local timezone).
+
+Example:  To convert 2/2/96 noon PST to CST (regardless of what timezone
+you are in, do the following:
+
+ $date=&ParseDate("2/2/96 noon");
+ $date=&Date_ConvTZ($date,"PST","CST");
+
+Both timezones MUST be in one of the formst listed below in the section
+TIMEZONES.
 
 =item Date_Init
 
@@ -4195,12 +4337,108 @@ Similar to Date_NextWorkDay.
 Returns the version of Date::Manip.
 
 =back
+=head1 TIMEZONES
+
+The following timezone names are currently understood (and can be used in
+parsing dates).  These are zones defined in RFC 822.
+
+    Universal:  GMT, UT
+    US zones :  EST, EDT, CST, CDT, MST, MDT, PST, PDT
+    Military :  A to Z (except J)
+    Other    :  +HHMM or -HHMM
+
+In addition, the following timezone abbreviations are also accepted.  In a
+few cases, the same abbreviation is used for two different timezones (for
+example, NST stands for Newfoundland Standare -0330 and North Sumatra +0630).
+In these cases, only 1 of the two is available.  The one preceded by a "#"
+sign is NOT available but is documented here for completeness.  This list of
+zones comes from the Time::Zone module by Graham Barr, David Muir Sharnoff,
+and Paul Foley.
+
+      IDLW    -1200    International Date Line West
+      NT      -1100    Nome
+      HST     -1000    Hawaii Standard
+      CAT     -1000    Central Alaska
+      AHST    -1000    Alaska-Hawaii Standard
+      YST     -0900    Yukon Standard
+      HDT     -0900    Hawaii Daylight
+      YDT     -0800    Yukon Daylight
+      PST     -0800    Pacific Standard
+      PDT     -0700    Pacific Daylight
+      MST     -0700    Mountain Standard
+      MDT     -0600    Mountain Daylight
+      CST     -0600    Central Standard
+      CDT     -0500    Central Daylight
+      EST     -0500    Eastern Standard
+      EDT     -0400    Eastern Daylight
+      AST     -0400    Atlantic Standard
+     #NST     -0330    Newfoundland Standard       nst=North Sumatra    +0630
+      NFT     -0330    Newfoundland
+     #GST     -0300    Greenland Standard          gst=Guam Standard    +1000
+      BST     -0300    Brazil Standard             bst=British Summer   +0100
+      ADT     -0300    Atlantic Daylight
+      NDT     -0230    Newfoundland Daylight
+      AT      -0200    Azores
+      WAT     -0100    West Africa
+      GMT     +0000    Greenwich Mean
+      UT      +0000    Universal (Coordinated)
+      UTC     +0000    Universal (Coordinated)
+      WET     +0000    Western European
+      CET     +0100    Central European
+      FWT     +0100    French Winter
+      MET     +0100    Middle European
+      MEWT    +0100    Middle European Winter
+      SWT     +0100    Swedish Winter
+     #BST     +0100    British Summer              bst=Brazil standard  -0300
+      EET     +0200    Eastern Europe, USSR Zone 1
+      FST     +0200    French Summer
+      MEST    +0200    Middle European Summer
+      SST     +0200    Swedish Summer              sst=South Sumatra    +0700
+      BT      +0300    Baghdad, USSR Zone 2
+      IT      +0330    Iran
+      ZP4     +0400    USSR Zone 3
+      ZP5     +0500    USSR Zone 4
+      IST     +0530    Indian Standard
+      ZP6     +0600    USSR Zone 5
+      NST     +0630    North Sumatra               nst=Newfoundland Std -0330
+      WAST    +0700    West Australian Standard
+     #SST     +0700    South Sumatra, USSR Zone 6  sst=Swedish Summer   +0200
+      JT      +0730    Java (3pm in Cronusland!)
+      CCT     +0800    China Coast, USSR Zone 7
+      WADT    +0800    West Australian Daylight
+      JST     +0900    Japan Standard, USSR Zone 8
+      CAST    +0930    Central Australian Standard
+      EAST    +1000    Eastern Australian Standard
+      GST     +1000    Guam Standard, USSR Zone 9  gst=Greenland Std    -0300
+      CADT    +1030    Central Australian Daylight
+      EADT    +1100    Eastern Australian Daylight
+      IDLE    +1200    International Date Line East
+      NZST    +1200    New Zealand Standard
+      NZT     +1200    New Zealand
+      NZDT    +1300    New Zealand Daylight
+
+      US/Pacific  -0800
+      US/Mountain -0700
+      US/Central  -0600
+      US/Eastern  -0500
+
+Others can be added in the future upon request.
+
+DateManip needs to be able to determine the local timezone.  It can do this
+by certain things such as the TZ environment variable (see Date_TimeZone
+documentation above) or useing the TZ config variable (described below).
+In either case, the timezone can be of the form STD#DST (for example
+EST5EDT).  Both the standard and daylight savings time abbreviations must
+be in the table above in order for this to work.  Also, this form may NOT
+be used when parsing a date as there is no way to determine whether the
+date is in daylight saving time or not.
+
 =head1 BUSINESS MODE
 
 Anyone using business mode is going to notice a few quirks about it which
 should be explained.  When I designed business mode, I had in mind what UPS
 tells me when they say 2 day delivery, or what the local business which
-promises 1 business day turnaround.
+promises 1 business day turnaround really means.
 
 If you do a business day calculation (with the workday set to 9:00-5:00),
 you will get the following:
@@ -4240,6 +4478,11 @@ specially (depending on what you want.
 So Saturday + 1 business day = Tuesday at 9:00 (which means anything
 from Monday 17:00 to Tuesday 9:00), but Monday at 9:01 + 1 business
 day = Tuesday at 9:01 which is exact.
+
+If this is not exactly what you have in mind, don't use the DateCalc
+routine.  You can probably get whatever behavior you want using the
+routines Date_IsWorkDay, Date_NextWorkDay, and Date_PrevWorkDay described
+above.
 
 =head1 CUSTOMIZING DATE::MANIP
 
@@ -4359,14 +4602,8 @@ behavior (Oct 12).
 
 Date::Manip is able to understand some timezones (and others will be added
 in the future).  At the very least, all zones defined in RFC 822 are
-supported.  Currently supported zones include:
-
-   Universal:  GMT, UT, UTC
-   US zones :  EST, EDT, CST, CDT, MST, MDT, PST, PDT
-   Military :  A to Z (except J)
-   Other    :  +HHMM or -HHMM
-
-and all timezones should be entered as one of the above.
+supported.  Currently supported zones are listed in the TIMEZONES section
+above and all timezones should be entered as one of them.
 
 Date::Manip must be able to determine the timezone the user is in.  It does
 this by looking in the following places:
@@ -4376,9 +4613,9 @@ this by looking in the following places:
    the file /etc/TIMEZONE
    the 5th element of the unix "date" command (not available on NT machines)
 
-At least one of these must contain a timezone in one of the supported forms.
-If it doesn't, the TZ variable must be set to contain the local timezone
-in the appropriate form.
+At least one of these should contain a timezone in one of the supported
+forms.  If it doesn't, the TZ variable must be set to contain the local
+timezone in the appropriate form.
 
 The TZ variable will override the other methods of determining the
 timezone, so it should probably be left blank if any of the other methods

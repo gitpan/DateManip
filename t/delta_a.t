@@ -9,7 +9,7 @@ if (defined $runtests) {
   require "t/test.pl";
 }
 
-print "1..28\n"  if (! $runtests);
+print "1..30\n"  if (! $runtests);
 
 $deltas="
 
@@ -98,6 +98,12 @@ in 1:2:3:4:5:6
 
 +1:-1:-1:+1
     +0:0:0:22:59:1
+
+-0:1:+0:0:0:0
+    -0:1:0:0:0:0
+
+-0:1:+0:-0:0:0
+    -0:1:0:0:0:0
 ";
 
 print "Delta...\n";
