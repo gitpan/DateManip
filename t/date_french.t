@@ -10,13 +10,17 @@ if (defined $runtests) {
 }
 
 print "1..89\n"  if (! $runtests);
+&Date_Init("PersonalCnfPath=.:./t","IgnoreGlobalCnf=1");
 
-open(IN,"date +%Y%m%d%H:%M:%S |");
-$today=<IN>;
-chop($today);
-close(IN);
-$today=~ /(\d\d\d\d)(\d\d)(\d\d)(\d\d):(\d\d):(\d\d)/;
-($currY,$currM,$currD,$currH,$currMN,$currS)=($1,$2,$3,$4,$5,$6);
+($currS,$currMN,$currH,$currD,$currM,$currY)=localtime(time);
+$currY+=1900;
+$currM++;
+$currM ="0$currM"   while (length $currM < 2);
+$currD ="0$currD"   while (length $currD < 2);
+$currH ="0$currH"   while (length $currH < 2);
+$currMN="0$currMN"  while (length $currMN < 2);
+$currS ="0$currS"   while (length $currS < 2);
+$today="$currY$currM$currD$currH:$currMN:$currS";
 #$todaydate="$currY$currM$currD";
 $yesterday="$currY$currM". $currD-1 ."$currH:$currMN:$currS";
 $tomorrow ="$currY$currM". $currD+1 ."$currH:$currMN:$currS";

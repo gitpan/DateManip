@@ -92,6 +92,8 @@ require Exporter;
    Date_PrevWorkDay
 );
 use strict;
+use Carp;
+use Cwd;
 #use POSIX qw(tzname);
 
 ########################################################################
@@ -336,6 +338,15 @@ use strict;
 #       <dhall@sportsline.com>.
 #    Modified Date_ConvTZ (and documented it).
 #    Released 5.08 to get this and the other two patches into circulation.
+#
+# Version 5.09  01/28/97
+#    Upgraded to 5.003_23 and fixed one problem associated with it.
+#    Used carp and changed all die's to confess.
+#    Changed SearchPath return value to undef to fix a problem on some
+#       systems.  Fixed by Michael Fuhr <mfuhr@dimensional.com>.
+#    Replaced all UNIX commands with perl equivalents (date with localtime
+#       in the tests, pwd with cwd in the path routines).
+#    Cleaned up all routines working with the path.
 
 # Incompatibilities or changes from older version
 #
@@ -345,13 +356,16 @@ use strict;
 #     number of signs stored).  Backwards compatible if you set DeltaSigns=1.
 #   Date_Init arguments changed (old method supported but depreciated)
 
-$Date::Manip::Version="5.08";
+$Date::Manip::Version="5.09";
 
 ########################################################################
 # TODO
 ########################################################################
 
 ################ NEXT VERSION
+
+# Try to get rid of all `date` and other `UNIX COMMAND` things in Date::Manip
+#    `grep ^TZ`; `date`  in Date_TimeZone
 
 ### SPEEDUPS
 
@@ -637,7 +651,7 @@ sub Date_GetPrev {
       ($hr,$min,$sec)=($h,$mn,$ts);
       $delta="-0:0:0:0:1:0";
     } else {
-      die "ERROR: invalid arguments in Date_GetPrev.\n";
+      confess "ERROR: invalid arguments in Date_GetPrev.\n";
     }
 
     $d=&Date_SetTime($date,$hr,$min,$sec);
@@ -695,7 +709,7 @@ sub Date_GetNext {
       ($hr,$min,$sec)=($h,$mn,$ts);
       $delta="+0:0:0:0:1:0";
     } else {
-      die "ERROR: invalid arguments in Date_GetNext.\n";
+      confess "ERROR: invalid arguments in Date_GetNext.\n";
     }
 
     $d=&Date_SetTime($date,$hr,$min,$sec);
@@ -1433,7 +1447,8 @@ sub ParseDate {
 
 sub Date_DayOfWeek {
   my($m,$d,$y)=@_;
-  die "ERROR: Date_DayOfWeek requires a 4 digit year.\n"  if ($y!~/^\d{4}$/);
+  confess "ERROR: Date_DayOfWeek requires a 4 digit year.\n"
+    if ($y!~/^\d{4}$/);
   my($dayofweek,$dec31)=();
 
   $dec31=2;                     # Dec 31, 0999 was Tuesday
@@ -1443,7 +1458,7 @@ sub Date_DayOfWeek {
 
 sub Date_SecsSince1970 {
   my($m,$d,$y,$h,$mn,$s)=@_;
-  die "ERROR: Date_SecsSince1970 requires a 4 digit year.\n"
+  confess "ERROR: Date_SecsSince1970 requires a 4 digit year.\n"
     if ($y!~/^\d{4}$/);
   my($sec_now,$sec_70)=();
   $sec_now=(&Date_DaysSince999($m,$d,$y)-1)*24*3600 + $h*3600 + $mn*60 + $s;
@@ -1454,7 +1469,7 @@ sub Date_SecsSince1970 {
 
 sub Date_SecsSince1970GMT {
   my($m,$d,$y,$h,$mn,$s)=@_;
-  die "ERROR: Date_SecsSince1970GMT requires a 4 digit year.\n"
+  confess "ERROR: Date_SecsSince1970GMT requires a 4 digit year.\n"
     if ($y!~/^\d{4}$/);
 
   my($sec)=&Date_SecsSince1970($m,$d,$y,$h,$mn,$s);
@@ -1473,7 +1488,7 @@ sub Date_SecsSince1970GMT {
 
 sub Date_DaysSince999 {
   my($m,$d,$y)=@_;
-  die "ERROR: Date_DaysSince999 requires a 4 digit year.\n"
+  confess "ERROR: Date_DaysSince999 requires a 4 digit year.\n"
     if ($y!~/^\d{4}$/);
   my($Ny,$N4,$N100,$N400,$dayofyear,$days)=();
   my($cc,$yy)=();
@@ -1503,7 +1518,8 @@ sub Date_DaysSince999 {
 
 sub Date_DayOfYear {
   my($m,$d,$y)=@_;
-  die "ERROR: Date_DayOfYear requires a 4 digit year.\n"  if ($y!~/^\d{4}$/);
+  confess "ERROR: Date_DayOfYear requires a 4 digit year.\n"
+    if ($y!~/^\d{4}$/);
   my(@daysinmonth)=(0,31,28,31,30,31,30,31,31,30,31,30,31);
   my($daynum,$i)=();
   $daysinmonth[2]=29  if (&Date_LeapYear($y));
@@ -1519,14 +1535,16 @@ sub Date_DayOfYear {
 
 sub Date_DaysInYear {
   my($y)=@_;
-  die "ERROR: Date_DaysInYear requires a 4 digit year.\n"  if ($y!~/^\d{4}$/);
+  confess "ERROR: Date_DaysInYear requires a 4 digit year.\n"
+    if ($y!~/^\d{4}$/);
   return 366  if (&Date_LeapYear($y));
   return 365;
 }
 
 sub Date_WeekOfYear {
   my($m,$d,$y,$f)=@_;
-  die "ERROR: Date_WeekOfWeek requires a 4 digit year.\n"  if ($y!~/^\d{4}$/);
+  confess "ERROR: Date_WeekOfWeek requires a 4 digit year.\n"
+    if ($y!~/^\d{4}$/);
   my($jan1)=&Date_DayOfWeek(1,1,$y); # Jan 1 is what day of week
   my($dofy)=&Date_DayOfYear($m,$d,$y);
 
@@ -1545,7 +1563,8 @@ sub Date_WeekOfYear {
 
 sub Date_LeapYear {
   my($y)=@_;
-  die "ERROR: Date_LeapYear requires a 4 digit year.\n"  if ($y!~/^\d{4}$/);
+  confess "ERROR: Date_LeapYear requires a 4 digit year.\n"
+    if ($y!~/^\d{4}$/);
   return 0 unless $y % 4 == 0;
   return 1 unless $y % 100 == 0;
   return 0 unless $y % 400 == 0;
@@ -1638,7 +1657,7 @@ sub Date_TimeZone {
     }
   }
 
-  die "ERROR: Date::Manip unable to determine TimeZone.\n";
+  confess "ERROR: Date::Manip unable to determine TimeZone.\n";
 }
 
 sub Date_Init {
@@ -1697,7 +1716,8 @@ sub Date_Init {
     if ($Date::Manip::GlobalCnf) {
       $file=&ExpandTilde($Date::Manip::GlobalCnf);
     }
-    &ReadInitFile($file)  if (defined $file  and  -r "$file");
+    &ReadInitFile($file)  if (defined $file  and  $file  and  -r $file  and
+                              -s $file  and  -f $file);
   }
   if ($Date::Manip::InitFilesRead<2) {
     $Date::Manip::InitFilesRead=2;
@@ -1706,7 +1726,8 @@ sub Date_Init {
       $file=&SearchPath($Date::Manip::PersonalCnf,
                         $Date::Manip::PersonalCnfPath,"r");
     }
-    &ReadInitFile($file)  if (defined $file  and  -r $file);
+    &ReadInitFile($file)  if (defined $file  and  $file  and  -r $file  and
+                              -s $file  and  -f $file);
   }
 
   foreach (@args) {
@@ -1718,13 +1739,13 @@ sub Date_Init {
     &Date_SetConfigVariable($var,$val);
   }
 
-  die "ERROR: Unknown FirstDay in Date::Manip.\n"
+  confess "ERROR: Unknown FirstDay in Date::Manip.\n"
     if (! &IsInt($Date::Manip::FirstDay,0,6));
-  die "ERROR: Unknown WorkWeekBeg in Date::Manip.\n"
+  confess "ERROR: Unknown WorkWeekBeg in Date::Manip.\n"
     if (! &IsInt($Date::Manip::WorkWeekBeg,0,6));
-  die "ERROR: Unknown WorkWeekEnd in Date::Manip.\n"
+  confess "ERROR: Unknown WorkWeekEnd in Date::Manip.\n"
     if (! &IsInt($Date::Manip::WorkWeekEnd,0,6));
-  die "ERROR: Invalid WorkWeek in Date::Manip.\n"
+  confess "ERROR: Invalid WorkWeek in Date::Manip.\n"
     if ($Date::Manip::WorkWeekEnd <= $Date::Manip::WorkWeekBeg);
 
   my($i,$j,@tmp,@tmp2,@tmp3,$a,$b,$now,$offset,$last,$in,$at,$on,$tmp,%tmp,
@@ -1982,7 +2003,7 @@ sub Date_Init {
       # } elsif ($lang eq "Russian") {
 
     } else {
-      die "ERROR: Unknown language in Date::Manip.\n";
+      confess "ERROR: Unknown language in Date::Manip.\n";
     }
 
     # Date::Manip:: variables for months
@@ -2214,9 +2235,9 @@ sub Date_Init {
       $Date::Manip::WorkDayEnd="23:59";
 
     } else {
-      die "ERROR: Invalid WorkDayBeg in Date::Manip.\n"
+      confess "ERROR: Invalid WorkDayBeg in Date::Manip.\n"
         if (! (($h1,$m1)=&CheckTime($Date::Manip::WorkDayBeg)));
-      die "ERROR: Invalid WorkDayEnd in Date::Manip.\n"
+      confess "ERROR: Invalid WorkDayEnd in Date::Manip.\n"
         if (! (($h2,$m2)=&CheckTime($Date::Manip::WorkDayEnd)));
 
       ($Date::Manip::WDBh,$Date::Manip::WDBm)=($h1,$m1);
@@ -2426,7 +2447,7 @@ sub Date_Regexp {
   } elsif ($ref eq "ARRAY") {
     $list = join("&&&",@$list);
   } else {
-    die "ERROR: Date_Regexp.\n";
+    confess "ERROR: Date_Regexp.\n";
   }
 
   if (! $list) {
@@ -2599,7 +2620,7 @@ sub FormDate {
     $hmn=$mns=":";
 
   } else {
-    die "ERROR: Invalid internal format in Date_FormDate.\n";
+    confess "ERROR: Invalid internal format in Date_FormDate.\n";
   }
   $m="0$m"    if (length($m)==1);
   $d="0$d"    if (length($d)==1);
@@ -2665,7 +2686,7 @@ sub CheckDate {
     $hmn=$mns=":";
 
   } else {
-    die "ERROR: Invalid internal format in Date_CheckDate.\n";
+    confess "ERROR: Invalid internal format in Date_CheckDate.\n";
   }
 
   my($t)="^$y$ym$m$md$d$dh$h$hmn$mn$mns$s\$";
@@ -2832,7 +2853,7 @@ sub DateCalc_DateDate {
     $date1=&Date_NextWorkDay($date1,1,0);
     $date1=&Date_SetTime($date1,$Date::Manip::WorkDayBeg);
     $d1=( &CheckDate($date1) )[2];
-    die "ERROR: DateCalc DateDate Business.\n"  if ($d1 != $d2);
+    confess "ERROR: DateCalc DateDate Business.\n"  if ($d1 != $d2);
   }
 
   # Hours, minutes, seconds
@@ -3033,7 +3054,7 @@ sub Date_SetConfigVariable {
   $Date::Manip::ResetWorkDay=1,    return  if ($var =~ /^WorkDay24Hr$/i);
   $Date::Manip::DeltaSigns=$val,   return  if ($var =~ /^DeltaSigns$/i);
 
-  die "ERROR: Unknown configuration variable $var in Date::Manip.\n";
+  confess "ERROR: Unknown configuration variable $var in Date::Manip.\n";
 }
 
 # This reads an init file.
@@ -3044,7 +3065,7 @@ sub ReadInitFile {
   my($var,$val,$date,$name)=();
 
   open(IN,$file);
-  while($_=<IN>) {
+  while(defined ($_=<IN>)) {
     chomp;
     s/^\s+//;
     s/\s+$//;
@@ -3055,13 +3076,13 @@ sub ReadInitFile {
     }
 
     if ($section =~ /var/) {
-      die "ERROR: invalid Date::Manip config file line.\n  $_\n"
+      confess "ERROR: invalid Date::Manip config file line.\n  $_\n"
         if (! /(.*\S)\s*=\s*(.*)$/);
       ($var,$val)=($1,$2);
       &Date_SetConfigVariable($var,$val);
 
     } elsif ($section =~ /holiday/i) {
-      die "ERROR: invalid Date::Manip config file line.\n  $_\n"
+      confess "ERROR: invalid Date::Manip config file line.\n  $_\n"
         if (! /(.*\S)\s*=\s*(.*)$/);
       ($date,$name)=($1,$2);
       $name=""  if (! defined $name);
@@ -3270,19 +3291,38 @@ sub Index_First {
   return 0;
 }
 
+# $File=&CleanFile($file);
+#   This cleans up a path to remove the following things:
+#     double slash       /a//b  -> /a/b
+#     trailing dot       /a/.   -> /a
+#     leading dot        ./a    -> a
+#     trailing slash     a/     -> a
+sub CleanFile {
+  my($file)=@_;
+  $file =~ s/\s*$//;
+  $file =~ s/^\s*//;
+  $file =~ s|//+|/|g;  # multiple slash
+  $file =~ s|/\.$|/|;  # trailing /. (leaves trailing slash)
+  $file =~ s|^\./||    # leading ./
+    if ($file ne "./");
+  $file =~ s|/$||      # trailing slash
+    if ($file ne "/");
+  return $file;
+}
+
 # $File=&ExpandTilde($file);
 #   This checks to see if a "~" appears as the first character in a path.
 #   If it does, the "~" expansion is interpreted (if possible) and the full
 #   path is returned.  If a "~" expansion is used but cannot be
-#   interpreted, an empty string is returned.
+#   interpreted, an empty string is returned.  CleanFile is called.
 sub ExpandTilde {
   my($file)=shift;
   my($user)=();
   my($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell)=();
-  # ~USER/a =~      ~ USER      /a
+  # ~aaa/bbb=      ~  aaa      /bbb
   if ($file =~ m% ^~ ([^\/]*) (\/.*)? %x) {
-    return ""  if ($^O =~ /MacOS/);
     ($user,$file)=($1,$2);
+    return ""  if ($^O =~ /MacOS/);   # MacPerl doesn't have getpwnam/getpwuid
     $user=""  if (! defined $user);
     $file=""  if (! defined $file);
     if ($user) {
@@ -3292,17 +3332,116 @@ sub ExpandTilde {
       ($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell)=
         getpwuid($<);
     }
-    if (! $dir) {
-      return "";
-    }
-    # For root's sake...
-    $file="$dir$file";
-    $file=~ s#//#/#g;
+    return ""  if (! $dir);
+
+    $file="$dir/$file";
   }
-  return $file;
+  return &CleanFile($file);
 }
 
-# $File=&SearchPath($file,$path [,$mode [,@suffixes]]);
+# $File=&FullFilePath($file);
+#   Returns the full path to $file.  Returns an empty string if a "~"
+#   expansion cannot be interpreted.  The path does not need to exist.
+#   CleanFile is called.
+sub FullFilePath {
+  my($file)=shift;
+  $file=&ExpandTilde($file);
+  return ""  if (! $file);
+  $file=cwd . "/$file"  if ($file !~ m|^/|);   # $file = "a/b/c"
+  return &CleanFile($file);
+}
+
+# $Flag=&CheckFilePath($file [,$mode]);
+#   Checks to see if $file exists, to see what type it is, and whether
+#   the script can access it.  If it exists and has the correct mode, 1
+#   is returned.
+#
+#   $mode is a string which may contain any of the valid file test operator
+#   characters except t, M, A, C.  The appropriate test is run for each
+#   character.  For example, if $mode is "re" the -r and -e tests are both
+#   run.
+#
+#   An empty string is returned if the file doesn't exist.  A 0 is returned
+#   if the file exists but any test fails.
+#
+#   All characters in $mode which do not correspond to valid tests are
+#   ignored.
+sub CheckFilePath {
+  my($file,$mode)=@_;
+  my($test)=();
+  $file=&FullFilePath($file);
+  $mode = ""  if (! defined $mode);
+
+  # File doesn't exist
+  return "" if (! defined $file  or  ! $file  or  ! -e $file );
+
+  # Run tests
+  foreach $test ("r","w","x","R","W","X","o","O","e","z","s","f","d","l","s",
+                 "p","b","c","u","g","k","T","B") {
+    return 0  if ($mode =~ /$test/  and  ! eval "-$test '$file'");
+  }
+
+  return 1;
+}
+
+# $Path=&FixPath($path [,$full] [,$mode] [,$error]);
+#   Makes sure that every directory in $path (a colon separated list of
+#   directories) appears as a full path or relative path.  All "~"
+#   expansions are removed.  All trailing slashes are removed also.  If
+#   $full is non-nil, relative paths are expanded to full paths as well.
+#
+#   If $mode is given, it may be either "e", "r", or "w".  In this case,
+#   additional checking is done to each directory.  If $mode is "e", it
+#   need ony exist to pass the check.  If $mode is "r", it must have have
+#   read and execute permission.  If $mode is "w", it must have read,
+#   write, and execute permission.
+#
+#   The value of $error determines what happens if the directory does not
+#   pass the test.  If it is non-nil, if any directory does not pass the
+#   test, the subroutine returns the empty string.  Otherwise, it is simply
+#   removed from $path.
+#
+#   The corrected path is returned.
+sub FixPath {
+  my($path,$full,$mode,$err)=@_;
+  my(@dir)=split(/:/,$path);
+  $full=0  if (! defined $full);
+  $mode="" if (! defined $mode);
+  $err=0   if (! defined $err);
+  $path="";
+  if ($mode eq "e") {
+    $mode="de";
+  } elsif ($mode eq "r") {
+    $mode="derx";
+  } elsif ($mode eq "w") {
+    $mode="derwx";
+  }
+
+  foreach (@dir) {
+
+    # Expand path
+    if ($full) {
+      $_=&FullFilePath($_);
+    } else {
+      $_=&ExpandTilde($_);
+    }
+    if (! $_) {
+      return ""  if ($err);
+      next;
+    }
+
+    # Check mode
+    if (! $mode  or  &CheckFilePath($_,$mode)) {
+      $path .= ":$_";
+    } else {
+      return "" if ($err);
+    }
+  }
+  $path =~ s/^://;
+  return $path;
+}
+
+# $File=&SearchPath($file,$path [,$mode] [,@suffixes]);
 #   Searches through directories in $path for a file named $file.  The
 #   full path is returned if one is found, or an empty string otherwise.
 #   The file may exist with one of the @suffixes.  The mode is checked
@@ -3313,7 +3452,7 @@ sub ExpandTilde {
 sub SearchPath {
   my($file,$path,$mode,@suff)=@_;
   my($f,$s,$d,@dir,$fs)=();
-  $path=&FixPath($path,1,"e");
+  $path=&FixPath($path,1,"r");
   @dir=split(/:/,$path);
   foreach $d (@dir) {
     $f="$d/$file";
@@ -3327,172 +3466,6 @@ sub SearchPath {
   return "";
 }
 
-# $Path=&FixPath($path [,$relative] [,$mode]);
-#   Makes sure that every directory in $path appears as a full path or
-#   relative path.  All "~" expansions are removed.  All trailing slashes
-#   are removed also.  If $relative is non-nil, relative paths are expanded
-#   to full paths as well.  If $mode is given, additional checking is done
-#   to each directory and directories that do not pass the check are
-#   removed from the path.  Valid modes are:
-#      x   : directories do not have to exist (though "~" expansions that
-#            cannot be exmpanded are removed) and no mode checking is done.
-#      e   : each directory must exist or it is removed from the list
-#      E   : each directory must exist or an error occurs
-#      r   : each directory must exist with the r, and x permssion or it is
-#            removed from the list
-#      R   : each directory must exist with the r, and x permssion or an error
-#            occurs
-#      eR  : each directory that exists must have the r, and x permssion or
-#            an error occurs (nonexistant directories are removed from the
-#            list)
-#      w   : each directory must exist with the r, w, and x permissions set
-#            or an error occurs
-#      W   : each directory must exist with the r, w, and x permissions set
-#            or an error occurs
-#      eW  : each directory that exists must have the r, w, and x permssion
-#            or an error occurs (nonexistant directories are removed from the
-#            list)
-#   If no mode is given, it defaults to "x".
-#
-#   $path is a colon separated list of directories.
-#
-#   The empty string is returned if an error occurs.  The path is returned
-#   otherwise.
-sub FixPath {
-  my($path,$rel,$mode)=@_;
-  local($_)=();
-  my(@dir)=split(/:/,$path);
-  $mode="x" if (! $mode);
-  if ($mode !~ /x|e|E|r|R|eR|w|W|eW/) {
-    die "ERROR: unknonw mode $mode in FixPath.\n";
-  }
-  $path="";
-  foreach (@dir) {
-
-    # Expand path
-    if ($rel) {
-      $_=&FullFilePath($_);
-    } else {
-      $_=&ExpandTilde($_);
-    }
-
-    # x mode
-    if ($mode eq "x") {
-      $path .= ":$_" if ($_);
-      next;
-    }
-
-    # If directory doesn't exist, either remove it or return an error
-    if (! &CheckFilePath($_,"d")) {
-      next if ($mode=~/e/ || $mode eq "r" || $mode eq "w");
-      return "";
-    }
-
-    # Check mode
-    if ($mode =~ /^e$/i or
-        $mode =~ /r/i && &CheckFilePath($_,"rx") or
-        $mode =~ /w/i && &CheckFilePath($_,"rwx")) {
-      $path .= ":$_";
-    } else {
-      if ($mode =~ /RW/) {
-        return "";
-      } else {
-        next;
-      }
-    }
-  }
-  $path =~ s/^://;
-  return $path;
-}
-
-# $Flag=&CheckFilePath($file [,$mode]);
-#   Checks to see if $file exists, to see what type it is, and whether
-#   the script can access it.
-#
-#   If $mode contains any of the characters "fdlSpbc", it checks to
-#   see if it is type file, directory, soft link, socket, named pipe,
-#   block special, or character special.  If none are present, the file
-#   type is ignored.
-#
-#   Soft links to a certain type of file will pass the same tests that
-#   that tests on that type of file would pass (in addition to passing
-#   the test that they are a link).
-#
-#   If $mode contains any of the characters "rwxugk", it tests to to see
-#   if the file is readable, writable, or executable by the script or has
-#   the setuid, setgid, or sticky bit set.
-#
-#   If $mode contains any of the characters "zs", it checks to see if the
-#   file is of zero/non-zero length.
-#
-#   An empty string is returned if the file doesn't exist, is the wrong
-#   type (a directory when a file was expected or vice versa), or has the
-#   wrong size.  0 is returned if the file exists but does not have the
-#   mode given.
-sub CheckFilePath {
-  my($file,$mode)=@_;
-  $file=&FullFilePath($file);
-
-  # File doesn't exist
-  return "" if (! $file or
-                ! -e $file );
-
-  # File the wrong type
-  return "" if ($mode =~ /f/ && ! -f $file or
-                $mode =~ /d/ && ! -d $file or
-                $mode =~ /l/ && ! -l $file or
-                $mode =~ /S/ && ! -S $file or
-                $mode =~ /p/ && ! -p $file or
-                $mode =~ /b/ && ! -b $file or
-                $mode =~ /c/ && ! -c $file);
-  $mode =~ s/[fdlSpbc]//g;
-
-  # File the wrong size
-  return "" if ($mode =~ /z/ && ! -z $file or
-                $mode =~ /s/ && ! -s $file);
-  $mode =~ s/[zs]//g;
-
-  # File the wrong mode
-  return 0 if ($mode =~ /r/ && ! -r $file or
-               $mode =~ /w/ && ! -w $file or
-               $mode =~ /x/ && ! -x $file or
-               $mode =~ /u/ && ! -u $file or
-               $mode =~ /g/ && ! -g $file or
-               $mode =~ /k/ && ! -k $file);
-  $mode =~ s/[rwxugk]//g;
-
-  if ($mode) {
-    die "ERROR: unknown mode $mode in CheckFilePath.\n";
-  }
-  return 1;
-}
-
-# $File=&FullFilePath($file);
-#   Returns the full path to $file.  Returns an empty string if a "~"
-#   expansion cannot be interpreted.  The path does not need to exist.
-sub FullFilePath {
-  my($file)=shift;
-  my($curr)=();
-  $file=&ExpandTilde($file);
-  if (! $file) {
-    return "";
-  }
-  if ($file !~ m|^/|) {         # $file = "a/b/c"
-    $curr=&Pwd;
-    $file="$curr/$file";
-    $file =~ s|//|/|g;
-  }
-  return $file;
-}
-
-# $Dire=&Pwd;
-#   Returns the current directory.  Taken from an early news post of
-#   Randal Schwartz.
-sub Pwd {
-  my($pwd)=();
-  chomp($pwd = `pwd`);
-  return $pwd;
-}
 
 1;
 

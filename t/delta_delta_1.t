@@ -10,6 +10,7 @@ if (defined $runtests) {
 }
 
 print "1..6\n"  if (! $runtests);
+&Date_Init("PersonalCnfPath=.:./t","IgnoreGlobalCnf=1");
 
 $calcs="
 
