@@ -2,6 +2,18 @@ Copyright (c) 1995,1996 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
+Notes for version 5.04:
+  Mainly a bug fix.  You ought to get this rather than 5.03.
+
+  Also, if you would like to stay informed about future versions of
+  DateManip, let me know.  Anyone who asks will be added to a mail
+  alias which I will use to keep people informed of new versions and
+  bug fixes as I come out with them.  DateManip is currently under
+  fairly active development.  I have made a lot of changes in the
+  last 3 months.  If you want me to mail you when a new version comes
+  out, send mail to beck@qtp.ufl.edu.
+
+
 This is a set of routines to work with the Gregorian calendar (the one
 currently in use).  The Julian calendar defined leap years as every 4th
 year.  The Gregorian calendar improved this by making every 100th year
@@ -45,7 +57,7 @@ In the documentation below, US formats are used, but in most cases, a
 non-English equivalent will work equally well.
 
 EXAMPLES:
-u
+
 1.  Parsing a date from any conveniant format
 
   $date=&ParseDate("today");

@@ -4,5 +4,6 @@ To install, just type
   make install
 
 If you want to skip the makefile, just copy Date/Manip.pm to somewhere in
-your perl include path.
+your perl include path.  Also, copy the man page into a directory in your
+manpath.
 
