@@ -616,6 +616,39 @@ Version 5.39  2000-06-27
       over time.  Matthew R. Sheahan <chaos@crystal.palace.net>
    Added timezones.  Eli Selinger <eli@infoinsights.com>
 
+Version 5.40  2001-06-07
+   Added an example.  Philip Jones <phil@lynxafrica.demon.co.uk>
+   Fixed a warning.  Edward Avis <epa98@doc.ic.ac.uk>
+   Fixed a bug where the date wasn't rolling over when parsing dates
+      containing only times.  James L. Gordon <jlgordon@vanion.com>
+   Fixed a bug where some times were defaulting to the current time
+      instead of 00:00:00.  Edward Avis <epa98@doc.ic.ac.uk>
+   Added `date +%Z` support in Date_TimeZone.  Mike Bristow
+      <mike@urgle.com>
+   Added support for negative values is "epoch SECS" type dates.
+      Larry Warner <warner@swansystems.com>
+   Fixed a warning if the timezone is supplied as a +HHMM format.
+      Viola Mauro <mao_@libero.it>
+   Fixed a bug in Date_NthDayOfYear with decimal days.  Olga Polyakov
+      <olga@icess.ucsb.edu>
+   Fixed a bug where ParseDateDelta returned a delta if nothing was
+      passed in.  Jim Hranicky <jfh@cise.ufl.edu>.
+   Fixed a bug where noon was case sensitive.  Bion Pohl <bpohl@deja.com>
+   Fixed a bug where dateTtime wasn't parsed.  Jeremy Brinkley
+      <jeremy@loudcloud.com>
+   Fixed South African time zone.  David Sieborger <drs@rucus.ru.ac.za>
+   Fixed a bug in holiday parsing involving recurrences.  Jerry Wilcox
+      <Jerry.Wilcox@ucop.edu>
+   Added NWD/PWD/DWD flags to ParseRecur.  Peter Wyngaard
+      <peterw@iconnect-inc.com>
+   Fixed a bug where an invalid date passed to Date_IsWorkDay produced
+      an error message.  Mark Rejhon <markr@globilltech.com>
+   Fixed a bug where EraseHolidays wasn't taking affect correctly.
+      Chateauvieux Martial <Martial.Chateauvieux@sfs.siemens.de>
+   Fixed a bug where the list produced by Date_Init couldn't be passed
+      back in to Date_Init.  James Elson <James@citria.com>
+   Fixed a typo in the docs.  Zhen Liu <zhen_hua_liu2@yahoo.com>
+
 #########################################################################
 # Backwards incompatibilities
 #########################################################################

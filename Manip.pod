@@ -1,4 +1,4 @@
-# Copyright (c) 1995-2000 Sullivan Beck. All rights reserved.
+# Copyright (c) 1995-2001 Sullivan Beck. All rights reserved.
 # This program is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
@@ -114,9 +114,12 @@ when the Gregorian calendar was adopted by the Catholic church.  Protestant
 countries did not accept it until later; Germany and Netherlands in 1698,
 British Empire in 1752, Russia in 1918.  Note that the Gregorian calendar
 is itself imperfect and at some point will need to be corrected.  No attempt
-is made to correct for that, and my great grandchildren will be long dead
-before this even occurs, so it's not an immediate concern (isn't this the
-same type of attitude that caused the great Y2K problem? :-).
+is made to correct for that, and my great great great grandchildren will be
+long dead before this even occurs, so it's not an immediate concern.  Yes,
+this is the same type of attitute that caused the great Y2K problem... but
+I have an excuse: I don't know what the correction will be, so I can't
+possible implement it.  Nobody doubted that the year after 1999 would be
+known as 2000 :-).
 
 Date::Manip is therefore not equipped to truly deal with historical dates,
 but should be able to perform (virtually) any operation dealing with a
@@ -274,26 +277,28 @@ if you can provide me the translation, I will fix Date::Manip.
 =head1 SHOULD I USE DATE::MANIP
 
 If you look in CPAN, you'll find that there are a number of Date and Time
-packages.  Is Date::Manip the one you should be using?  In my opinion,
-the answer is no about 90% of the time.  This sounds odd coming from the
-author of the software, but read on.
+packages.  Is Date::Manip the one you should be using?  In my opinion, the
+answer is no most of the time.  This sounds odd coming from the author of
+the software, but read on.
 
 Date::Manip is written entirely in perl.  It's the most powerful of the
 date modules.  It's also the biggest and slowest.
 
-Since Date::Manip is written entirely in perl, no C compiler is required to
-install it.  In fact, Date::Manip has no dependancy on anything not
-included in a standard perl distribution.  To my knowledge, none of the
-other time or date modules have any dependancies either, except that
-Date::Calc is written in C and therfore requires that you have a C compiler
-OR get a pre-compiled version of the module.  Since most (if not all) unix
-platforms come with a C compiler, and since pre-compiled versions of many
-of the modules are available for WinXX platforms, the fact that Date::Manip
-is written in perl is rarely a huge advantage.  On the other hand, modules
-written in C are significantly faster than their perl counterparts (at
-least if they're done right).  The TimeDate and Time-modules modules are
-written in perl.  The Date::Calc module is written in C.  Between these
-three, most of your common date operations can be done.
+Since Date::Manip is written entirely in perl, and depends on no other
+module not in a standard perl distribution, Date::Manip has no dependancies
+to meet.  Other modules have dependancies on a C compiler or other perl
+modules.  Since it is fairly easy to satisfy these dependancies for
+anyone who is reasonably familiar with perl modules, this is not a
+huge advantage that Date::Manip has.
+
+On the other hand, simpler perl modules tend to be faster than Date::Manip,
+and modules written in C are significantly faster than their perl
+counterparts (at least if they're done right).  The TimeDate and
+Time-modules modules are written in perl, but are much simpler (and
+hence, faster) than Date::Manip.  The Date::Calc module is written in C
+and is a good module for doing many date calculations much faster than
+Date::Manip.  Between these three, most of your common date operations
+can be done.
 
 Date::Manip is certainly the most powerful of the Date modules.  To the
 best of my knowledge, it will do everything that any other date module will
@@ -303,13 +308,11 @@ the "Swiss Army Knife" of Date modules.  I'm trying to build a library
 which can do _EVERY_ conceivable date/time manipulation that you'll run
 into in everyday life.
 
-The downside is that Date::Manip is slow.  The much simpler Date modules
-listed above are all faster (usually by a significant amount).  Although I
-am working on making Date::Manip faster, it will never be as fast as these
-modules.  And before anyone asks, Date::Manip will never be translated to C
-(at least by me).  I write C because I have to.  I write perl because I
-like to.  Date::Manip is something I do because it interests me, not
-something I'm paid for.
+Although I am working on making Date::Manip faster, it will never be as
+fast as other modules.  And before anyone asks, Date::Manip will never
+be translated to C (at least by me).  I write C because I have to.  I
+write perl because I like to.  Date::Manip is something I do because it
+interests me, not something I'm paid for.
 
 Date::Manip is also big.  The last time I looked, it's one of the largest
 CPAN modules there is.  If you ignore modules like Tk, LWP, etc. which are
@@ -321,20 +324,19 @@ a good bit.
 
 If you are going to be using the module in cases where performance is an
 important factor (started up in a CGI program being run by your web server
-5,000 times a second), you might check out one of the other Date or Time
+5,000 times a second), you should check out one of the other Date or Time
 modules in CPAN.  If you're only doing fairly simple date operations
 (parsing common date formats, finding the difference between two dates,
 etc.), the other modules will almost certainly suffice.  If you're doing
-one operation very repetively (parsing 10,000 dates from a database), you
+one operation very repetitively (parsing 10,000 dates from a database), you
 are probably better off writing your own functions (perhaps bypassing all
 date modules entirely) designed specifically for your needs.
 
-On the other hand, if you want one solution for all date needs, don't need
-peak speed, or are trying to do more exotic date operations, Date::Manip is
-for you.  Operations on things like business dates, foreign language dates,
-holidays and other recurring events, etc. are available more-or-less
-exclusively in Date::Manip.  If you want a module written in terms of how
-you (not the computer) think of dates and times, Date::Manip is it.
+On the other hand, if you want one solution for all your date needs, don't
+need peak speed, or are trying to do more exotic date operations,
+Date::Manip is for you.  Operations on things like business dates, foreign
+language dates, holidays and other recurring events, etc. are available
+more-or-less exclusively in Date::Manip.
 
 =head1 ROUTINES
 
@@ -523,7 +525,8 @@ Miscellaneous other allowed formats are:
   last day in mmm in YY        "last day of October"
   dofw                         "Friday" (Friday of current week)
   Nth                          "12th", "1st" (day of current month)
-  epoch SECS                   seconds since the epoch
+  epoch SECS                   seconds since the epoch (negative values
+                               are supported)
 
 ** Note that the formats "sunday week 22" and "22nd sunday" give very
 different bahaviors.  "sunday week 22" returns the sunday of the 22nd week
@@ -949,7 +952,7 @@ The following flags (case insensitive) are understood:
 
   MWn   : n is 1-7.  The first week of the month is the week
           which contains the first occurrence of day n (1=Monday).
-          FD2 means that the first week contains the first Tuesday
+          MW2 means that the first week contains the first Tuesday
           of the month.
   MDn   : n is 1-7.  The first week of the month contains the
           actual date (1st through 7th).  FI4 means that the first
@@ -968,6 +971,10 @@ The following flags (case insensitive) are understood:
   CWD   : the closest work day (using the TomorrowFirst config variable).
   CWN   : the closest work day (looking forward first).
   CWP   : the closest work day (looking backward first).
+
+  NWD   : next work day counting today
+  PWD   : previous work day counting today
+  DWD   : next/previous work day (TomorrowFirst config) counting today
 
   EASTER: select easter for this year (the M, W, D fields are ignored
           in the recur).
@@ -1337,6 +1344,14 @@ a floating point day of the year.
 All arguments must be numeric.  $n must be greater than or equal to 1
 and less than 366 on non-leap years and 367 on leap years.
 
+NOTE: When $n is a decimal number, the results are non-intuitive perhaps.
+Day 1 is Jan 01 00:00.  Day 2 is Jan 02 00:00.  Intuitively, you
+might think of day 1.5 as being 1.5 days after Jan 01 00:00, but this
+would mean that Day 1.5 was Jan 02 12:00 (which is later than Day 2).
+The best way to think of this function is a timeline starting at 1 and
+ending at 366 (in a non-leap year).  In terms of a delta, think of $n
+as the number of days after Dec 31 00:00 of the previous year.
+
 =item Date_DaysInYear
 
  $days=&Date_DaysInYear($y);
@@ -1466,7 +1481,8 @@ the "EraseHolidays=1" element to the list.
   $flag=&Date_IsWorkDay($date [,$flag]);
 
 This returns 1 if $date is a work day.  If $flag is non-zero, the time is
-checked to see if it falls within work hours.
+checked to see if it falls within work hours.  It returns an empty string
+if $date is not valid.
 
 =item Date_NextWorkDay
 
@@ -1555,7 +1571,6 @@ Sharnoff, and Paul Foley (with several additions by myself).
       ADT     -0300    Atlantic Daylight
       NDT     -0230    Newfoundland Daylight
       AT      -0200    Azores
-      SAST    -0200    South African Standard
       WAT     -0100    West Africa
       GMT     +0000    Greenwich Mean
       UT      +0000    Universal (Coordinated)
@@ -1576,6 +1591,7 @@ Sharnoff, and Paul Foley (with several additions by myself).
       MEST    +0200    Middle European Summer
       MESZ    +0200    Middle European Summer
       METDST  +0200    An alias for MEST used by HP-UX
+      SAST    +0200    South African Standard
       SST     +0200    Swedish Summer              sst=South Sumatra    +0700
       EEST    +0300    Eastern Europe Summer
       BT      +0300    Baghdad, USSR Zone 2
@@ -2359,9 +2375,10 @@ Perhaps the most common problem occurs when you get the error:
 
 Date::Manip tries hard to determine the local timezone, but on some
 machines, it cannot do this (especially non-unix systems).  To fix this,
-just set the TZ variable, either at the top of the Manip.pm file, or in the
-DateManip.cnf file.  I suggest using the form "EST5EDT" so you don't have
-to change it every 6 months when going to or from daylight savings time.
+just set the TZ variable, either at the top of the Manip.pm file,, in the
+DateManip.cnf file, or in a call to Date_Init.  I suggest using the form
+"EST5EDT" so you don't have to change it every 6 months when going to or
+from daylight savings time.
 
 Windows NT does not seem to set the TimeZone by default.  From the
 Perl-Win32-Users mailing list:
@@ -2457,9 +2474,10 @@ but if you uncomment the Date_Init line, it works.  The reason for this is
 that the first time you call Date_Init, it initializes a number of items
 used by Date::Manip.  Some of these have to be sorted (regular expressions
 sorted by length to ensure the longest match).  It turns out that perl
-(5.004 and earlier) has a bug in it which does not allow a sort within a
-sort.  At some point, this should be fixed, but for now, the best thing to
-do is to call Date_Init explicitly.
+has a bug in it which does not allow a sort within a sort.  At some point,
+this should be fixed, but for now, the best thing to do is to call Date_Init
+explicitly.  The bug exists in all versions up to 5.005 (I haven't
+tested 5.6.0 yet).
 
 NOTE: This is an EXTREMELY inefficient way to sort data.  Instead, you
 should parse the dates with ParseDate, sort them using a normal string

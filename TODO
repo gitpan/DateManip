@@ -2,6 +2,15 @@
 # MISC
 ########################################################################
 
+James Elson <James@citria.com>
+Make a &now function which returns the current time (so you don't
+have to use a language-dependent word).
+
+jfh@cise.ufl.edu
+To Delta_Format, add %02Xv type formats, so that it is formatted to
+2 characters wide with leading 0's, %2Xv is 2 characters wide with
+leading spaces.  %3.1Xv handles decimal places.
+
 Add Date_LocaleInit which calls Date_Init and then sets DateFormat
 config varialbe.  Benjamin Low <ben@snrc.uow.edu.au>
    Essentially, I use POSIX::strftime to print a known date in the locale

@@ -1,6 +1,6 @@
 package Date::Manip;
 
-# Copyright (c) 1995-2000 Sullivan Beck.  All rights reserved.
+# Copyright (c) 1995-2001 Sullivan Beck.  All rights reserved.
 # This program is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
@@ -199,7 +199,7 @@ use Carp;
 use IO::File;
 
 use vars qw($VERSION);
-$VERSION="5.39";
+$VERSION="5.40";
 
 ########################################################################
 ########################################################################
@@ -307,8 +307,9 @@ sub Date_Init {
   foreach (@args) {
     s/\s*$//;
     s/^\s*//;
-    /^(\S+) \s* = \s* (.+)$/x;
+    /^(\S+) \s* = \s* (.*)$/x;
     ($var,$val)=($1,$2);
+    $val=""  if (! defined $val);
     &Date_SetConfigVariable($var,$val);
   }
 
@@ -547,7 +548,6 @@ sub Date_Init {
       "adt    -0300 ".  # Atlantic Daylight
       "ndt    -0230 ".  # Newfoundland Daylight
       "at     -0200 ".  # Azores
-      "sast   -0200 ".  # South African Standard
       "wat    -0100 ".  # West Africa
       "gmt    +0000 ".  # Greenwich Mean
       "ut     +0000 ".  # Universal
@@ -569,6 +569,7 @@ sub Date_Init {
       "mest   +0200 ".  # Middle European Summer
       "mesz   +0200 ".  # Middle European Summer
       "metdst +0200 ".  # An alias for mest used by HP-UX
+      "sast   +0200 ".  # South African Standard
       "sst    +0200 ".  # Swedish Summer             sst=South Sumatra    +0700
       "bt     +0300 ".  # Baghdad, USSR Zone 2
       "eest   +0300 ".  # Eastern Europe Summer
@@ -854,7 +855,7 @@ sub ParseDateString {
     # Substitute all special time expressions.
     if (/(^|[^a-z])$timeexp($|[^a-z])/i) {
       $tmp=$2;
-      $tmp=$Lang{$L}{"TimesH"}{$tmp};
+      $tmp=$Lang{$L}{"TimesH"}{lc($tmp)};
       s/(^|[^a-z])$timeexp($|[^a-z])/$1 $tmp $3/i;
     }
 
@@ -874,6 +875,7 @@ sub ParseDateString {
     $to="00${hm}00${ms}00";
     $midnight=1  if (!/$falsefrom/  &&  s/$from/$to/);
 
+    $h=$mn=$s=0;
     if (/$D$mnsec/i || /$ampmexp/i) {
       $iso=0;
       $tmp=0;
@@ -908,7 +910,10 @@ sub ParseDateString {
         # final date), so get rid of $ampm so that we don't have an error
         # due to "15:30:00 PM".  It'll get reset below.
         $ampm="";
-        last PARSE  if (/^\s*$/);
+        if (/^\s*$/) {
+          &Date_Init()  if (! $Cnf{"UpdateCurrTZ"});
+          last PARSE;
+        }
       }
     }
     $time=0  if ($time ne "1");
@@ -922,6 +927,8 @@ sub ParseDateString {
     # Parse ISO 8601 dates now (which may still have a zone stuck to it).
     if ( ($iso && /^[0-9-]+(W[0-9-]+)?$zone?$/i)  ||
          ($iso && /^[0-9-]+(W[0-9-]+)?$zone2?$/i)  ||
+         ($iso && /^[0-9-]+(T[0-9-]+)?$zone?$/i)  ||
+         ($iso && /^[0-9-]+(T[0-9-]+)?$zone2?$/i)  ||
          0) {
 
       # ISO 8601 dates
@@ -929,10 +936,10 @@ sub ParseDateString {
       s/^\s+//;
       s/\s+$//;
 
-      if (/^$D4\s*$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone2?$/  ||
-          /^$D4\s*$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone?()$/i  ||
-          /^$DD\s+$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone2?$/  ||
-          /^$DD\s+$DD\s*$DD\s*$DD(?:$DD(?:$DD\d*)?)?$zone?()$/i  ||
+      if (/^$D4\s*$DD\s*$DD\s*t?$DD(?:$DD(?:$DD\d*)?)?$zone2?$/i  ||
+          /^$D4\s*$DD\s*$DD\s*t?$DD(?:$DD(?:$DD\d*)?)?$zone?()$/i ||
+          /^$DD\s+$DD\s*$DD\s*t?$DD(?:$DD(?:$DD\d*)?)?$zone2?$/i  ||
+          /^$DD\s+$DD\s*$DD\s*t?$DD(?:$DD(?:$DD\d*)?)?$zone?()$/i ||
           0
          ) {
         # ISO 8601 Dates with times
@@ -945,7 +952,7 @@ sub ParseDateString {
         #    YY MMDDHHMN
         #    YY MMDDHH
         ($y,$m,$d,$h,$mn,$s,$tmp,$z2)=($1,$2,$3,$4,$5,$6,$7,$8);
-        if ($h==24 && $mn==0 && $s==0) {
+        if ($h==24 && (! defined $mn || $mn==0) && (! defined $s || $s==0)) {
           $h=0;
           $midnight=1;
         }
@@ -1250,6 +1257,11 @@ sub ParseDateString {
     }
 
     {
+      # So that we can handle negative epoch times, let's convert
+      # things like "epoch -" to "epochNEGATIVE " before we strip out
+      # the $sep chars, which include '-'.
+      s,epoch\s*-,epochNEGATIVE ,g;
+
       # Non-ISO8601 dates
       s,\s*$sep\s*, ,g;     # change all non-ISO8601 seps to spaces
       s,^\s*,,;             # remove leading/trailing space
@@ -1300,6 +1312,9 @@ sub ParseDateString {
           return "";
         }
 
+      } elsif (/^epochNEGATIVE (\d+)$/) {
+        $s=$1;
+        $date=&DateCalc("1970-01-01 00:00 GMT","-0:0:$s");
       } elsif (/^epoch\s*(\d+)$/i) {
         $s=$1;
         $date=&DateCalc("1970-01-01 00:00 GMT","+0:0:$s");
@@ -1430,6 +1445,7 @@ sub DateCalc {
 
   $old=$Curr{"InCalc"};
   $Curr{"InCalc"}=1;
+
   if ($tmp=&ParseDateString($D1)) {
     # If we've already parsed the date, we don't want to do it a second
     # time (so we don't convert timezones twice).
@@ -1531,6 +1547,7 @@ sub ParseDateDelta {
  PARSE: while (@a) {
     $_ = join(" ", grep {defined;} @a);
     s/\s+$//;
+    last  if ($_ eq "");
 
     # Mode is set in DateCalc.  ParseDateDelta only overrides it if the
     # string contains a mode.
@@ -1762,7 +1779,7 @@ sub UnixDate {
   $f{"s"}=&Date_SecsSince1970GMT($m,$d,$y,$h,$mn,$s);
   $f{"Z"}=($Cnf{"ConvTZ"} eq "IGNORE" or $Cnf{"ConvTZ"} eq "") ?
            $Cnf{"TZ"} : $Cnf{"ConvTZ"};
-  $f{"z"}=$Zone{"n2o"}{lc $f{"Z"}};
+  $f{"z"}=($Zone{"n2o"}{lc $f{"Z"}} || "");
 
   # date, time
   $f{"c"}=qq|$f{"a"} $f{"b"} $f{"e"} $h:$mn:$s $y|;
@@ -2701,8 +2718,9 @@ sub ParseRecur {
         next FLAG;
       }
 
-      if ($f =~ /^CW(N|P|D)$/) {
+      if ($f =~ /^CW(N|P|D)$/ || $f =~ /^(N|P|D)W(D)$/) {
         $tmp=$1;
+        my $noalt = $2 ? 1 : 0;
         if ($tmp eq "N"  ||  ($tmp eq "D" && $Cnf{"TomorrowFirst"})) {
           $forw=1;
         } else {
@@ -2726,7 +2744,7 @@ sub ParseRecur {
               push(@tmp,$d);
               next DATE;
             }
-            $forw=1-$forw;
+            $forw=1-$forw  if (! $noalt);
           }
         }
         @date=@tmp;
@@ -3294,20 +3312,33 @@ sub Date_TimeZone {
   # always call it with a full path... otherwise, use the user's path.
   #
   # Microsoft operating systems don't have a date command built in.  Try
-  # to trap all the various ways of knowing we are on one of these systems:
+  # to trap all the various ways of knowing we are on one of these systems.
+  #
+  # We'll try `date +%Z` first, and if that fails, we'll take just the
+  # `date` program and assume the output is of the format:
+  # Thu Aug 31 14:57:46 EDT 2000
+
   unless (($^X =~ /perl\.exe$/i) or
           $OS eq "Windows") {
     if ($Date::Manip::NoTaint) {
-      $tz=`date`;
+      $tz=`date +%Z 2> /dev/null`;
       chomp($tz);
-      $tz=(split(/\s+/,$tz))[4];
+      if (! $tz) {
+         $tz=`date 2> /dev/null`;
+         chomp($tz);
+         $tz=(split(/\s+/,$tz))[4];
+      }
       push(@tz,$tz);
     } else {
       foreach my $dir (@Date::Manip::DatePath) {
         next  if (! -x "$dir/date");
-        $tz=`$dir/date`;
+        $tz=`$dir/date +%Z 2> /dev/null`;
         chomp($tz);
-        $tz=(split(/\s+/,$tz))[4];
+        if (! $tz) {
+           $tz=`$dir/date 2> /dev/null`;
+           chomp($tz);
+           $tz=(split(/\s+/,$tz))[4];
+        }
         push(@tz,$tz);
       }
     }
@@ -3371,12 +3402,14 @@ sub Date_TimeZone {
 }
 
 # Returns 1 if $date is a work day.  If $time is non-zero, the time is
-# also checked to see if it falls within work hours.
+# also checked to see if it falls within work hours.  Returns "" if
+# an invalid date is passed in.
 sub Date_IsWorkDay {
   print "DEBUG: Date_IsWorkDay\n"  if ($Curr{"Debug"} =~ /trace/);
   my($date,$time)=@_;
   &Date_Init()  if (! $Curr{"InitDone"});
   $date=&ParseDateString($date);
+  return ""  if (! $date);
   my($d)=$date;
   $d=&Date_SetTime($date,$Cnf{"WorkDayBeg"})  if (! $time);
 
@@ -3542,6 +3575,7 @@ sub Date_NthDayOfYear {
 
   # Calculate the month and the day.
   my($m,$d)=(0,0);
+  $n=int($n);
   while ($n>0) {
     $m++;
     if ($n<=$d_in_m[0]) {
@@ -4770,6 +4804,7 @@ sub Date_UpdateHolidays {
   print "DEBUG: Date_UpdateHolidays\n"  if ($Curr{"Debug"} =~ /trace/);
   my($year)=@_;
   $Holiday{"year"}=$year;
+  $Holiday{"dates"}{$year}={};
 
   my($date,$delta,$err)=();
   my($key,@tmp,$tmp);
@@ -4819,6 +4854,7 @@ sub Date_SetConfigVariable {
   $Cnf{"PersonalCnfPath"}=$val,  return  if ($var =~ /^PersonalCnfPath$/i);
   &EraseHolidays(),              return  if ($var =~ /^EraseHolidays$/i);
   $Cnf{"IgnoreGlobalCnf"}=1,     return  if ($var =~ /^IgnoreGlobalCnf$/i);
+  $Cnf{"GlobalCnf"}=$val,        return  if ($var =~ /^GlobalCnf$/i);
 
   $Curr{"InitLang"}=1,
   $Cnf{"Language"}=$val,         return  if ($var =~ /^Language$/i);
@@ -4855,6 +4891,7 @@ sub EraseHolidays {
   $Holiday{"list"}={};
   delete $Holiday{"desc"};
   $Holiday{"desc"}={};
+  $Holiday{"dates"}={};
 }
 
 # This returns a pointer to a list of times and events in the format

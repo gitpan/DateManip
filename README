@@ -1,4 +1,4 @@
-Copyright (c) 1995-2000 Sullivan Beck. All rights reserved.
+Copyright (c) 1995-2001 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
@@ -27,12 +27,8 @@ don't, the internal format for both will change, so the above routines
 should be used.
 
 
-Notes for version 5.39:
-   Fixed problem where the timezone wasn't getting correctly found due
-      to changes made in 5.38.
-   Added timezenes.
-   Support for /etc/timezone (Debian).
-   One bug fix.
+Notes for version 5.40:
+   Bug fix release.  No significant new functionality.
 
 
   ############################################################################
