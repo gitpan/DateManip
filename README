@@ -58,7 +58,7 @@ Notes for version 5.07:
   versions of Date::Manip.  Based on common American usage, I have parsed
   dates in the form MM%DD%YY with any of the character ". / -" as separators.
   That is, 12-10-1965, 12/10/1965, and 12.10.1965 all worked.  Since "-" is
-  the standard character for ISO 8601 dates, there are a number of conflicts
+  the standard character for ISO 8601 dates, there are a couple of conflicts
   between ISO 8601 formats and previously allowed format.  In the event of a
   conflict, the ISO 8601 date will take priority.  Although I will try to
   minimize the incompatibilities, I would encourage people to NOT use "-" as
@@ -126,7 +126,7 @@ Each of these tasks is trivial (one or two lines at most) with this package.
 
 Although the word date is used extensively here, it is actually somewhat
 misleading.  Date::Manip works with the full date AND time (year, month,
-day, hour, minute, second).
+day, hour, minute, second, and will ignore fractional seconds).
 
 In the documentation below, US formats are used, but in most (if not all)
 cases, a non-English equivalent will work equally well.

@@ -10,7 +10,7 @@ if (defined $runtests) {
 }
 
 print "1..89\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=.:./t","IgnoreGlobalCnf=1");
+&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 ($currS,$currMN,$currH,$currD,$currM,$currY)=localtime(time);
 $currY+=1900;
@@ -28,15 +28,19 @@ $tomorrow ="$currY$currM". $currD+1 ."$currH:$currMN:$currS";
 $dates="
 
 aujourd'hui
+    >May safely fail on a slow computer.
     ~$today
 
 maintenant
+    >May safely fail on a slow computer.
     ~$today
 
 hier
+    >May safely fail on a slow computer or on 1st day of month.
     ~$yesterday
 
 demain
+    >May safely fail on a slow computer or on last day of month.
     ~$tomorrow
 
 dernier mar en Juin 96

@@ -9,8 +9,8 @@ if (defined $runtests) {
   require "t/test.pl";
 }
 
-print "1..2\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=.:./t","IgnoreGlobalCnf=1");
+print "1..3\n"  if (! $runtests);
+&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 $calcs="
 
@@ -21,6 +21,10 @@ Wed Nov 20 1996 noon
 Wed Nov 20 1996 noon
 +3:7:0:0
   1996112610:30:00
+
+Mar 31 1997 16:59:59
++ 1 sec
+  1997040108:30:00
 
 ";
 

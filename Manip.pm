@@ -1,6 +1,6 @@
 package Date::Manip;
 
-# Copyright (c) 1995,1996 Sullivan Beck. All rights reserved.
+# Copyright (c) 1995-1997 Sullivan Beck. All rights reserved.
 # This program is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
@@ -342,13 +342,42 @@ use Cwd;
 # Version 5.09  01/28/97
 #    Upgraded to 5.003_23 and fixed one problem associated with it.
 #    Used carp and changed all die's to confess.
-#    Changed SearchPath return value to undef to fix a problem on some
-#       systems.  Fixed by Michael Fuhr <mfuhr@dimensional.com>.
-#    Replaced all UNIX commands with perl equivalents (date with localtime
+#    Replaced some UNIX commands with perl equivalents (date with localtime
 #       in the tests, pwd with cwd in the path routines).
 #    Cleaned up all routines working with the path.
+#    Tests work again (broke in 5.08).  Thanks to Alex Lewin <lewin@vgi.com>,
+#       and Michael Fuhr <mfuhr@blackhole.dimensional.com> for running
+#       debugging tests.
+#
+# Version 5.10  03/19/97
+#    Tests will now run regardless of the timezone you are in.
+#    Test will always read the DateManip.cnf file in t/ now.
+#    A failed test will now give slightly more information.
+#    Cleaned up In, At, and On regexps.
+#    DateManip.cnf file in t/ now sets ALL options to override any changes
+#       made in the Manip.pm file.
+#    Added documentation for backwards incompatibilities to POD.
+#    Added 2 checks for MSWin32 (date command and getpw* didn't work).  Thanks
+#       to Alan Humphrey <alanh@velleb.com>.
+#    Fixed two bugs in the DateCalc routines.  Pointed out by Kevin Baker
+#       <ol@twics.com>
+#    Fixed some problems in POD documentation.  Thanks to Marvin Solomon
+#       <solomon@cs.wisc.edu>.
+#    Fixed some problems with how "US/Eastern" type timezones were used.
+#       Thanks to Marvin Solomon <solomon@cs.wisc.edu>.
+#    Fixed minor POD error pointed out by John Perkins <john@cs.wisc.edu>.
+#    Added a check for Windows_95.  Thanks to charliew@atfppc.ppc.att.com.
+#    Changed documentation for Date_IsWorkDay (it was quite confusing using
+#       a variable named $time).  Thanks to Erik M. Schwartz
+#       <eriks@library.nrl.navy.mil>.
+#    Cleaned up checks for MacOS and Microsoft OS's.  Hopefully I'm catching
+#       everything.  Thanks to Charlie Wu <charwu@ibm.net> for one more check.
+#    Fixed typo in docs (midnight mispelled).  Thanks to Timothy Kimball
+#       <kimball@stsci.edu>.
+#    Fixed a typo which broke Time%Date (Date=dd%mmm%yy) format.  Thanks to
+#       Timothy Kimball <kimball@stsci.edu>.
 
-# Incompatibilities or changes from older version
+# Backwards incompatibilities
 #
 # In 5.07
 #   %s format changed
@@ -356,16 +385,13 @@ use Cwd;
 #     number of signs stored).  Backwards compatible if you set DeltaSigns=1.
 #   Date_Init arguments changed (old method supported but depreciated)
 
-$Date::Manip::Version="5.09";
+$Date::Manip::Version="5.10";
 
 ########################################################################
 # TODO
 ########################################################################
 
 ################ NEXT VERSION
-
-# Try to get rid of all `date` and other `UNIX COMMAND` things in Date::Manip
-#    `grep ^TZ`; `date`  in Date_TimeZone
 
 ### SPEEDUPS
 
@@ -410,7 +436,8 @@ $Date::Manip::Version="5.09";
 #        97W012
 # Weeks are 1-53.
 #
-# Weekdays are numbered 1 (monday) to 7 (sunday).
+# Weekdays are numbered 1 (monday) to 7 (sunday).  Support sunday as 0 as
+# well, and typically sunday will be referred to as day 0.
 #
 # Formats with the day-of-year (001 to 366)
 #        YYYY-DOY
@@ -433,27 +460,101 @@ $Date::Manip::Version="5.09";
 #        +HHMN
 #        +HH
 
+# Add an option to treat Jan 1 as the 1st week of the year.
+
 # Add a UnixDate format to print out a date in the format:
 #   YYYY-Wwwd
+#   YYYY-doy
 
 # check "Sunday 22nd week", "22nd Sunday" vs. ISO weeks
 
 ### TESTS
 
-# Make sure test suite runs in an alternate timezone
-
 # Add tests for all the new ParseDate formats to the test suite.
 
+### GRANULARITY
+
+# $flag=&Date_GranularityTest($date,$base,$granularity [,$flags] [$width])
+#    $date and $base are dates
+#    $granularity and $width are deltas
+#    $flags is a list of flags
+#
+#    To test if a day is one of every other Friday (starting at Friday
+#    Feb 7, 1997), go:
+#       $base=&ParseDate("Friday Feb 7 1997");
+#       $date=&ParseDate("...");
+#       $granularity=&ParseDateDelta("+ 2 weeks");
+#       $flag=&Date_Granularity($date,$base,$granularity,"exact");
+#    If $flag is 1, the $date is a 2nd Friday from Feb 7.
+#
+#    The most important field in $granularity is the last non-zero element.
+#    In the above example, 2 weeks returns the delta 0:0:14:0:0:0 so the
+#    last non-zero element is days with a value of 14.
+#
+#    If $flags is empty, $date is checked to see if it occurs some multiple
+#    of 14 days before or after $base.  In this case, hourse, minutes, and
+#    seconds are completely ignored.
+#
+#    If $flags contains the words "before" or "after", $date must come
+#    before or after $base.
+#
+#    If $flags contains any other options, or if $width is passed in, the
+#    test is treated in an approximate way.  A flag of "approx" forces this
+#    behavior.
+#
+#    If $width is not passed in in an approximate comparison, it defaults
+#    to 1 in the last non-zero element.  Here, the default width is 1 day.
+#    If the flag "half" is used, the width (default or passed in) is
+#    halved.
+#
+#    For example if $width is 1 day, add a multiple of $granularity to
+#    $base to get as close to $date as possible.  If $date is within plus
+#    or minus 1 day of this new base, the test is successful.  A flag of
+#    "plus" or "minus" means that $date must be with plus 1 day or within
+#    minus one day of this new base.  Flags of "before" or "after" work
+#    as well.
+
+# @list=&Date_GranularityList($date,$N,$granularity)
+#    Returns a list of $N dates AFTER $date which are created by adding
+#    $granularity to $date $N times.  If $N<0, it returns $N dates BEFORE
+#    $date (the list is in chronological order).
+
+### DAYLIGHT SAVINGS TIME
+
+# Use POSIX tzset/tzname (and perhaps GNU date) to handle timezone and
+# daylight savings time correctly.  See messages by Marvin Soloman.
+
+# If ignoring TIMEZONE info, treat all dates as in current timezone with
+# no d.s.t. effects (i.e. Jun 1 12:00 EDT == Jun 1 12:00 EST).
+
+# To do calculations, convert to current timezone (Jun 1 12:00 EDT -> Jun 1
+# 11:00 EST even if that date doesn't really exist)
+
+# Determine zone pairings EST/EDT, PST/PDT for all zones.  Store EST#EDT in
+# $Date::Manip::TZ rather than just EST or EDT.  Make sure everything is
+# paired up.  Places with only a single timezone should work as well.
+
+# Make a 2nd hash where EST -> EST#EDT for all timezones.
+
+# When doing date calculations, if neither date has a time (or if both are
+# at the exact same time and are in the same timezone or in timezones
+# related through daylight savings time such as EST and EDT), ignore the
+# time gain/loss from savings time transitions IFF the variable IgnoreDST
+# is on (it is by default).  Otherwise, do the calculation exactly.
+
+# Add an option to all date calculations to ignore daylight savings time
+# transitions.
+
 ### MISC
+
+# Try to get rid of all `date` and other `UNIX COMMAND` things in Date::Manip
+#    `grep ^TZ`; `date`  in Date_TimeZone
 
 # Add to ParseDate (Rob Perelman)
 #    dofw           (Friday == &Date_GetNext("today","friday",0,"00:00:00")
 
 # Document how you need to use the stock .DateManip.cnf file when running
 # the tests.  Make sure that TZ=EST is set in the sample one.
-
-# Add a bunch of dayofyear formats (dayofyear is a 3 digit field that
-# replaces day/mon or mon/day.
 
 # Fix Date::Manip:: Future,Past,Next,Prev
 
@@ -468,12 +569,15 @@ $Date::Manip::Version="5.09";
 # it is mode.
 
 # Add a "SPECIAL HOLIDAY" section to fully specify holidays so weird ones
-# can be defined for each year.
+# can be defined for each year.  Add Easter calculations here as well:
+#   Easter = easter
+# means that Easter is calculated using the method easter.
 
 # Add
 #   Spanish
 #   German
 #   Italian
+#   Japanese (Kevin Baker will help)
 
 # Fill in some of the language variables ($past, $future, $zones).
 
@@ -481,7 +585,20 @@ $Date::Manip::Version="5.09";
 
 # Change EXPORT to EXPORT_OK (message 9 by Peter Bray)
 
-# Use POSIX::tzname
+# Add equivalent of UnixDate to print out Deltas in various formats
+# (mess 37 by Alan Burlison).  Nothing fancy.
+#
+# It prints out exact deltas as:
+#    plus/minus d:h:mn:s
+#    plus/minus s         (converted to s)
+#    plus/minus d         (converted to d, returned as a floating point)
+#    plus/minus h         (similar)
+#    plus/minus mn        (similar)
+# Approximate deltas as:
+#    plus/minus y:m  plus/minus d:h:m:s
+#    or, you can give a date as an argument which says take the approx.
+#    delta from that date and turn the result into an exact delta which
+#    can be printed in any of the exact formats.
 
 ################ MAYBE (undecided whether it should be added)
 
@@ -489,11 +606,6 @@ $Date::Manip::Version="5.09";
 #    "friday before last"
 
 # $Date problems with RCS (mess 35 by Tim Freeman)
-
-# Add equivalent of UnixDate to print out Deltas in various formats
-# (mess 37 by Alan Burlison)
-
-# Add full timezone and daylight saving time handling.
 
 # Add "delta FROM date", "IN delta ON date", "delta AGO ON date"
 
@@ -524,6 +636,7 @@ $Date::Manip::CurrM = undef;
 $Date::Manip::CurrMn = undef;
 $Date::Manip::CurrS = undef;
 $Date::Manip::CurrY = undef;
+$Date::Manip::CurrZoneExp = undef;
 $Date::Manip::DExp = undef;
 $Date::Manip::DayExp = undef;
 $Date::Manip::Exact = undef;
@@ -572,6 +685,7 @@ $Date::Manip::ZoneExp = undef;
 
 %Date::Manip::AmPm = ();
 %Date::Manip::CurrHolidays = ();
+%Date::Manip::CurrZone = ();
 %Date::Manip::Day = ();
 %Date::Manip::Holidays = ();
 %Date::Manip::Month = ();
@@ -1093,7 +1207,6 @@ sub ParseDate {
   my($next)=$Date::Manip::Next;
   my($prev)=$Date::Manip::Prev;
   my($ago)=$Date::Manip::Past;
-  my($on)=$Date::Manip::On;
 
   # Regular expressions for part of the date
   my($hm)=$Date::Manip::SepHM;
@@ -1112,8 +1225,9 @@ sub ParseDate {
   # time in hh:MM:SS [Zone]
   my($time) ="(?:$D$hm$DD(?:$ms$DD$FD)?(?:\\s*$ampm)?$zone)";
   my($sep)='([\/ .-])';
-  my($at)=$Date::Manip::At;
-  my($in)=$Date::Manip::In;
+  my($at)='\s*'.$Date::Manip::At;
+  my($in)='\s*'.$Date::Manip::In;
+  my($on)='\s*'.$Date::Manip::On;
   my($com)=',?';
 
   $ampm="";
@@ -1361,7 +1475,7 @@ sub ParseDate {
       #   Date=dd%mmm dd%mmm%YY
       ($h,$mn,$s,$ampm,$z,$d,$m,$y)=($1,$2,$3,$4,$5,$6,$8,$9);
 
-    } elsif (/^$time$sep$D\5$mmm(?:\6$YY)?$/i) {
+    } elsif (/^$time$sep$D\6$mmm(?:\6$YY)?$/i) {
       # Time%Date
       #   Date=dd%mmm dd%mmm%YY
       ($h,$mn,$s,$ampm,$z,$d,$m,$y)=($1,$2,$3,$4,$5,$7,$8,$9);
@@ -1620,12 +1734,27 @@ sub Date_ConvTZ {
 }
 
 sub Date_TimeZone {
-  my($null,$tz,@tz,$std,$dst,$time,$isdst)=();
+  my($null,$tz,@tz,$std,$dst,$time,$isdst,$tmp)=();
 
   # Get timezones from all of the relevant places
 
   push(@tz,$Date::Manip::TZ)  if (defined $Date::Manip::TZ);  # TZ config var
   push(@tz,$ENV{"TZ"})        if (exists $ENV{"TZ"});         # TZ environ var
+  # Microsoft operating systems don't have a date command built in.  Try
+  # to trap all the various ways of knowing we are on one of these systems:
+  unless ((defined $^O and
+           $^O =~ /MSWin32/i ||
+           $^O =~ /Windows_95/i ||
+           $^O =~ /Windows_NT/i) or
+          (defined $ENV{OS} and
+           $ENV{OS} =~ /MSWin32/i ||
+           $ENV{OS} =~ /Windows_95/i ||
+           $ENV{OS} =~ /Windows_NT/i)) {
+    $tz = `date`;
+    chomp($tz);
+    $tz=(split(/\s+/,$tz))[4];
+    push(@tz,$tz);
+  }
   push(@tz,$main::TZ)         if (defined $main::TZ);         # $main::TZ
   if (-s "/etc/TIMEZONE") {                                   # /etc/TIMEZONE
     ($null,$tz) = split (/\=/,`grep ^TZ /etc/TIMEZONE`);
@@ -1633,16 +1762,17 @@ sub Date_TimeZone {
     $tz=~ s/\s+//g;
     push(@tz,$tz);
   }
-  unless (defined $ENV{OS}  and  $ENV{OS} ne 'Windows_NT') {  # date command
-    $tz = `date`;                                             #  not on NT!
-    chomp($tz);
-    $tz=(split(/\s+/,$tz))[4];
-    push(@tz,$tz);
-  }
 
   # Now parse each one to find the first valid one.
   foreach $tz (@tz) {
-    return $tz  if (defined $Date::Manip::Zone{lc($tz)} or $tz=~/^[+-]\d{4}/);
+    return uc($tz)
+      if (defined $Date::Manip::Zone{lc($tz)} or $tz=~/^[+-]\d{4}/);
+
+    # Handle US/Eastern format
+    if ($tz =~ /^$Date::Manip::CurrZoneExp$/i) {
+      $tmp=lc $1;
+      $tz=$Date::Manip::CurrZone{$tmp};
+    }
 
     # Handle STD#DST# format
     if ($tz =~ /^([a-z]+)\d([a-z]+)\d?$/i) {
@@ -1652,8 +1782,8 @@ sub Date_TimeZone {
       $time = time();
       ($null,$null,$null,$null,$null,$null,$null,$null,$isdst) =
         localtime($time);
-      return $dst  if ($isdst);
-      return $std;
+      return uc($dst)  if ($isdst);
+      return uc($std);
     }
   }
 
@@ -2116,14 +2246,12 @@ sub Date_Init {
     $Date::Manip::SepSS=$sepss;
 
     # Date::Manip:: variables for time zones
-    #    $ZoneExp: regular expression
-    #    %Zone   : all zones with their translation
-    #    $Zone   : the current time zone
+    #    $ZoneExp     : regular expression
+    #    %Zone        : all parsable zones with their translation
+    #    $Zone        : the current time zone
+    #    $CurrZoneExp : "(us/eastern|us/central)"
+    #    %CurrZone    : ("us/eastern","est7edt","us/central","cst6cdt")
     $zonesrfc=
-      "US/Pacific  -0800 ".
-      "US/Mountain -0700 ".
-      "US/Central  -0600 ".
-      "US/Eastern  -0500 ".
       "idlw -1200 ".  # International Date Line West
       "nt   -1100 ".  # Nome
       "hst  -1000 ".  # Hawaii Standard
@@ -2194,8 +2322,13 @@ sub Date_Init {
     ($Date::Manip::ZoneExp,%Date::Manip::Zone)=
       &Date_Regexp("$zonesrfc $zones","sort,lc,under,back,opt,PRE,POST",
                    "keys");
-    # In order to handle "US/Eastern", quote "/" characters.
-    $Date::Manip::ZoneExp =~ s|/|\/|g;
+    $tmp=
+      "US/Pacific  PST8PDT ".
+      "US/Mountain MST7MDT ".
+      "US/Central  CST6CDT ".
+      "US/Eastern  EST5EDT";
+    ($Date::Manip::CurrZoneExp,%Date::Manip::CurrZone)=
+      &Date_Regexp($tmp,"lc,under,back","keys");
     $Date::Manip::TZ=&Date_TimeZone;
 
     # Date::Manip:: misc. variables
@@ -2206,9 +2339,9 @@ sub Date_Init {
     #    $Past   : "(?:ago)"
     #    $Next   : "(?:next)"
     #    $Prev   : "(?:last|previous)"
-    $Date::Manip::At    =&Date_Regexp($at,"lc,under,pre,post");
+    $Date::Manip::At    =&Date_Regexp($at,"lc,under,pre,post,optws");
     $Date::Manip::In    =&Date_Regexp($in,"lc,under,pre,post");
-    $Date::Manip::On    =&Date_Regexp($on,"lc,under,pre,post");
+    $Date::Manip::On    =&Date_Regexp($on,"lc,under,pre,post,optws");
     $Date::Manip::Future=&Date_Regexp($future,"lc,under");
     $Date::Manip::Past  =&Date_Regexp($past,"lc,under");
     $Date::Manip::Next  =&Date_Regexp($next,"lc,under");
@@ -2393,6 +2526,10 @@ sub Date_PrevWorkDay {
 #   back     : the regular expression has a backreference
 #   opt      : the regular expression is optional and a "?" is appended in
 #              the first two forms
+#   optws    : the regular expression is optional and may be replaced by
+#              whitespace
+#   optWs    : the regular expression is optional, but if not present, must
+#              be replaced by whitespace
 #   sort     : the items in the list are sorted by length (longest first)
 #   lc       : the string is lowercased
 #   under    : any underscores are converted to spaces
@@ -2421,7 +2558,7 @@ sub Date_Regexp {
   $sort =1  if ($options =~ /sort/i);
   $lc   =1  if ($options =~ /lc/i);
   $under=1  if ($options =~ /under/i);
-  my($back,$opt,$pre,$post)=("?:","","","");
+  my($back,$opt,$pre,$post,$ws)=("?:","","","","");
   $back =""          if ($options =~ /back/i);
   $opt  ="?"         if ($options =~ /opt/i);
   $pre  ='\s*'       if ($options =~ /pre/);
@@ -2430,6 +2567,8 @@ sub Date_Regexp {
   $post ='\s*'       if ($options =~ /post/);
   $post ='\s+'       if ($options =~ /Post/);
   $post ='(?:$|\s+)' if ($options =~ /POST/);
+  $ws   ='\s*'       if ($options =~ /optws/);
+  $ws   ='\s+'       if ($options =~ /optws/);
 
   my($hash,$keys,$key0,$key1,$val0,$val1)=(0,0,0,0,0,0);
   $keys =1     if ($array =~ /keys/i);
@@ -2478,6 +2617,7 @@ sub Date_Regexp {
   $ret="($back" . join("|",@list) . ")";
   $ret="(?:$pre$ret$post)"  if ($pre or $post);
   $ret.=$opt;
+  $ret="(?:$ret|$ws)"  if ($ws);
 
   if ($array and $hash) {
     return ($ret,%hash);
@@ -2699,6 +2839,7 @@ sub CheckDate {
 sub DateCalc_DateDate {
   my($D1,$D2,$mode)=@_;
   my(@d_in_m)=(0,31,28,31,30,31,30,31,31,30,31,30,31);
+  $mode=0  if (! defined $mode);
 
   # Exact mode
   if ($mode==0) {
@@ -2808,14 +2949,12 @@ sub DateCalc_DateDate {
     }
 
   } else {
-    $d1=( &CheckDate($date1) )[2];
+    ($y1,$m1,$d1)=( &CheckDate($date1) )[0..2];
     $dd=0;
-    $ddd=0;
     # If we're jumping across months, set $d1 to the first of the next month
     # (or possibly the 0th of next month which is equivalent to the last day
     # of this month)
-    if ($d1>$d2) {
-      ($y1,$m1,$d1)=( &CheckDate($date1) )[0..2];
+    if ($m1!=$m2) {
       $d_in_m[2]=29  if (&Date_LeapYear($y1));
       $dd=$d_in_m[$m1]-$d1+1;
       $d1=1;
@@ -2828,6 +2967,7 @@ sub DateCalc_DateDate {
       $date1=$tmp;
     }
 
+    $ddd=0;
     if ($d1<$d2) {
       $ddd=$d2-$d1;
       $tmp=&DateCalc_DateDelta($date1,"+0:0:$ddd:0:0:0",\$err,0);
@@ -2873,6 +3013,7 @@ sub DateCalc_DateDate {
 sub DateCalc_DeltaDelta {
   my($D1,$D2,$mode)=@_;
   my(@delta1,@delta2,$i,$delta,@delta)=();
+  $mode=0  if (! defined $mode);
 
   @delta1=&CheckDelta($D1);
   @delta2=&CheckDelta($D2);
@@ -2891,6 +3032,7 @@ sub DateCalc_DateDelta {
   my($date)=();
   my(@d_in_m)=(0,31,28,31,30,31,30,31,31,30,31,30,31);
   my($h1,$m1,$h2,$m2,$len,$hh,$mm)=();
+  $mode=0  if (! defined $mode);
 
   if ($mode==2) {
     $h1=$Date::Manip::WDBh;
@@ -2912,11 +3054,11 @@ sub DateCalc_DateDelta {
   # do the month/year part
   $y+=$dy;
   &ModuloAddition(-12,$dm,\$m,\$y);   # -12 means 1-12 instead of 0-11
+  $d_in_m[2]=29  if (&Date_LeapYear($y));
 
   # in business mode, set the day to a work day at this point so the h/mn/s
   # stuff will work out
   if ($mode==2) {
-    $d_in_m[2]=29  if (&Date_LeapYear($y));
     $d=$d_in_m[$m] if ($d>$d_in_m[$m]);
     $date=&Date_NextWorkDay(&FormDate($y,$m,$d,$h,$mn,$s),0,1);
     ($y,$m,$d,$h,$mn,$s)=&CheckDate($date);
@@ -2956,6 +3098,13 @@ sub DateCalc_DateDelta {
   } else {
     &ModuloAddition(60,$dmn,\$mn,\$h);
     &ModuloAddition(24,$dh,\$h,\$d);
+  }
+
+  # If we have just gone past the last day of the month, we need to make
+  # up for this:
+  if ($d>$d_in_m[$m]) {
+    $dd+= $d-$d_in_m[$m];
+    $d=$d_in_m[$m];
   }
 
   # days
@@ -3322,7 +3471,17 @@ sub ExpandTilde {
   # ~aaa/bbb=      ~  aaa      /bbb
   if ($file =~ m% ^~ ([^\/]*) (\/.*)? %x) {
     ($user,$file)=($1,$2);
-    return ""  if ($^O =~ /MacOS/);   # MacPerl doesn't have getpwnam/getpwuid
+    # Single user operating systems (Mac, MSWindows) don't have the getpwnam
+    # and getpwuid routines defined.  Try to catch various different ways
+    # of knowing we are on one of these systems:
+    return ""  if (defined $^O and
+                   $^O =~ /MacOS/i ||
+                   $^O =~ /MSWin32/i ||
+                   $^O =~ /Windows_95/i);
+    return ""  if (defined $ENV{OS} and
+                   $ENV{OS} =~ /MacOS/i ||
+                   $ENV{OS} =~ /MSWin32/i ||
+                   $ENV{OS} =~ /Windows_95/i);
     $user=""  if (! defined $user);
     $file=""  if (! defined $file);
     if ($user) {
@@ -3510,7 +3669,7 @@ Date::Manip - date manipulation routines
 
  $version=&DateManipVersion
 
- $flag=&Date_IsWorkDay($date [,$time]);
+ $flag=&Date_IsWorkDay($date [,$flag]);
 
  $date=&Date_NextWorkDay($date,$off [,$time]);
  $date=&Date_PrevWorkDay($date,$off [,$time]);
@@ -3646,6 +3805,7 @@ if you can provide me the translation, I will fix DateManip.
 =head1 ROUTINES
 
 =over 4
+
 =item ParseDate
 
  $date=&ParseDate(\@args)
@@ -3673,9 +3833,10 @@ an am/pm type string, and a timezone.  For example:
      HH:MN:SS.SSSS am [Zone]
 
 Hours can be written using 1 or 2 digits when the time follows the date and
-is separated from the date with spaces or some other separator.  Any time a
-digit (that is part of the date) immediately precedes the hour, 2 digits
-MUST be included for the hours.
+is separated from the date with spaces or some other separator.  Any time
+there is no space separating the time from a date and the part of the
+date immediately preceding the hour is a digit, 2 digits must be used
+for the hours.
 
 Fractional seconds are also supported in parsing but the fractional part is
 discarded.
@@ -3750,7 +3911,7 @@ In addition, the following strings are recognized:
   yesterday (exactly 24 hours before now)
   tomorrow  (exactly 24 hours from now)
   noon      (12:00:00)
-  midnignt  (00:00:00)
+  midnight  (00:00:00)
 
  %       One of the valid date separators: - . / or whitespace (the same
          character must be used for all occurences of a single date)
@@ -3788,7 +3949,8 @@ A time is usually entered in 24 hour mode.  It can be followed by "am" or
 The year may be entered as 2 or 4 digits.  If entered as 2 digits, it is
 taken to be the year in the range CurrYear-89 to CurrYear+10.  So, if the
 current year is 1996, the range is [1907 to 2006] so entering the year 00
-refers to 2000, 05 to 2005, but 07 refers to 1907.
+refers to 2000, 05 to 2005, but 07 refers to 1907.  Use 4 digit years to
+avoid confusion!
 
 Any number of spaces or tabs can be used anyhere whitespace is appropriate.
 
@@ -4207,8 +4369,8 @@ in the following order:
 
    $ENV{TZ}
    $main::TZ
+   unix 'date' command
    /etc/TIMEZONE
-   date '+%Z'
 
 If it's not found in any of those places, an error occurs:
 
@@ -4279,9 +4441,9 @@ results.
 
 =item Date_IsWorkDay
 
-  $flag=&Date_IsWorkDay($date [,$time]);
+  $flag=&Date_IsWorkDay($date [,$flag]);
 
-This returns 1 if $date is a work day.  If $time is non-zero, the time is
+This returns 1 if $date is a work day.  If $flag is non-zero, the time is
 checked to see if it falls within work hours.
 
 =item Date_NextWorkDay
@@ -4310,6 +4472,7 @@ Similar to Date_NextWorkDay.
 Returns the version of Date::Manip.
 
 =back
+
 =head1 TIMEZONES
 
 The following timezone names are currently understood (and can be used in
@@ -4390,11 +4553,6 @@ and Paul Foley.
       NZT     +1200    New Zealand
       NZDT    +1300    New Zealand Daylight
 
-      US/Pacific  -0800
-      US/Mountain -0700
-      US/Central  -0600
-      US/Eastern  -0500
-
 Others can be added in the future upon request.
 
 DateManip needs to be able to determine the local timezone.  It can do this
@@ -4404,7 +4562,13 @@ In either case, the timezone can be of the form STD#DST (for example
 EST5EDT).  Both the standard and daylight savings time abbreviations must
 be in the table above in order for this to work.  Also, this form may NOT
 be used when parsing a date as there is no way to determine whether the
-date is in daylight saving time or not.
+date is in daylight saving time or not.  The following forms are also
+available and are treated similar to the STD#DST forms:
+
+      US/Pacific
+      US/Mountain
+      US/Central
+      US/Eastern
 
 =head1 BUSINESS MODE
 
@@ -4533,6 +4697,7 @@ All Date::Manip variables which can be used are described in the following
 section.
 
 =over 4
+
 =item IgnoreGlobalCnf
 
 If this variable is used (any value is ignored), the global config file
@@ -4641,8 +4806,9 @@ complete accordance with ISO 8601.
 =item WorkWeekBeg, WorkWeekEnd
 
 The first and last days of the work week.  By default, monday and friday.
-WorkWeekBeg must come before WorkWeekEnd (i.e. there is no way to handle
-an odd work week of Thu to Mon for example).
+WorkWeekBeg must come before WorkWeekEnd numerically.  The days are
+numbered from 0 (sunday) to 6 (saturday).  There is no way to handle an odd
+work week of Thu to Mon for example.
 
 =item WorkDay24Hr
 
@@ -4671,7 +4837,100 @@ variable to non-zero forces deltas to be stored with a sign in front of
 every element (including elements equal to 0).
 
 =back
+
+=head1 BACKWARDS INCOMPATIBILITIES
+
+For the most part, Date::Manip has remained backward compatible at every
+release.  There have been a few minor incompatibilities introduced at
+various stages.
+
+Version 5.07 introduced 2 minor incompatibilities.  In the UnixDate
+command, the "%s" format changed.  In version 5.06, "%s" returned the
+number of seconds since Jan 1, 1970 in the current timezone.  In 5.07,
+it returns the number of seconds since Jan 1, 1970 GMT.  The "%o" format
+was added to return what "%s" previously did.
+
+Also in 5.07, the format for the deltas returned by ParseDateDelta changed.
+Previously, each element of a delta had a sign attached to it
+(+1:+2:+3:+4:+5:+6).  The new format removes all unnecessary signs by
+default (+1:2:3:4:5:6).  Also, because of the way deltas are normalized
+(see documentation on ParseDateDelta), at most two signs are included.
+For backwards compatibility, the config variable DeltaSigns was added.  If
+set to 1, all deltas include all 6 signs.
+
+Finally, in 5.07 the format of the Date_Init calling arguments changed.  The
+old method
+
+  &Date_Init($language,$format,$tz,$convtz);
+
+is still supported, but this support will likely disappear in the future.
+Use the new calling format instead:
+
+  &Date_Init("var=val","var=val",...);
+
+One more important incompatibility is projected for ParseDate in the next
+major release of Date::Manip.  The next release will support full ISO 8601
+date formats including the format YY-MM-DD.  The current version of
+ParseDate supports the format MM-DD-YY, which is commonly used in the US,
+but is not part of any standard.  Unfortunately, there is no way to
+unambiguously look at a date of the format XX-XX-XX and determine whether
+it is YY-MM-DD or MM-DD-YY.  As a result, the MM-DD-YY format will no
+longer be supported in favor of the YY-MM-DD format.  The MM/DD/YY and
+MM-DD-YYYY formats WILL still be supported!
+
+=head1 COMMON PROBLEMS
+
+Perhaps the most common problem occurs when you get the error:
+
+   Error: Date::Manip unable to determine TimeZone.
+
+Date::Manip tries hard to determine the local timezone, but on some
+machines, it cannot do this (especially those without a unix date
+command... i.e. Microsoft Windows systems).  To fix this, just set the TZ
+variable, either at the top of the Manip.pm file, or in the DateManip.cnf
+file.  I suggest using the form "EST5EDT" so you don't have to change it
+every 6 months when going to or from daylight savings time.
+
 =head1 KNOWN PROBLEMS
+
+=over 4
+
+=item Daylight Savings Times
+
+Date::Manip does not handle daylight savings time, though it does handle
+timezones to a certain extent.  Converting from EST to PST works fine.
+Going from EST to PDT is unreliable.
+
+The following examples are run in the winter of the US East coast (i.e.
+in the EST timezone).
+
+	print UnixDate(ParseDate("6/1/97 noon"),"%u"),"\n";
+        => Sun Jun  1 12:00:00 EST 1997
+
+June 1 EST does not exist.  June 1st is during EDT.  It should print:
+
+        => Sun Jun  1 00:00:00 EDT 1997
+
+Even explicitely adding the timezone doesn't fix things (if anything, it
+makes them worse):
+
+	print UnixDate(ParseDate("6/1/97 noon EDT"),"%u"),"\n";
+        => Sun Jun  1 11:00:00 EST 1997
+
+Date::Manip converts everything to the current timezone (EST in this case).
+
+Related problems occur when trying to do date calculations over a timezone
+change.  These calculations may be off by an hour.
+
+Also, if you are running a script which uses Date::Manip over a period of
+time which starts in one time zone and ends in another (i.e. it switches
+form Daylight Savings Time to Standard Time or vice versa), many things may
+be wrong (especially elapsed time).
+
+I hope to fix these problems in the next release so that it would convert
+everything to the current zones (EST or EDT).
+
+=item Sorting Problems
 
 If you use Date::Manip to sort a number of dates, you must call Date_Init
 either explicitely, or by way of some other Date::Manip routine before it
@@ -4693,29 +4952,23 @@ is used in the sort.  For example, the following code fails:
 but if you uncomment the Date_Init line, it works.  The reason for this is
 that the first time you call Date_Init, it initializes a number of items
 used by Date::Manip.  Some of these are sorted.  It turns out that perl
-(5.003 and earlier, fixed in 5.003_07) does not like a sort within a sort.
-The solution is to either upgrade to perl 5.004 (when it comes out) or to
-do the initialization sorting ahead of time by calling Date_Init
-explicitely.
+(5.003 and earlier) has a bug in it which does not allow a sort within a
+sort.  The next version (5.004) may fix this.  For now, the best thing to
+do is to call Date_Init explicitely.  NOTE: This is an extremely
+inefficient way to sort data.  Instead, you should translate the dates to
+the Date::Manip internal format, sort them using a normal string
+comparison, and then convert them back to the format desired using
+UnixDate.
 
-Date::Manip has other sorting problems on an NT machine.  Again, 5.004 may
-fix this, but I can't be sure since I don't have access to an NT machine.
-If someone will confirm this one way or the other, I'd appreciate it.
-
-If you are running a script which uses Date::Manip over a period of time
-which starts in one time zone and ends in another (i.e. it switches form
-Daylight Savings Time to Standard Time or vice versa), many things may be
-wrong (especially elapsed time).  Since the most likely place for
-Date::Manip probably gets the current time zone is from an environment
-variable, you will have to reset this variable (by logging out or other
-means) and restart the script under the new environment before it is back
-to normal.
+=item RCS Control
 
 If you try to put Date::Manip under RCS control, you are going to have
 problems.  Apparently, RCS replaces strings of the form "$Date...$" with
 the current date.  This form occurs all over in Date::Manip.  Since very
 few people will ever have a desire to do this (and I don't use RCS), I have
 not worried about it.
+
+=back
 
 =head1 AUTHOR
 

@@ -10,7 +10,7 @@ if (defined $runtests) {
 }
 
 print "1..198\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=.:./t","IgnoreGlobalCnf=1");
+&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 ($currS,$currMN,$currH,$currD,$currM,$currY)=localtime(time);
 $currY+=1900;

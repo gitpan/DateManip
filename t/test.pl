@@ -84,13 +84,18 @@ sub test_Func {
       warn "Expected = $exp\n";
       warn "Got      = $ans\n";
       warn "========================\n";
-      warn "Test     = ",shift(@args),"\n";
-      while (@args) {
-        $test=shift(@args);
+      foreach $test (@args) {
         if (defined $test) {
-          warn "         = $test\n";
+          warn "Test     = $test\n";
         } else {
-          warn "         = nil\n";
+          warn "Test     = nil\n";
+        }
+      }
+      foreach $test (@extra) {
+        if (defined $test) {
+          warn "Extra    = $test\n";
+        } else {
+          warn "Extra    = nil\n";
         }
       }
       warn "Note     = $note\n"   if ($note);
@@ -100,6 +105,7 @@ sub test_Func {
       print "ok $t\n"  if (! defined $runtests or $runtests==0);
     }
   }
+  print "$t tests\n"  if (defined $runtests);
 }
 
 1;

@@ -1,8 +1,14 @@
 Before you install Date::Manip, check out the variables at the top of
-Date/Manip.pm.  If you are not in the United States, you may wish to
-change the default language (DefLang) or whether 01/02 means Jan 2 or
-Feb 1 (DefDateFormat).  Also, check to make sure that Date::Manip can
-correctly determine the time zone or set the TZ variable.
+Manip.pm.  You may want to modify some of the configuration variables.
+All variables are documented in the POD documentation included in the
+Manip.pm file.
+
+The $Date::Manip::TZ variable is perhaps the most important of these
+variables.  If you get the error:
+  ERROR: Date::Manip unable to determine TimeZone.
+Date::Manip was unable to automatically determine your timezone.  In
+this case, you will need to set the TZ variable appropriately.
+
 
 AUTOMATIC INSTALLATION
 
@@ -41,31 +47,25 @@ To test it, cd to the "t" directory and run the "runtests" command.
 
 TESTS
 
-If any of the tests fail... don't panic.  This is the first release with a
-test suite, and the tests themselves may have bugs in them.  Some of them
-may run correctly only in the EST timezone for example.  Some will fail if
-they are run on a very slow computer (it will compare two different times
-that were supposed to be the same but aren't because a measurable amount of
-time passed between determining the time in two different ways).  I will
-try to get any bugs out of the test suite quickly.
+At this point, the test suite should run on almost any architecture
+correctly.  A number of problems in the suite have been fixed since
+version 5.07 was released.
 
-There are a few things which will almost always cause problems.  If you
-modify any of the default options in Manip.pm before running tests, some
-tests will probably fail.  Also, if you modify the DateManip.cnf file,
-tests may fail.  To get around this, you should probably run the following
-sequence of commands using an UNMODIFIED version of Date::Manip.
+A few of the tests may fail.  Some will fail if they are run on a very slow
+computer (it will compare two different times that were supposed to be the
+same but aren't because a measurable amount of time passed between
+determining the time in two different ways).
 
-   perl Makefile.PL
-   make
-   make test
+Some of the tests may fail if they are run on either the first or last day
+of the month.  The test suite checks dates of the form "tomorrow".
+Unfortunately, there is no trivial way (that I could think of) to find
+tomorrows date using standard perl or Unix commands (which is one of the
+reasons you need this module).  So to get the value to compare
+Date::Manip's value with, I just add 1 to todays date (which returns Jan 32
+instead of Feb 1, for example).  So, the "tomorrow" tests fail on the last
+day of the month and the "yesterday" tests fail on the first day of the
+month.
 
-If all the tests pass, you're fine, so proceed with the installation.  Modify
-any defaults in Manip.pm you want and then type:
-
-   make
-   make install
-
-So, you build Date::Manip twice.  Once using an unmodified version which is
-used only to run the tests and a second time using any local modifications
-which you will then install.
-
+The tests may now be run regardless of the local timezone and regardless
+of whether the config variables at the top of the Manip.pm file have been
+modified.

@@ -4,20 +4,20 @@
 # See Date::Manip man page for a description of all config variables.
 
 # EraseHolidays		=
-# PersonalCnf		=
-# PersonalCnfPath	=
-# Language		=
-# DateFormat		=
-# TZ			=
+# PersonalCnf		= .DateManip.cnf
+# PersonalCnfPath	= .:~
+# Language		= English
+# DateFormat		= US
+# TZ			= EST
 # ConvTZ		=
-# Internal		=
-# FirstDay		=
-# WorkWeekBeg		=
-# WorkWeekEnd		=
-# WorkDay24Hr		=
-# WorkDayBeg		=
-# WorkDayEnd		=
-# DeltaSigns		=
+# Internal		= 0
+# FirstDay		= 0
+# WorkWeekBeg		= 1
+# WorkWeekEnd		= 5
+# WorkDay24Hr		= 0
+# WorkDayBeg		= 08:00
+# WorkDayEnd		= 17:00
+# DeltaSigns		= 0
 
 ################################
 # HOLIDAYS

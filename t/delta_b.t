@@ -10,7 +10,7 @@ if (defined $runtests) {
 }
 
 print "1..4\n"  if (! $runtests);
-&Date_Init("PersonalCnfPath=.:./t","IgnoreGlobalCnf=1");
+&Date_Init("PersonalCnfPath=./t:.","IgnoreGlobalCnf=1","TZ=EST");
 
 &Date_Init("DeltaSigns=1");
 
