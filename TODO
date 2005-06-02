@@ -2,6 +2,9 @@
 # MISC
 ########################################################################
 
+Fix Date_ConvTZ so that errors are handled for timezones too.  Also,
+add errlev flags to many functions.
+
 Specify a holiday of:
   1*12:0:31:0:0:0*FW1             = New Year's Day
   fails.  Fix it.  Alan Burlison <Alan.Burlison@sun.com>

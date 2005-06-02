@@ -22,7 +22,7 @@ $tests ="
    ~
    [
    2000020100:00:00
-   [ Winter Event1 ] 
+   [ Event1 Winter ] 
    ]
 
 2000-04-01
@@ -39,7 +39,7 @@ $tests ="
    2000040100:00:00
    [ Spring ]
    2000040112:00:00
-   [ Spring Event3 ]
+   [ Event3 Spring ]
    2000040113:00:00
    [ Spring ]
    ]
@@ -48,7 +48,7 @@ $tests ="
    ~
    [
    2000040112:30:00
-   [ Spring Event3 ]
+   [ Event3 Spring ]
    ]
 
 2000-04-01 13:30
@@ -67,7 +67,7 @@ $tests ="
    2000032200:00:00
    [ Spring ]
    2000040112:00:00
-   [ Spring Event3 ]
+   [ Event3 Spring ]
    2000040113:00:00
    [ Spring ]
    ]

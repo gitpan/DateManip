@@ -1,4 +1,4 @@
-# Copyright (c) 1995-2003 Sullivan Beck. All rights reserved.
+# Copyright (c) 1995-2005 Sullivan Beck. All rights reserved.
 # This program is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
@@ -9,6 +9,8 @@ Date::Manip - date manipulation routines
 =head1 SYNOPSIS
 
  use Date::Manip;
+
+ $version = DateManipVersion;
 
  $date = ParseDate(\@args);
  $date = ParseDate($string);
@@ -42,17 +44,23 @@ Date::Manip - date manipulation routines
  $date = Date_GetNext($date,$dow,$today,$hr,$min,$sec);
  $date = Date_GetNext($date,$dow,$today,$time);
 
- $version = DateManipVersion;
-
- $flag = Date_IsWorkDay($date [,$flag]);
-
- $date = Date_NextWorkDay($date,$off [,$time]);
- $date = Date_PrevWorkDay($date,$off [,$time]);
-
  $name = Date_IsHoliday($date);
 
  $listref = Events_List($date);
  $listref = Events_List($date0,$date1);
+
+ $date = Date_ConvTZ($date);
+ $date = Date_ConvTZ($date,$from);
+ $date = Date_ConvTZ($date,"",$to);
+ $date = Date_ConvTZ($date,$from,$to);
+
+ $flag = Date_IsWorkDay($date [,$flag]);
+
+ $date = Date_NextWorkDay($date,$off [,$time]);
+
+ $date = Date_PrevWorkDay($date,$off [,$time]);
+
+ $date = Date_NearestWorkDay($date [,$tomorrowfirst]);
 
  &Date_Init();
  &Date_Init("VAR=VAL","VAR=VAL",...);
@@ -62,32 +70,42 @@ Date::Manip - date manipulation routines
 The above routines all check to make sure that Date_Init is called.  If it
 hasn't been, they will call it automatically.  As a result, there is usually
 no need to call Date_Init explicitely unless you want to change some of the
-config variables (described below).
+config variables (described below).  They also do error checking on the
+input.
 
-The following routines are used by the above routines (though they can also
-be called directly).  $y may be entered as either a 2 or 4 digit year (it
-will be converted to a 4 digit year based on the variable YYtoYYYY
+The routines listed below are intended primarily for internal use by other
+Date::Manip routines.  They do little or no error checking, and do not
+explicitely call Date_Init.  Those functions are all done in the main
+Date::Manip routines above.
+
+Because they are significantly faster than the full Date::Manip routines,
+they are available for use with a few caveats.  Since little or no
+error checking is done, it is the responsibility of the programmer to
+ensure that valid data (AND valid dates) are passed to them.  Passing
+invalid data (such as a non-numeric month) or invalid dates (Feb 31)
+will fail in unpredictable ways (possibly returning erroneous results).
+Also, since Date_Init is not called by these, it must be called
+explicitely by the programmer before using these routines.
+
+In the following routines, $y may be entered as either a 2 or 4 digit year
+(it will be converted to a 4 digit year based on the variable YYtoYYYY
 described below).  Month and day should be numeric in all cases.  Most (if
 not all) of the information below can be gotten from UnixDate which is
 really the way I intended it to be gotten, but there are reasons to use
 these (these are significantly faster).
-
-***NOTE*** Unlike the routines listed above, the following routines do NOT
-explicitely call Date_Init.  You must make sure that Date_Init has been
-called, either by you explicitely, or by one of the above routines before you
-use these routines.
 
  $day = Date_DayOfWeek($m,$d,$y);
  $secs = Date_SecsSince1970($m,$d,$y,$h,$mn,$s);
  $secs = Date_SecsSince1970GMT($m,$d,$y,$h,$mn,$s);
  $days = Date_DaysSince1BC($m,$d,$y);
  $day = Date_DayOfYear($m,$d,$y);
+ ($y,$m,$d,$h,$mn,$s) = Date_NthDayOfYear($y,$n);
  $days = Date_DaysInYear($y);
+ $days = Date_DaysInMonth($m,$y);
  $wkno = Date_WeekOfYear($m,$d,$y,$first);
  $flag = Date_LeapYear($y);
  $day = Date_DaySuffix($d);
  $tz = Date_TimeZone();
- ($y,$m,$d,$h,$mn,$s) = Date_NthDayOfYear($y,$n);
 
 =head1 DESCRIPTION
 
@@ -162,7 +180,7 @@ they are identical at a granularity of days, then they only have to occur
 on the same day.  At a granularity of an hour, they have to occur within
 an hour of each other, etc.
 
-NOTE:  Support for this will be added in the future.
+NOTE:  Support for this does not exist, but may be added in the future.
 
 =item HOLIDAYS and EVENTS
 
@@ -287,18 +305,21 @@ date modules.  It's also the biggest and slowest.
 Since Date::Manip is written entirely in perl, and depends on no other
 module not in a standard perl distribution, Date::Manip has no dependancies
 to meet.  Other modules have dependancies on a C compiler or other perl
-modules.  Since it is fairly easy to satisfy these dependancies for
-anyone who is reasonably familiar with perl modules, this is not a
-huge advantage that Date::Manip has.
+modules.  Since it is fairly easy to satisfy these dependancies for anyone
+who is reasonably familiar with perl modules, this is not a huge advantage
+that Date::Manip has.
 
 On the other hand, simpler perl modules tend to be faster than Date::Manip,
 and modules written in C are significantly faster than their perl
 counterparts (at least if they're done right).  The TimeDate and
-Time-modules modules are written in perl, but are much simpler (and
-hence, faster) than Date::Manip.  The Date::Calc module is written in C
-and is a good module for doing many date calculations much faster than
-Date::Manip.  Between these three, most of your common date operations
-can be done.
+Time-modules modules are written in perl, but are much simpler (and hence,
+faster) than Date::Manip.  The Date::Calc module is written in C and is a
+good module for doing many date calculations much faster than Date::Manip.
+Between these three, most of your common date operations can be done.
+
+It should be noted that using the Memoize module in conjunction with
+Date::Manip can have a huge impact on it's performance, depending on the
+types of operations you do. Your mileage may vary though.
 
 Date::Manip is certainly the most powerful of the Date modules.  To the
 best of my knowledge, it will do everything that any other date module will
@@ -309,10 +330,10 @@ which can do _EVERY_ conceivable date/time manipulation that you'll run
 into in everyday life.
 
 Although I am working on making Date::Manip faster, it will never be as
-fast as other modules.  And before anyone asks, Date::Manip will never
-be translated to C (at least by me).  I write C because I have to.  I
-write perl because I like to.  Date::Manip is something I do because it
-interests me, not something I'm paid for.
+fast as other modules.  And before anyone asks, Date::Manip will never be
+translated to C (at least by me).  I write C because I have to.  I write
+perl because I like to.  Date::Manip is something I do because it interests
+me, not something I'm paid for.
 
 Date::Manip is also big.  The last time I looked, it's one of the largest
 CPAN modules there is.  If you ignore modules like Tk, LWP, etc. which are
@@ -453,6 +474,12 @@ Valid date formats include the ISO 8601 formats:
 In the above list, YYYY and YY signify 4 or 2 digit years, MM, DD, HH, MN, SS
 refer to two digit month, day, hour, minute, and second respectively.  F...
 refers to fractional seconds (any number of digits) which will be ignored.
+In all cases, the date and time parts may be separated by the letter "T"
+(but this is optional), so
+   2002-12-10-12:00:00
+   2002-12-10T12:00:00
+are identical.
+
 The last 4 formats can be explained by example:  1965-w02-2 refers to Tuesday
 (day 2) of the 2nd week of 1965.  1965-045 refers to the 45th day of 1965.
 
@@ -509,10 +536,12 @@ are not used, the date will either be unparsable or will get parsed
 incorrectly.
 
 Miscellaneous other allowed formats are:
-  which dofw in mmm in YY      "first sunday in june 1996 at 14:00" **
+  which dofw in mmm in YY      "first sunday in june
+                               1996 at 14:00" **
   dofw week num YY             "sunday week 22 1995" **
   which dofw YY                "22nd sunday at noon" **
-  dofw which week YY           "sunday 22nd week in 1996" **
+  dofw which week YY           "sunday 22nd week in
+                               1996" **
   next/last dofw               "next friday at noon"
   next/last week/month         "next month"
   in num days/weeks/months     "in 3 weeks at 12:00"
@@ -523,10 +552,13 @@ Miscellaneous other allowed formats are:
   dofw num week ago            "Friday 2 weeks ago"
   num week ago dofw            "2 weeks ago friday"
   last day in mmm in YY        "last day of October"
-  dofw                         "Friday" (Friday of current week)
-  Nth                          "12th", "1st" (day of current month)
-  epoch SECS                   seconds since the epoch (negative values
-                               are supported)
+  dofw                         "Friday" (Friday of
+                               current week)
+  Nth                          "12th", "1st" (day of
+                               current month)
+  epoch SECS                   seconds since the epoch
+                               (negative values are
+                               supported)
 
 ** Note that the formats "sunday week 22" and "22nd sunday" give very
 different bahaviors.  "sunday week 22" returns the sunday of the 22nd week
@@ -614,17 +646,19 @@ The format options are:
  Year
      %y     year                     - 00 to 99
      %Y     year                     - 0001 to 9999
-     %G     year                     - 0001 to 9999 (see below)
-     %L     year                     - 0001 to 9999 (see below)
+     %G     year, Sunday as first
+            day of week              - 0001 to 9999 (see below)
+     %L     year, Monday as first
+            day of week              - 0001 to 9999 (see below)
  Month, Week
      %m     month of year            - 01 to 12
      %f     month of year            - " 1" to "12"
      %b,%h  month abbreviation       - Jan to Dec
      %B     month name               - January to December
      %U     week of year, Sunday
-            as first day of week     - 01 to 53
+            as first day of week     - 01 to 53 (see below)
      %W     week of year, Monday
-            as first day of week     - 01 to 53
+            as first day of week     - 01 to 53 (see below)
  Day
      %j     day of the year          - 001 to 366
      %d     day of month             - 01 to 31
@@ -653,7 +687,9 @@ The format options are:
      %c     %a %b %e %H:%M:%S %Y     - Fri Apr 28 17:23:15 1995
      %C,%u  %a %b %e %H:%M:%S %z %Y  - Fri Apr 28 17:25:57 EDT 1995
      %g     %a, %d %b %Y %H:%M:%S %z - Fri, 28 Apr 1995 17:23:15 EDT
-     %D,%x  %m/%d/%y                 - 04/28/95
+     %D     %m/%d/%y                 - 04/28/95
+     %x     %m/%d/%y or %d/%m/%y     - 04/28/95 or 28/04/28
+                                       (Depends on DateFormat variable)
      %l     date in ls(1) format
               %b %e $H:$M            - Apr 28 17:23  (if within 6 months)
               %b %e  %Y              - Apr 28  1993  (otherwise)
@@ -664,6 +700,7 @@ The format options are:
      %Q     %Y%m%d                   - 19961025
      %q     %Y%m%d%H%M%S             - 19961025174058
      %P     %Y%m%d%H%M%S             - 1996102517:40:58
+     %O     %Y-%m-%dT%H:%M:%S        - 1996-10-25T17:40:58
      %F     %A, %B %e, %Y            - Sunday, January  1, 1996
      %J     %G-W%W-%w                - 1997-W02-2
      %K     %Y-%j                    - 1997-045
@@ -673,7 +710,7 @@ The format options are:
      %%     insert a `%' character
      %+     insert a `+' character
  The following formats are currently unused but may be used in the future:
-     NO 1234567890 !@#$^&*()_|-=\`[];',./~{}:<>?
+     N 1234567890 !@#$^&*()_|-=\`[];',./~{}:<>?
  They currently insert the character following the %, but may (and probably
  will) change in the future as new formats are added.
 
@@ -683,28 +720,39 @@ Note that the ls format (%l) applies to date within the past OR future 6
 months!
 
 The %U, %W, %L, and %G formats are used to support the ISO-8601 format:
-YYYY-wWW-D.  In this format, a date is written as a year, the week of
-the year, and the day of the week.  Technically, the week may be considered
-to start on any day of the week, but Sunday and Monday are the two most
-common choices, so both are supported.
+YYYY-wWW-D.  In this format, a date is written as a year, the week of the
+year, and the day of the week.  Technically, the week may be considered to
+start on any day of the week, but Sunday and Monday are the both common
+choices, so both are supported.
 
-The %U and %W formats return a week-of-year number from 01 to 53, and
-%L and %G return a 4-digit year corresponding to the week.  Most of the
-time, the %L and %G formats returns the same value as the %Y format,
-but there is a problem with days occuring in the first or last week of
-the year.
+The %W and %G formats return the week-of-year and the year treating weeks
+as starting on Monday.
 
-The ISO-8601 representation of Jan 1, 1993 written in the YYYY-wWWW-D
-format is actually 1992-W53-5.  In other words, Jan 1 is treates as being
-in the last week of the preceding year.  Depending on the year, days in
-the first week of a year may belong to the previous year, and days in the
-final week of a year may belong to the next year.
+The %U and %L formats return the week-of-year and the year treating weeks
+as starting on Sunday.
 
-The %L and %U formats contains the year and week-of-year values treating
-weeks as starting on Sunday.  The %G and %W formats are the year and
-week-of-year values treating weeks as starting on Monday.
+Most of the time, the %L and %G formats returns the same value as the %Y
+format, but there is a problem with days occuring in the first or last week
+of the year.
+
+The ISO-8601 representation of Jan 1, 1993 written in the YYYY-wWW-D format
+is actually 1992-W53-5.  In other words, Jan 1 is treates as being in the
+last week of the preceding year.  Depending on the year, days in the first
+week of a year may belong to the previous year, and days in the final week
+of a year may belong to the next year.  The week is assigned to the year
+which has most of the days.  For example, if the week starts on Sunday,
+then the last week of 2003 is 2003-12-28 to 2004-01-03.  This week is
+assigned to 2003 since 4 of the days in it are in 2003 and only 3 of them
+are in 2004.  The first week of 2004 starts on 2004-01-04.
+
+The %U and %W formats return a week-of-year number from 01 to 53.
 
 %J returns the full ISO-8601 format (%G-W%W-%w).
+
+The %s and %o formats return negative values if the date is before
+the start of the epoch.  Other unix utilities would return an error, or
+a zero, so if you are going to use Date::Manip in conjuction with these,
+be sure to check for a negative value.
 
 The formats used in this routine were originally based on date.pl (version
 3.2) by Terry McGonigal, as well as a couple taken from different versions
@@ -788,8 +836,8 @@ to extract information rather than parsing it yourself.
 
 =item Delta_Format
 
- @str = Delta_Format($delta,$dec,@format);
- $str = Delta_Format($delta,$dec,@format);
+ @str = Delta_Format($delta [,$mode], $dec,@format);
+ $str = Delta_Format($delta [,$mode], $dec,@format);
 
 This is similar to the UnixDate routine except that it extracts information
 from a delta.  Unlike the UnixDate routine, most of the formats are 2
@@ -808,22 +856,32 @@ Formats currently understood are:
 
    %%      : returns a "%"
 
-NOTE: Delta_Format only understands "exact" relationships, so for any delta
-that has a month component, there can be no mixing of the Y/M and
-W/D/H/MN/S segments.  In other words, the delta 1:6:1:1:1:1:1 has a month
-component, so asking for the total number of years (using the %yd format)
-will return 1.5 (which is what 1 year 6 months is).  For deltas which have
-NO month component, the relationship between years and days is known
-(365.25 is used) and all formats work as expected (except that formats with
-X equal to "M" are not allowed).
-
 So, the format "%hd" means the values of H, MN, and S expressed in hours.
-So for the delta "0:0:0:0:2:30:0", this format returns 2.5.  Similarly, the
-format "%yd" means the value (in years) of both the Y and M fields, or,
-if the month component is 0, it uses Y, W, D, H, MN, S.
+So for the delta "0:0:0:0:2:30:0", this format returns 2.5.
 
-The format "%hh" returns the value of W, D, and H expressed in hours if
-the month component is non-zero, or Y, W, D, H if the month component is 0.
+Delta_Format can operate in two modes: exact and approximate. The exact
+mode is done by default. Approximate mode can be done by passing in
+the string "approx" as the 2nd argument.
+
+In exact mode, Delta_Format only understands "exact" relationships. This
+means that there can be no mixing of the Y/M and W/D/H/MN/S segments
+because the relationship because, depending on when the delta occurs, there
+is no exact relation between the number of years or months and the number
+of days.
+
+The two sections are treated completely separate from each other. So,
+the delta "1:6:1:2:12:0:0" would return the following values:
+
+  %yt = 1.5 (1 year, 6 months)
+  %Mt = 18
+
+  %dt = 9.5 (1 week, 2 days, 12 hours)
+
+In approximate mode, the relationship of 1 year = 365.25 days is applied
+(with 1 month equal to 1/12 of a year exactly). So the delta
+"1:6:1:2:12:0:0" would return the following values:
+
+  %dt = 557.375 (1.5 years of 365.25 days + 9.5 days)
 
 If $dec is non-zero, the %Xd and %Xt values are formatted to contain $dec
 decimal places.
@@ -833,22 +891,166 @@ decimal places.
  $recur = ParseRecur($string [,$base,$date0,$date1,$flags]);
  @dates = ParseRecur($string [,$base,$date0,$date1,$flags]);
 
-A recurrence refers to a recurring event.  A fully specified recurrence
-requires (in most cases) 4 items: a recur description (describing the
-frequency of the event), a base date (a date when the event occurred and
-which other occurrences are based on), and a start and end date.  There may
-be one or more flags included which modify the behavior of the recur
-description.  The fully specified recurrence is written as:
+A recurrence refers to a recurring event, and more specifically, an event
+which occurs on a regular basis.  A fully specified recurring event
+may requires up to four pieces of information.
 
-  recur*flags*base*date0*date1
+First, it requires a decription of the frequency of the event.  Examples
+include "the first of every month", "every other day", "the 4th
+Thursday of each month at 2:00 PM", and "every 2 hours and 30 minutes".
+
+Second, it may require a base date to work from.  This piece of information
+is not required for every type of recurrence.  For example, if the
+frequency is "the first of every month", no base date is required.  All the
+information about when the event occurs is included in the frequency
+description.  If the frequency were "every other day" though, you need to
+know at least one day on which the event occured.
+
+Third, the recurring event may have a range (a starting and ending date).
+
+Fourth, there may be some flags included which modify the behavior of the
+above information.
+
+The fully specified recurrence is written as these 5 pieces of information
+(both a start and end date) as an asterix separated list:
+
+  freq*flags*base*date0*date1
 
 Here, base, date0, and date1 are any strings (which must not contain any
 asterixes) which can be parsed by ParseDate.  flags is a comma separated
-list of flags (described below), and recur is a string describing a
-recurring event.
+list of flags (described below), and freq is a string describing the
+frequency of the recurring event.
 
-If called in scalar context, it returns a string containing a fully
-specified recurrence (or as much of it as can be determined with
+The syntax of the frequency description is a colon separated list of the
+format Y:M:W:D:H:MN:S (which stand for year, month, week, etc.).  One (and
+only one) of the colons may optionally be replaced by an asterisk, or an
+asterisk may be prepended to the string.  For example, the following are
+all valid frequency descriptions:
+
+  1:2:3:4:5:6:7
+  1:2*3:4:5:6:7
+ *1:2:3:4:5:6:7
+
+But the following are NOT valid because they contain 2 or more asterixes:
+
+  1:2*3:4:5*6:7
+  1*2*3:4:5*6:7
+ *1:2:3:4:5:6*7
+
+If an asterix is included, values to the left of it refer to the number of
+times that time interval occurs between recurring events.  For example,
+if the first part of the recurrence is:
+
+  1:2*
+
+this says that the recurring event occurs approximately every 1 year and 2
+months.  I say approximately, because elements to the right of the asterix,
+as well as any flags included in the recurrence will affect when the actual
+events occur.
+
+If no asterixes are included, then the entire recurrence is of this form.
+For example,
+
+  0:0:0:1:12:0:0
+
+refers to an event that occurs every 1 day, 12 hours.
+
+Values that occur after an asterix refer to a specific value for that type
+of time element (i.e. exactly as it would appear on a calendar or a clock).
+For example, if the recurrence ends with:
+
+  *12:0:0
+
+then the recurring event occurs at 12:00:00 (noon).
+
+For example:
+
+  0:0:2:1:0:0:0        every 2 weeks and 1 day
+  0:0:0:0:5:30:0       every 5 hours and 30 minutes
+  0:0:0:2*12:30:0      every 2 days at 12:30 (each day)
+
+Values to the right of the asterix can be listed a single values, ranges
+(2 numbers separated by a dash "-"), or a comma separated list of values
+or ranges.  In most cases, negative values are appropriate for the week
+or day values. -1 stands for the last possible value, -2 for the second
+to the last, etc.
+
+Some examples are:
+
+  0:0:0:1*2,4,6:0:0    every day at at 2:00, 4:00, and 6:00
+  0:0:0:2*12-13:0,30:0 every other day at 12:00, 12:30, 13:00,
+                       and 13:30
+  0:1:0*-1:0:0:0       the last day of every month
+  *1990-1995:12:0:1:0:0:0
+                       Dec 1 in 1990 through 1995
+
+When the day element occurs to the right of the asterix, it can take on
+multiple meanings, depending on the value of the month and week elements.
+It can refer to the day of the week, day of the month, or day of the year.
+Similarily, if the week element occurs to the right of the asterix, it
+actually refers to the n'th time a certain day of the week occurs, either
+in the month or in the year.
+
+If the week element is non-zero and the day element is non-zero, it refers
+to the day of the week.  It can be any value from 1 to 7 (negative values
+-1 to -7 are also allowed). If you use the ISO 8601 convention, the first
+day of the week is Monday (though Date::Manip can use any day as the start
+of the week by setting the FirstDay config variable).  So, assuming that
+you are using the ISO 8601 convention, the following examples illustrate
+day-of-week recurrences:
+
+  0:1*4:2:0:0:0        4th Tuesday (day 2) of every month
+  0:1*-1:2:0:0:0       last tuesday of every month
+  0:0:3*2:0:0:0        every 3rd tuesday (every 3 weeks on 2nd day of week)
+  1:0*12:2:0:0:0       the 12th tuesday of each year
+
+If the week element is non-zero, and the day element is zero, the day
+defaults to 1 (i.e. the first day of the week).
+
+  0:1*2:0:0:0:0        the 2nd occurence of FirstDay
+                       in the year (typically Monday)
+  0:1*2:1:0:0:0        the same
+
+If the week element is zero and the month element is non-zero, the day
+value is the day of the month (it can be from 1 to 31 or -1 to -31 counting
+from the end of the month). If a value of 0 is given, it defaults to 1.
+
+  3*1:0:2:12:0:0       every 3 years on Jan 2 at noon
+  0:1*0:2:12,14:0:0    2nd of every month at 12:00 and 14:00
+  0:1:0*-2:0:0:0       2nd to last day of every month
+
+If the day given refers to the 29th, 30th, or 31st, in a month
+that does not have that number of days, it is ignored. For example,
+if you ask for the 31st of every month, it will return dates in Jan,
+Mar, May, Jul, etc.  Months with fewer than 31 days will be ignored.
+
+If both the month and week elements are zero, and the year element
+is non-zero, the day value is the day of the year (1 to 365 or 366 -- or
+the negative numbers to count backwards from the end of the year).
+
+  1:0:0*45:0:0:0       45th day of every year
+
+Specifying a day that doesn't occur in that year silently ignores that
+year. The only result of this is that specifying +366 or -366 will ignore
+all years except leap years.
+
+There is no way to express the following with a single recurrence:
+
+  every day at 12:30 and 1:00
+
+You have to use two recurrences to do this.
+
+I realize that this looks a bit cryptic, but after a discussion on the
+CALENDAR mailing list, it appeared like there was no concise, flexible
+notation for handling recurring events.  ISO 8601 notations were very bulky
+and lacked the flexibility I wanted.  As a result, I developed this
+notation (based on crontab formats, but with much more flexibility) which
+fits in well with this module. Even better, it is able to express every
+type of recurring event I could think of that is used in common life in
+(what I believe to be) a very concise and elegant way.
+
+If ParseRecur is called in scalar context, it returns a string containing a
+fully specified recurrence (or as much of it as can be determined with
 unspecified fields left blank).  In list context, it returns a list of all
 dates referred to by a recurrence if enough information is given in the
 recurrence.  All dates returned are in the range:
@@ -858,79 +1060,19 @@ recurrence.  All dates returned are in the range:
 The argument $string can contain any of the parts of a full recurrence.
 For example:
 
-  recur
-  recur*flags
-  recur**base*date0*date1
+  freq
+  freq*flags
+  freq**base*date0*date1
 
-The only part which is required is the recur description.  Any values
+The only part which is required is the frequency description.  Any values
 contained in $string are overridden or modified by values passed in as
 parameters to ParseRecur.
-
-A recur description is a string of the format Y:M:W:D:H:MN:S .  Exactly one
-of the colons may optionally be replaced by an asterisk, or an asterisk may
-be prepended to the string.
-
-Any value "N" to the left of the asterisk refers to the "Nth" one.  Any
-value to the right of the asterisk refers to a value as it appears on a
-calendar/clock.  Values to the right can be listed a single values, ranges
-(2 numbers separated by a dash "-"), or a comma separated list of values
-or ranges.  In a few cases, negative values are appropriate.
-
-This is best illustrated by example.
-
-  0:0:2:1:0:0:0        every 2 weeks and 1 day
-  0:0:0:0:5:30:0       every 5 hours and 30 minutes
-  0:0:0:2*12:30:0      every 2 days at 12:30 (each day)
-  3*1:0:2:12:0:0       every 3 years on Jan 2 at noon
-  0:1*0:2:12,14:0:0    2nd of every month at 12:00 and 14:00
-  1:0:0*45:0:0:0       45th day of every year
-  0:1*4:2:0:0:0        4th tuesday (day 2) of every month
-  0:1*-1:2:0:0:0       last tuesday of every month
-  0:1:0*-2:0:0:0       2nd to last day of every month
-  0:0:3*2:0:0:0        every 3rd tuesday (every 3 weeks on 2nd day of week)
-  1:0*12:2:0:0:0       tuesday of the 12th week of each year
-  *1990-1995:12:0:1:0:0:0
-                       Dec 1 in 1990 through 1995
-
-  0:1*2:0:0:0:0        the start of the 2nd week of every month (see Note 2)
-  1*1:2:0:0:0:0        the start of the 2nd week in January each year (Note 2)
-
-I realize that this looks a bit cryptic, but after a discussion on the
-CALENDAR mailing list, it looked like there was no concise, flexible
-notation for handling recurring events.  ISO 8601 notations were very bulky
-and lacked the flexibility I wanted.  As a result, I developed this
-notation (based on crontab formats, but with much more flexibility) which
-fits in well with this module, and which is able to express every type of
-recurring event I could think of.
 
 NOTE: If a recurrence has a date0 and date1 in it AND a date0 and date1
 are passed in to the function, both sets of criteria apply.  If flags are
 passed in, they override any flags in the recurrence UNLESS the flags
 passed in start with a plus (+) character in which case they are appended
 to the flags in the recurrence.
-
-NOTE: There is no way to express the following with a single recurrence:
-
-  every day at 12:30 and 1:00
-
-You have to use two recurrences to do this.
-
-NOTE: A recurrence specifying the week of a month is NOT clearly defined
-in common usage.  What is the 1st week in a month?  The behavior (with
-respect to this module) is well defined (using the FDn and FIn flags
-below), but in common usage, this is so ambiguous that this form should
-probably never be used.  It is included here solely for the sake of
-completeness.
-
-NOTE: Depending on whether M and W are 0 or nonzero, D means different
-things.  This is given in the following table.
-
-  M  W  D (when right of an asterisk) refers to
-  -  -  -------------------------------------------
-  0  0  day of year (1-366)
-  M  0  day of month (1-31)
-  0  W  day of week (1-7),  W refers to the week of year
-  M  W  the Wth (1-5 or -1 to -5) occurrence of Dth (1-7) day of week in month
 
 NOTE: Base dates are only used with some types of recurrences.  For example,
 
@@ -955,7 +1097,6 @@ necessary for the left part of a recurrence.  For example, the recurrence:
 
 would only use the year and month of the base date.
 
-
 There are a small handful of English strings which can be parsed in place
 of a numerical recur description.  These include:
 
@@ -973,14 +1114,6 @@ year with Jan 1 being the base date is the default if the year and month
 are missing).
 
 The following flags (case insensitive) are understood:
-
-  MWn   : n is 1-7.  The first week of the month is the week
-          which contains the first occurrence of day n (1=Monday).
-          MW2 means that the first week contains the first Tuesday
-          of the month.
-  MDn   : n is 1-7.  The first week of the month contains the
-          actual date (1st through 7th).  MD4 means that the first
-          week of the month contains the 4th of that month.
 
   PDn   : n is 1-7.  Means the previous day n not counting today
   PTn   : n is 1-7.  Means the previous day n counting today
@@ -1002,10 +1135,6 @@ The following flags (case insensitive) are understood:
 
   EASTER: select easter for this year (the M, W, D fields are ignored
           in the recur).
-
-NOTE: only one of MWn and MDn can be set.  If both are set, only the
-last one is used.  The default is MW7 (i.e. the first week contains
-the first Sunday).
 
 CWD, CWN, and CWP will usually return the same value, but if you are
 starting at the middle day of a 3-day weekend (for example), it will return
@@ -1055,8 +1184,8 @@ handled while keeping the same date.  Mar 31 plus one month is Apr 31 (but
 since Apr only has 30 days, it becomes Apr 30).  Apr 30 + 2 days is May 2.
 As a result, in the case where two dates are entered, the resulting delta
 can take on two different forms.  By default ($mode=0), an absolutely
-correct delta (ignoring daylight savings time) is returned in days, hours,
-minutes, and seconds.
+correct delta (ignoring daylight savings time) is returned in weeks, days,
+hours, minutes, and seconds.
 
 If $mode is 1, the math is done using an approximate mode where a delta is
 returned using years and months as well.  The year and month part is
@@ -1434,8 +1563,8 @@ See The TIMEZONES section below for more information.
 
  $date = Date_ConvTZ($date);
  $date = Date_ConvTZ($date,$from);
- $date = Date_ConvTZ($date,"",$to);
- $date = Date_ConvTZ($date,$from,$to);
+ $date = Date_ConvTZ($date,"",$to [,$errlev]);
+ $date = Date_ConvTZ($date,$from,$to [,$errlev]);
 
 This converts a date (which MUST be in the format returned by ParseDate)
 from one timezone to another.
@@ -1471,6 +1600,12 @@ you are in, do the following:
 
 Both timezones MUST be in one of the formats listed below in the section
 TIMEZONES.
+
+If an error occurs, $errlev determines what happens:
+
+  0   : the program dies
+  1   : a warning is produced and nothing is returned
+  2   : the function silently returns nothing
 
 =item Date_Init
 
@@ -1587,6 +1722,7 @@ Sharnoff, and Paul Foley (with several additions by myself).
       EST     -0500    Eastern Standard
       ACT     -0500    Brazil, Acre
       SAT     -0400    Chile
+      CLST    -0400    Chile Standard
       BOT     -0400    Bolivia
       EDT     -0400    Eastern Daylight
       AST     -0400    Atlantic Standard
@@ -1594,13 +1730,15 @@ Sharnoff, and Paul Foley (with several additions by myself).
       ACST    -0400    Brazil, Acre Daylight
      #NST     -0330    Newfoundland Standard       nst=North Sumatra    +0630
       NFT     -0330    Newfoundland
+      CLDT    -0300    Chile Daylight
      #GST     -0300    Greenland Standard          gst=Guam Standard    +1000
      #BST     -0300    Brazil Standard             bst=British Summer   +0100
-      BRST    -0300    Brazil Standard
+     #BRST    -0300    Brazil Standard
       BRT     -0300    Brazil Standard
       AMST    -0300    Brazil, Amazon Daylight
       ADT     -0300    Atlantic Daylight
       ART     -0300    Argentina
+      UYT     -0300    Uruguay
       NDT     -0230    Newfoundland Daylight
       AT      -0200    Azores
       BRST    -0200    Brazil Daylight (official time)
@@ -1642,6 +1780,7 @@ Sharnoff, and Paul Foley (with several additions by myself).
       NST     +0630    North Sumatra               nst=Newfoundland Std -0330
      #SST     +0700    South Sumatra, USSR Zone 6  sst=Swedish Summer   +0200
       JAVT    +0700    Java
+      ICT     +0700    Indo China Time
       CCT     +0800    China Coast, USSR Zone 7
       AWST    +0800    Australian Western Standard
       WST     +0800    West Australian Standard
@@ -1653,6 +1792,7 @@ Sharnoff, and Paul Foley (with several additions by myself).
       AEST    +1000    Australian Eastern Standard
       EAST    +1000    Eastern Australian Standard
       GST     +1000    Guam Standard, USSR Zone 9  gst=Greenland Std    -0300
+      CHST    +1000    Guam Standard, USSR Zone 9  gst=Greenland Std    -0300
       ACDT    +1030    Australian Central Daylight
       CADT    +1030    Central Australian Daylight
       AEDT    +1100    Australian Eastern Daylight
@@ -1731,7 +1871,7 @@ of treating 9:00 as ambiguous.
 So, in case the business date calculations ever produce results that you
 find confusing, I believe the solution is to write a wrapper which,
 whenever it sees a date with the time of exactly 9:00, it treats it
-specially (depending on what you want.
+specially (depending on what you want).
 
 So Saturday + 1 business day = Tuesday at 9:00 (which means anything
 from Monday 17:00 to Tuesday 9:00), but Monday at 9:01 + 1 business
@@ -2024,6 +2164,11 @@ to force the current date to be interpreted as this date.  Since the current
 date is used in parsing, this string will not be parsed and MUST be in the
 format given above.
 
+=item TodayIsMidnight
+
+If set to a true value (e.g. 1), then "today" will mean the same as
+"midnight today"; otherwise it will mean the same as "now".
+
 =back
 
 =head1 HOLIDAY SECTION
@@ -2082,7 +2227,7 @@ not be used in this case.
 In cases where you are interested in business type calculations, you'll
 want to define most holidays using recurrences, since they can define
 when a holiday is celebrated in the financial world.  For example,
-Christmas chould be defined as:
+Christmas should be defined as:
 
    1*12:0:24:0:0:0*FW1  = Christmas
 
@@ -2242,7 +2387,28 @@ various stages.  Major differences are marked with bullets.
 
 =over 4
 
+=item VERSION 5.44
+
+=over 4
+
+=item * Recurrences revisited
+
+The behavior of some elements of recurrences changed. These included
+making the week element (N) refer to the Nth occurence of a day of the
+week in the week, month, or year. It is now possible to look at the
+3rd Friday of every month for example.
+
+=item Changed %x format in UnixDate
+
+The %x format used to be equivalent to %D (%m/%d/%y), but it has
+been modified to use the DateFormat config varible, so it may return
+%d/%m/%y if a non-US DateFormat is specified.
+
+=back
+
 =item VERSION 5.41
+
+=over 4
 
 =item Changed path separator for VMS
 
@@ -2254,11 +2420,17 @@ the path separator.  It has been changed to a newline ("\n") character.
 The entire delta is exact if no month component is present (previously,
 no year or month component could be present).
 
+=back
+
 =item VERSION 5.38
+
+=over 4
 
 =item Removed Date_DaysSince999
 
 The Date_DaysSince999 function (deprecated in 5.35) has been removed.
+
+=back
 
 =item VERSION 5.35
 
@@ -2557,10 +2729,24 @@ this should be fixed, but for now, the best thing to do is to call Date_Init
 explicitly.  The bug exists in all versions up to 5.005 (I haven't
 tested 5.6.0 yet).
 
-NOTE: This is an EXTREMELY inefficient way to sort data.  Instead, you
-should parse the dates with ParseDate, sort them using a normal string
-comparison, and then convert them back to the format desired using
-UnixDate.
+NOTE: This is an EXTREMELY inefficient way to sort data (but read the 2nd
+note below for an easy way to correct this).  Instead, you should parse the
+dates with ParseDate, sort them using a normal string comparison, and then
+convert them back to the format desired using UnixDate.
+
+2nd NOTE: It has been reported to me that you can still use ParseDate
+to sort dates in this way, and be quite efficient through the use of
+Memoize.  Just add the following lines to your code:
+
+   use Date::Manip;
+   use Memoize;
+   memoize('ParseDate');
+   ...
+   @i=sort sortDate @dates;
+
+Since sortDate would call ParseDate with the same data over and over,
+this is a perfect application for the Memoize module.  So, sorting with
+ParseDate is no longer slow for sorting.
 
 =item RCS Control
 

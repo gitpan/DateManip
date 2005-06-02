@@ -1,4 +1,4 @@
-Copyright (c) 1995-2003 Sullivan Beck. All rights reserved.
+Copyright (c) 1995-2005 Sullivan Beck. All rights reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
@@ -26,19 +26,15 @@ don't, the internal format for both will change, so the above routines
 should be used.
 
 
-Notes for version 5.42:
-   Mainly a bug fix release.
-   Added Russian, Dutch, Turkish translations.
-   Modified Delta_Format to treat the entire delta as exact if no month
-      component is present.
-   ***Fixed the problem of malformed UTF-8 character warnings.
+Notes for version 5.44:
+   Severl bug fixes.
+   ***Redid much of the recurrence code (read the man page for some
+     important changes in how the week/day components are used).
+   Added "approx" mode to Delta_Format.
+   New language: Catalan
+   Events_List events and dates are now sorted.
 
   ############################################################################
-  If you would like to stay informed about future versions of this module,
-  and especially if you are interested in beta testing future versions,
-  please let me know by email at:
-    sbeck@cpan.org
-
   The newest version (which should be considered a beta version) is available
   through my home page:
     http://www.cise.ufl.edu/~sbeck/

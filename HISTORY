@@ -618,11 +618,11 @@ Version 5.39  2000-06-27
 
 Version 5.40  2001-06-07
    Added an example.  Philip Jones <phil@lynxafrica.demon.co.uk>
-   Fixed a warning.  Edward Avis <epa98@doc.ic.ac.uk>
+   Fixed a warning.  Edward Avis <ed@membled.com>
    Fixed a bug where the date wasn't rolling over when parsing dates
       containing only times.  James L. Gordon <jlgordon@vanion.com>
    Fixed a bug where some times were defaulting to the current time
-      instead of 00:00:00.  Edward Avis <epa98@doc.ic.ac.uk>
+      instead of 00:00:00.  Edward Avis <ed@membled.com>
    Added `date +%Z` support in Date_TimeZone.  Mike Bristow
       <mike@urgle.com>
    Added support for negative values is "epoch SECS" type dates.
@@ -649,7 +649,7 @@ Version 5.40  2001-06-07
       back in to Date_Init.  James Elson <James@citria.com>
    Fixed a typo in the docs.  Zhen Liu <zhen_hua_liu2@yahoo.com>
 
-Version 5.41  2003-06-30
+Version 5.41  DEVELOPMENT
    Added runtests.bat contributed by Lon Amick <lon.g.amick@mail.sprint.com>
    Added JAVT timezone.  David Coppit <david@coppit.org>
    Fixed bug where -HH:MM and +HH:MM were not being accepted as valid
@@ -714,6 +714,59 @@ Version 5.42  2003-07-02
 Version 5.42a 2003-07-03
    A quick fix to replace a faulty test.
 
+Version 5.43  DEVELOPMENT
+   Fixed German translations.  Oliver Scheit <oscheit@quoka.com>
+   Minor doc fix.  Reuben Thomas <rrt@mupsych.org>
+   Fixed a bug is ParseRecur where values passed in were no overriding
+      old values in the recurrence.  Scott Barker <scott@mostlylinux.ca>
+      (reported to the Debian bugs list).
+   Added TodayIsMidnight.  Reuben Thomas <rrt@sc3d.org>
+   Clarified docs on %W/%G/%U/%L formats.  Joel Savignon <js@neosystem.com>
+   Fix for a potential problem in the "0000" timezone.  Ed Avis
+      <ed@membled.com>
+   Documentation fixes.  Ed Avis <ed@membled.com>
+   Changed taint check to be the one in persec(1).  Max Kalika <max@gentoo.org>
+   Minor fix so DateInit("VAR=") will work.  Thomas Bohme
+      <t.boehme@mc-wetter.de>
+   Minor corrections to Italian.  Nicola Pedrozzi <nikita@swissgalaxy.ch>
+   Fixed a problem with single character military timezones (T and W)
+      conflicting with ISO 8601 T and W dates.  Hugo Cornelis
+      <hugo_cornelis@yahoo.com>
+   Added "approx" mode to Delta_Format and reversed change to default
+      Delta_Format behavior to the one from version 5.40.  Based on
+      discussion with Adam Spiers <adam@spiers.net>.
+   Fixed a bug where business mode was kept operative even after the
+      calculation was over.  Emiliano Bruni <bruni@micso.com>
+   Minor change to run under cygwin.  Niel Markwick <nielm@bigfoot.com>
+   Minor documentation fix.  Thomas Winzig <thomas@iatn.net>
+   Added timezones.  Michael Wood-Vasey <wmwood-vasey@cfa.harvard.edu>
+   Minor VMS fix.  Martin P.J. Zinser <zinser@zinser.no-ip.info>
+   Small fix to taint checking.  David Worenklein <worenkd@gcm.com>
+   Small correction to Brazil timezones.  John McDonald <mcdonald@airtalk.com>
+   Added a timezone.  Don Robertson <don@robertson.net.nz>
+   Fixed a problem where deltas were getting misinterpreted as dates.
+      Harry Zhu <harry@greatlodge.com>
+   Added a timezone.  Michael D. Setzer II <mikes@kuentos.guam.net>
+   Fixed a bug in ParseRecur where "last day of every March" couldn't
+      be done.  Andras Karacsony <AKaracsony@infobal.com>
+   ***Revamped the recurrences. Y-0-WOY-DOW now refers to the WOY'th
+      occurence of DOW instead of the ISO 8601 date Y-W(WOY)-DOY. Also,
+      changed Y-0-WOY-0 to refer to the WOY'th occurence of FirstDay,
+      and got rid of the MW and MD flags. Many other similar changes.
+   Fixed a bug in business mode calculations.  Tracy L Sanders
+      <Tracy.L.Sanders@mail.sprint.com>
+   Added timezone.  Andres Tarallo <tarallo@ort.edu.uy>
+   Added the language Catalan.  Xavi Drudis <xdrudis@iiia.csic.es>
+   Modified %x UnixDate format to use DateFormat config variable.
+      Matt Lyons <mlyons@internode.com.au>
+   Added %O UnixDate format.  Martin Thurn <mthurn@verizon.net>
+   Sorted all events and dates returned by Events_List.  This fixes
+      problems with tests on some versions of perl.  Tulan
+      <twh@library.ho.lucent.com>
+
+Version 5.44 2005-06-02
+   Released
+
 #########################################################################
 # Backwards incompatibilities
 #########################################################################
@@ -770,3 +823,11 @@ Version 5.41
    For VMS, changed the path separator to "\n" since ":" is a part of some
      paths.
    Changed the behavior of Delta_Format slightly.
+
+Version 5.43
+   Changed default behavior of Delta_Format back.
+   ***Revamped the recurrences. Y-0-WOY-DOW now refers to the WOY'th
+      occurence of DOW instead of the ISO 8601 date Y-W(WOY)-DOY. Also,
+      changed Y-0-WOY-0 to refer to the WOY'th occurence of FirstDay,
+      and got rid of the MW and MD flags. Many other similar changes.
+   Changed behavior of %x format in UnixDate.

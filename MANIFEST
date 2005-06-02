@@ -26,6 +26,8 @@ t/date_misc_a.t
 t/date_misc_b.t
 t/date_romanian.t
 t/date_russian.t
+t/date_today_0.t
+t/date_today_1.t
 t/delta_a.t
 t/delta_b.t
 t/delta_delta_0.t
@@ -44,6 +46,4 @@ t/runtests
 t/runtests.bat
 t/settime.t
 t/test.pl
-t/testrun.log
-t/testrun.sum
 t/unixdate.t
